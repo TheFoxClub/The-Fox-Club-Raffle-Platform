@@ -1,8 +1,11 @@
+import FeaturedSection from "./FeaturedSection"
 
 
 const Home = () => {
   return (
-    <div>Home</div>
+    <div>
+      <FeaturedSection/>
+    </div>
   )
 }
 

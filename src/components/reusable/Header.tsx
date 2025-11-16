@@ -27,9 +27,9 @@ export const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
-            <img 
-              src={logoWhite} 
-              alt="The Fox Club" 
+            <img
+              src={logoWhite}
+              alt="The Fox Club"
               className="h-10 w-10 transition-transform group-hover:scale-110"
             />
             <div>
@@ -40,28 +40,25 @@ export const Header = () => {
 
           <div className="hidden md:flex items-center gap-2">
             <Link to="/">
-              <Button 
+              <Button
                 variant={isActive("/") ? "default" : "ghost"}
-                className="gap-2"
-              >
+                className="gap-2">
                 <Trophy className="h-4 w-4" />
                 Raffles
               </Button>
             </Link>
             <Link to="/leaderboard">
-              <Button 
+              <Button
                 variant={isActive("/leaderboard") ? "default" : "ghost"}
-                className="gap-2"
-              >
+                className="gap-2">
                 <Trophy className="h-4 w-4" />
                 Leaderboard
               </Button>
             </Link>
             <Link to="/profile">
-              <Button 
+              <Button
                 variant={isActive("/profile") ? "default" : "ghost"}
-                className="gap-2"
-              >
+                className="gap-2">
                 <User className="h-4 w-4" />
                 Profile
               </Button>
@@ -77,10 +74,9 @@ export const Header = () => {
                 </Button>
               </Link>
             )}
-            <Button 
+            <Button
               onClick={handleWalletConnect}
-              className="gap-2 gradient-primary glow-primary"
-            >
+              className="gap-2 gradient-primary glow-primary">
               <Wallet className="h-4 w-4" />
               <span className="hidden sm:inline">
                 {isWalletConnected ? walletAddress : "Connect Wallet"}
@@ -92,31 +88,28 @@ export const Header = () => {
         {/* Mobile Header */}
         <div className="flex md:hidden items-center gap-2 mt-4">
           <Link to="/" className="flex-1">
-            <Button 
+            <Button
               variant={isActive("/") ? "default" : "ghost"}
               className="w-full gap-2"
-              size="sm"
-            >
+              size="sm">
               <Trophy className="h-4 w-4" />
               Raffles
             </Button>
           </Link>
           <Link to="/leaderboard" className="flex-1">
-            <Button 
+            <Button
               variant={isActive("/leaderboard") ? "default" : "ghost"}
               className="w-full gap-2"
-              size="sm"
-            >
+              size="sm">
               <Trophy className="h-4 w-4" />
               Leaders
             </Button>
           </Link>
           <Link to="/profile" className="flex-1">
-            <Button 
+            <Button
               variant={isActive("/profile") ? "default" : "ghost"}
               className="w-full gap-2"
-              size="sm"
-            >
+              size="sm">
               <User className="h-4 w-4" />
               Profile
             </Button>
