@@ -5,11 +5,24 @@ import Leaderboard from "./views/leaderboard/Leaderboard";
 import Profile from "./views/profile/Profile";
 import CreateRaffle from "./views/raffle/CreateRaffle";
 import RaffleView from "./views/raffle/RaffleView";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function App() {
   return (
     <Router>
       <Layout>
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+        />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/leaderboard" element={<Leaderboard />} />

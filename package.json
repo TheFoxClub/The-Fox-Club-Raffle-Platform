@@ -13,6 +13,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
+    "@solana/web3.js": "^1.98.4",
     "@tailwindcss/vite": "^4.1.17",
     "class-variance-authority": "^0.7.1",
     "dotenv": "^17.2.3",
@@ -22,6 +24,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6",
+    "react-toastify": "^11.0.5",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.17"
   },
