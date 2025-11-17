@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import Button from "../ui/Button";
 import { Wallet, Trophy, PlusCircle, User } from "lucide-react";
-import logoWhite from "../../../public/vite.svg";
+// import logoWhite from "../../../public/vite.svg";
+import logo from "../../assets/foxclub_logo.png"; // adjust the path if needed
 import { useState } from "react";
 
 export const Header = () => {
@@ -23,12 +24,12 @@ export const Header = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 glass-card border-b border-border/50">
+    <nav className="sticky top-0 z-50 glass-card border-b border-border/50 w-full">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
             <img
-              src={logoWhite}
+              src={logo}
               alt="The Fox Club"
               className="h-10 w-10 transition-transform group-hover:scale-110"
             />
@@ -42,7 +43,8 @@ export const Header = () => {
             <Link to="/">
               <Button
                 variant={isActive("/") ? "default" : "ghost"}
-                className="gap-2">
+                className="gap-2"
+              >
                 <Trophy className="h-4 w-4" />
                 Raffles
               </Button>
@@ -50,7 +52,8 @@ export const Header = () => {
             <Link to="/leaderboard">
               <Button
                 variant={isActive("/leaderboard") ? "default" : "ghost"}
-                className="gap-2">
+                className="gap-2"
+              >
                 <Trophy className="h-4 w-4" />
                 Leaderboard
               </Button>
@@ -58,7 +61,8 @@ export const Header = () => {
             <Link to="/profile">
               <Button
                 variant={isActive("/profile") ? "default" : "ghost"}
-                className="gap-2">
+                className="gap-2"
+              >
                 <User className="h-4 w-4" />
                 Profile
               </Button>
@@ -76,7 +80,8 @@ export const Header = () => {
             )}
             <Button
               onClick={handleWalletConnect}
-              className="gap-2 gradient-primary glow-primary">
+              className="gap-2 gradient-primary glow-primary"
+            >
               <Wallet className="h-4 w-4" />
               <span className="hidden sm:inline">
                 {isWalletConnected ? walletAddress : "Connect Wallet"}
@@ -91,7 +96,8 @@ export const Header = () => {
             <Button
               variant={isActive("/") ? "default" : "ghost"}
               className="w-full gap-2"
-              size="sm">
+              size="sm"
+            >
               <Trophy className="h-4 w-4" />
               Raffles
             </Button>
@@ -100,7 +106,8 @@ export const Header = () => {
             <Button
               variant={isActive("/leaderboard") ? "default" : "ghost"}
               className="w-full gap-2"
-              size="sm">
+              size="sm"
+            >
               <Trophy className="h-4 w-4" />
               Leaders
             </Button>
@@ -109,7 +116,8 @@ export const Header = () => {
             <Button
               variant={isActive("/profile") ? "default" : "ghost"}
               className="w-full gap-2"
-              size="sm">
+              size="sm"
+            >
               <User className="h-4 w-4" />
               Profile
             </Button>

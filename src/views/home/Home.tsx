@@ -1,10 +1,17 @@
 import FeaturedSection from "./FeaturedSection";
+import HeroSection from "./HeroSection";
 import { toast } from "react-toastify";
 
 const Home = () => {
   const notifySuccess = () => toast.success("Welcome to the raffle!");
   const notifyError = () => toast.error("Something went wrong.");
-  
+
+  return (
+    <div>
+      <HeroSection />
+    </div>
+  );
+
   return (
     <div>
       <FeaturedSection />
