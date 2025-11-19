@@ -1,4 +1,4 @@
-import FeaturedSection from "./FeaturedSection";
+import RaffleCarousel from "./RaffleCarousel";
 import HeroSection from "./HeroSection";
 import { toast } from "react-toastify";
 
@@ -9,18 +9,14 @@ const Home = () => {
   return (
     <div>
       <HeroSection />
-    </div>
-  );
-
-  return (
-    <div>
-      <FeaturedSection />
-      <div style={{ marginTop: 12 }}>
+      <div>
         <button onClick={notifySuccess}>Show success toast</button>
         <button onClick={notifyError} style={{ marginLeft: 8 }}>
           Show error toast
         </button>
       </div>
+
+      <RaffleCarousel />
     </div>
   );
 };
