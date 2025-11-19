@@ -1,5 +1,6 @@
-import RaffleCarousel from "./RaffleCarousel";
 import HeroSection from "./HeroSection";
+import RaffleCarousel from "./RaffleCarousel";
+import { RaffleGrid } from "./RaffleGrid";
 import { toast } from "react-toastify";
 
 const Home = () => {
@@ -17,6 +18,10 @@ const Home = () => {
       </div>
 
       <RaffleCarousel />
+
+      <div className="container mx-auto py-10">
+        <RaffleGrid />
+      </div>
     </div>
   );
 };

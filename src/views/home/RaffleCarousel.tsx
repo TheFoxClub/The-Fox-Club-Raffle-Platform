@@ -48,7 +48,7 @@ export default function RaffleCarousel() {
   const data = raffles[index];
 
   return (
-    <Card className="glass-card overflow-hidden glow-primary border-primary/30">
+    <Card className="glass-card overflow-hidden glow-primary border-primary">
       <div className="relative">
         <div className="grid md:grid-cols-2 gap-0">
           {/* Image */}
@@ -67,16 +67,20 @@ export default function RaffleCarousel() {
           </div>
 
           {/* Details */}
-          <div className="p-8 flex flex-col justify-center gap-8 relative">
+          <div className="p-8 flex flex-col justify-center space-y-6 relative">
             {/* Featured Raffle Badge */}
-            <div className="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
-              Featured Raffle
-            </div>
+            <div>
+              <div className="inline-flex items-center rounded-full px-2.5 py-0.5 mb-4 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
+                Featured Raffle
+              </div>
 
-            <h2 className="text-3xl font-bold mb-3 text-gradient">
-              {data.title}
-            </h2>
-            <p className="text-muted-foreground text-lg">{data.description}</p>
+              <h2 className="text-2xl font-bold mb-3 text-gradient">
+                {data.title}
+              </h2>
+              <p className="text-muted-foreground text-md">
+                {data.description}
+              </p>
+            </div>
 
             {/* Ticket Info */}
             <div className="flex items-center gap-6 text-sm">
@@ -101,7 +105,7 @@ export default function RaffleCarousel() {
 
             {/* Button + Arrows */}
             <div className="flex items-center gap-3">
-              <Button className="gradient-primary glow-primary text-white rounded-xl text-lg flex-1">
+              <Button className="gradient-primary glow-primary text-white rounded-xl text-sm flex-1">
                 Enter Raffle
               </Button>
 

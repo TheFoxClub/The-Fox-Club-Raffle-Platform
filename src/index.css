@@ -147,7 +147,7 @@
 .page-wrapper {
   max-width: none;
   margin: 0 auto;
-  padding: 0;
+  padding: 16px;
 }
 
 .site-header {
