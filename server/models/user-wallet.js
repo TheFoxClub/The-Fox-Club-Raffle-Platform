@@ -11,30 +11,9 @@ module.exports = (sequelize, DataTypes) => {
 
   user_wallet.init(
     {
-      id: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true,
-      },
-      blockchainNetwork: {
-        type: DataTypes.STRING,
-        allowNull: false,
-      },
-      pubKey: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-      },
-      createdAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
-      },
-      updatedAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW,
-      },
+      userId: DataTypes.INTEGER,
+      blockchainNetwork: DataTypes.STRING,
+      pubkey: DataTypes.STRING,
     },
     {
       sequelize,
