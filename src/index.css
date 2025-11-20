@@ -63,23 +63,6 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    background: linear-gradient(
-      180deg,
-      hsl(240 10% 3.9%) 0%,
-      hsl(240 10% 5%) 100%
-    );
-  }
-
-  .glass-card {
-    @apply bg-card/50 backdrop-blur-xl border border-border/50;
-  }
-
   .gradient-primary {
     background: var(--gradient-primary);
   }
@@ -96,16 +79,75 @@
     box-shadow: var(--glow-accent);
   }
 
+  .glass-card {
+    background-color: hsl(var(--card) / 0.5);
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
   .text-gradient {
-    @apply bg-clip-text text-transparent;
     background-image: var(--gradient-primary);
+    --webkit-background-clip: text;
+    --webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .text-muted-foreground {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .bg-primary {
+    background-color: hsl(var(--primary));
+  }
+  .hover\:bg-primary-90:hover {
+    background-color: hsl(var(--primary) / 0.9);
+  }
+  .text-primary-foreground {
+    color: hsl(var(--primary-foreground));
+  }
+  .hover\:bg-primary:hover {
+    background-color: hsl(var(--primary));
+  }
+  .hover\:text-primary-foreground:hover {
+    color: hsl(var(--primary-foreground));
+  }
+
+  .bg-accent {
+    background-color: hsl(var(--accent));
+  }
+  .text-accent-foreground {
+    color: hsl(var(--accent-foreground));
+  }
+  .hover\:bg-accent:hover {
+    background-color: hsl(var(--accent));
+  }
+  .hover\:text-accent-foreground:hover {
+    color: hsl(var(--accent-foreground));
+  }
+
+  .bg-secondary {
+    background-color: hsl(var(--secondary));
+  }
+  .text-secondary-foreground {
+    color: hsl(var(--secondary-foreground));
+  }
+
+  .bg-destructive {
+    background-color: hsl(var(--destructive));
+  }
+  .hover\:bg-destructive-90:hover {
+    background-color: hsl(var(--destructive) / 0.9);
+  }
+  .text-destructive-foreground {
+    color: hsl(var(--destructive-foreground));
   }
 }
 
 .page-wrapper {
-  max-width: 1200px;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 16px;
 }
 
 .site-header {
@@ -116,4 +158,9 @@
 
 .page-content {
   padding: 24px 0;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
