@@ -142,12 +142,22 @@
   .text-destructive-foreground {
     color: hsl(var(--destructive-foreground));
   }
+
+  .border-border {
+    border-color: hsl(var(--border));
+  }
+  .bg-input {
+    background-color: hsl(var(--input));
+  }
+  .ring-ring {
+    --tw-ring-color: hsl(var(--ring));
+  }
 }
 
 .page-wrapper {
   max-width: none;
   margin: 0 auto;
-  padding: 16px;
+  /* padding: 16px; */
 }
 
 .site-header {
