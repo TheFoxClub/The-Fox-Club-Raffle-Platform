@@ -1,26 +1,28 @@
 const express = require("express");
-require("dotenv").config();
 const path = require("path");
+const { ALLOWED_ORIGINS, SERVER_PORT } = require("./config/credentials");
 const app = express();
-const port = process.env.SERVER_PORT;
+const port = SERVER_PORT;
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: false }));
-// Set up a route to serve the uploaded files
-app.use(express.static(path.join(__dirname, "/public")));
 
 app.use((req, res, next) => {
-  let accessControlAllowOrigin = [
-    "http://localhost:3000",
-  ].includes(req.headers.origin)
-    ? req.headers.origin
-    : "https://bots.solanaskypilots.com";
+  let accessControlAllowOrigin =
+    ALLOWED_ORIGINS.includes(req.headers.origin) && req.headers.origin;
+
   res.setHeader("Access-Control-Allow-Origin", accessControlAllowOrigin);
   res.setHeader("Access-Control-Allow-Credentials", `true`);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, x-client-key, x-client-token, x-client-secret, Authorization",
+    "Origin, X-Requested-With, Content-Type, Accept, x-client-key, x-client-token, x-client-secret, Authorization"
   );
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200); // ✅ Handle preflight here
+  }
+
   next();
 });
 
@@ -40,17 +42,18 @@ app.use(express.json());
 app.use("/api", require("./api"));
 app.use("/", express.static("build"));
 app.use("/uploads", express.static("uploads"));
-// if (process.env.NODE_ENV === "production") {
-// app.use(express.static(path.join(__dirname, "../build")));
 
-app.get("*", (req, res) => {
-  if (req.path.startsWith("/api") || req.path.startsWith("/server")) {
-    return res.status(404).json({ error: "API route not found" });
-  }
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../build")));
 
-  res.sendFile(path.join(__dirname, "../build", "index.html"));
-});
-// }
+  app.get(/(.*)/, (req, res) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/server")) {
+      return res.status(404).json({ error: "API route not found" });
+    }
+
+    res.sendFile(path.join(__dirname, "../build", "index.html"));
+  });
+}
 
 let server;
 
@@ -61,4 +64,3 @@ if (port) {
 } else {
   server = app.listen();
 }
-
