@@ -8,8 +8,8 @@ import {
   Coins,
   Users,
 } from "lucide-react";
-import card1 from "../../assets/card1.jpg";
-import card2 from "../../assets/card2.jpg";
+import card1 from "../../../public/assets/card1.jpg";
+import card2 from "../../../public/assets/card2.jpg";
 
 const raffles = [
   {

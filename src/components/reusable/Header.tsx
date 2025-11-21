@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import Button from "../ui/Button";
 import { Wallet, Trophy, PlusCircle, User } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
-import logo from "../../assets/foxclub_logo.png"; // adjust the path if needed
+import logo from "../../../public/assets/foxclub_logo.png"; // adjust the path if needed
 import { useState } from "react";
 
 export const Header = () => {

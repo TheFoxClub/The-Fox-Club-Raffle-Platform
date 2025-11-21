@@ -7,12 +7,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-import card1 from "../../assets/card1.jpg";
-import card2 from "../../assets/card2.jpg";
-import card3 from "../../assets/card3.jpg";
-import card4 from "../../assets/card4.jpg";
-import card5 from "../../assets/card5.jpg";
-import card6 from "../../assets/card5.jpg";
+import card1 from "../../../public/assets/card1.jpg";
+import card2 from "../../../public/assets/card2.jpg";
+import card3 from "../../../public/assets/card3.jpg";
+import card4 from "../../../public/assets/card4.jpg";
+import card5 from "../../../public/assets/card5.jpg";
+import card6 from "../../../public/assets/card5.jpg";
 
 const raffleData: RaffleCardProps[] = [
   {
