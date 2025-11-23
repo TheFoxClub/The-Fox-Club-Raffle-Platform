@@ -4,7 +4,6 @@ import Home from "./views/home/Home";
 import Leaderboard from "./views/leaderboard/Leaderboard";
 import Profile from "./views/profile/Profile";
 import CreateRaffle from "./views/raffle/CreateRaffle";
-import RaffleView from "./views/raffle/RaffleView";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import MyWalletWrapper from "./helpers/wallet-hooks/MyWalletWrapper";
@@ -12,6 +11,8 @@ import { useSelector } from "react-redux";
 import type { RootState } from "./redux/store";
 import Loading from "./components/reusable/Loading";
 // import { UmiProvider } from "./helpers/umi/UmiProvider";
+import "./index.css";
+import RaffleDetail from "./views/raffle/RaffleDetail";
 
 function App() {
   // let endpoint = "https://api.devnet.solana.com";
@@ -44,7 +45,7 @@ function App() {
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/create" element={<CreateRaffle />} />
-            <Route path="/raffle/:id" element={<RaffleView />} />
+            <Route path="/raffle/:id" element={<RaffleDetail />} />
           </Routes>
         </Layout>
         {/* </UmiProvider> */}

@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
 import { Wallet, Trophy, PlusCircle, User, LogOut } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
-import logo from "../../assets/foxclub_logo.png";
+import logo from "../../../public/assets/foxclub_logo.png";
 import MyConnectWalletButton from "../../helpers/wallet-hooks/MyConnectWalletButton";
 import { useWallet } from "../../helpers/solana-helpers/solana-hooks";
 import { useSelector } from "react-redux";
@@ -92,15 +92,7 @@ export const Header = () => {
                   <Wallet className="h-4 w-4" />
                   {shortenAddress(publicKey?.toBase58() || "")}
                 </Button>
-              ) : (
-                <Button
-                  variant="secondary"
-                  className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
-                >
-                  <Wallet className="h-4 w-4" />
-                  Connect Wallet
-                </Button>
-              )}
+              ) : null}
             </MyConnectWalletButton>
             {user.isAuthenticated && (
               <Button

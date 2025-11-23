@@ -8,38 +8,12 @@ import {
   Coins,
   Users,
 } from "lucide-react";
-import card1 from "../../assets/card1.jpg";
-import card2 from "../../assets/card2.jpg";
-
-const raffles = [
-  {
-    id: 1,
-    title: "Rare Fox NFT Collection",
-    description:
-      "Win 1 of 3 exclusive Fox Club Genesis NFTs with unique traits",
-    price: "0.5 SOL",
-    sold: 78,
-    total: 100,
-    image: card1,
-    tokenType: "SOL",
-    isVerified: true,
-  },
-
-  {
-    id: 2,
-    title: "5000 USDC Prize Pool",
-    description: "Massive cash prize - Multiple winners guaranteed",
-    price: "10 USDC",
-    sold: 342,
-    total: 500,
-    image: card2,
-    tokenType: "USDC",
-    isVerified: true,
-  },
-];
+import { featuredRaffles } from "../../dummydata/featuredRaffles";
 
 export default function RaffleCarousel() {
   const [index, setIndex] = useState(0);
+
+  const raffles = featuredRaffles;
 
   const next = () => setIndex((prev) => (prev + 1) % raffles.length);
   const prev = () =>
@@ -48,7 +22,7 @@ export default function RaffleCarousel() {
   const data = raffles[index];
 
   return (
-    <Card className="glass-card overflow-hidden glow-primary border-primary">
+    <Card className="glass-card overflow-hidden glow-primary border-primary-30">
       <div className="relative">
         <div className="grid md:grid-cols-2 gap-0">
           {/* Image */}

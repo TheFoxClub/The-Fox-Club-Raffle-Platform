@@ -93,12 +93,46 @@
     color: transparent;
   }
 
+  .text-primary {
+    color: hsl(var(--primary));
+  }
+
   .text-muted-foreground {
     color: hsl(var(--muted-foreground));
   }
 
+  .text-popover-foreground {
+    color: hsl(var(--popover-foreground));
+  }
+
   .bg-primary {
     background-color: hsl(var(--primary));
+  }
+
+  .bg-muted {
+    background-color: hsl(var(--muted));
+  }
+
+  .bg-popover {
+    background-color: hsl(var(--popover));
+  }
+
+  .bg-card {
+    background-color: hsl(var(--card));
+  }
+
+  .hover\:bg-destructive-80:hover {
+    background-color: hsl(var(--destructive) / 0.8);
+  }
+
+  .data-[state="active"].bg-background {
+    background-color: hsl(var(--background));
+  }
+  .bg-background-50 {
+    background-color: hsl(var(--background) / 0.5);
+  }
+  .bg-background-80 {
+    background-color: hsl(var(--background) / 0.8);
   }
   .hover\:bg-primary-90:hover {
     background-color: hsl(var(--primary) / 0.9);
@@ -115,6 +149,22 @@
 
   .bg-accent {
     background-color: hsl(var(--accent));
+  }
+  .border-accent-30 {
+    border-color: hsl(var(--accent) / 0.3);
+  }
+  .border-primary-30 {
+    border-color: hsl(var(--primary) / 0.3);
+  }
+  .border-primary-50 {
+    border-color: hsl(var(--primary) / 0.5);
+  }
+  .bg-primary-10 {
+    background-color: hsl(var(--primary) / 0.1);
+  }
+
+  .text-accent {
+    color: hsl(var(--accent));
   }
   .text-accent-foreground {
     color: hsl(var(--accent-foreground));
@@ -136,6 +186,9 @@
   .bg-destructive {
     background-color: hsl(var(--destructive));
   }
+  .hover\:border-primary-50:hover {
+    border-color: hsl(var(--primary) / 0.5);
+  }
   .hover\:bg-destructive-90:hover {
     background-color: hsl(var(--destructive) / 0.9);
   }
@@ -145,6 +198,17 @@
 
   .border-border {
     border-color: hsl(var(--border));
+  }
+
+  .border-border-50 {
+    border-color: hsl(var(--border) / 0.5);
+  }
+
+  .border-primary {
+    border-color: hsl(var(--primary));
+  }
+  .border-input {
+    border-color: hsl(var(--input));
   }
   .bg-input {
     background-color: hsl(var(--input));

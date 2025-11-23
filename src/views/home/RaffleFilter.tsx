@@ -1,16 +1,46 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/Select";
+import { useState } from "react";
+import Select from "../../components/ui/Select";
 import { Search, Filter } from "lucide-react";
 import Button from "../../components/ui/Button";
 
 export default function RaffleFilter() {
+  const [statusFilter, setStatusFilter] = useState("");
+  const [tokenFilter, setTokenFilter] = useState("");
+  const [priceFilter, setPriceFilter] = useState("");
+  const [collectionFilter, setCollectionFilter] = useState("");
+
+  const statusOptions = [
+    { value: "live", label: "Live" },
+    { value: "ended", label: "Ended" },
+    { value: "upcoming", label: "Upcoming" },
+  ];
+
+  const tokenOptions = [
+    { value: "sol", label: "SOL" },
+    { value: "usdc", label: "USDC" },
+    { value: "bonk", label: "BONK" },
+    { value: "all", label: "All Tokens" },
+  ];
+
+  const priceOptions = [
+    { value: "lowtohigh", label: "Low to High" },
+    { value: "hightolow", label: "High to Low" },
+  ];
+
+  const collectionOptions = [
+    { value: "verified", label: "Verified Only" },
+    { value: "all", label: "All Collections" },
+  ];
+
+  const handleClearFilters = () => {
+    setStatusFilter("");
+    setTokenFilter("");
+    setPriceFilter("");
+    setCollectionFilter("");
+  };
+
   return (
-    <div className="glass-card p-4 space-y-4 rounded-lg mt-8">
+    <div className="glass-card p-4 space-y-4 rounded-lg mt-10">
       <div className="flex items-center gap-2">
         <Filter className="h-5 w-5 text-muted-foreground" />
         <span className="text-lg font-semibold text-muted-foreground">
@@ -27,50 +57,48 @@ export default function RaffleFilter() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Select>
-          <SelectTrigger className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="live">Live</SelectItem>
-            <SelectItem value="ended">Ended</SelectItem>
-            <SelectItem value="upcoming">Upcoming</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* 1. Status Filter */}
+        <Select
+          options={statusOptions}
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          placeholder="Status" // This text will appear when nothing is selected
+          className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]"
+        />
 
-        <Select>
-          <SelectTrigger className="bg-[hsla(240,10%,3.9%,0.5)] focus-[hsl(10 85% 58%)] border-[hsl(240,6%,20%)]">
-            <SelectValue placeholder="Token Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sol">SOL</SelectItem>
-            <SelectItem value="usdc">USDC</SelectItem>
-            <SelectItem value="bonk">BONK</SelectItem>
-            <SelectItem value="all">All Tokens</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* 2. Token Type Filter */}
 
-        <Select>
-          <SelectTrigger className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]">
-            <SelectValue placeholder="Price Range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="lowtohigh">Low to High</SelectItem>
-            <SelectItem value="hightolow">High to Low</SelectItem>
-          </SelectContent>
-        </Select>
+        <Select
+          options={tokenOptions}
+          value={tokenFilter}
+          onValueChange={setTokenFilter}
+          placeholder="Token Type" // This text will appear when nothing is selected
+          className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]"
+        />
 
-        <Select>
-          <SelectTrigger className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]">
-            <SelectValue placeholder="Collection" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="verified">Verified Only</SelectItem>
-            <SelectItem value="allcollections">All Collections</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* 3. Price Range Filter */}
+        <Select
+          options={priceOptions}
+          value={priceFilter}
+          onValueChange={setPriceFilter}
+          placeholder="Price Range" // This text will appear when nothing is selected
+          className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]"
+        />
+
+        {/* 4. Collection Filter */}
+        <Select
+          options={collectionOptions}
+          value={collectionFilter}
+          onValueChange={setCollectionFilter}
+          placeholder="Collection" // This text will appear when nothing is selected
+          className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]"
+        />
       </div>
-      <Button variant="outline" className="w-full border-[hsl(240,6%,20%)]">
+      <Button
+        variant="outline"
+        className="w-full border-[hsl(240,6%,20%)]"
+        onClick={handleClearFilters}
+      >
         Clear Filters
       </Button>
     </div>
