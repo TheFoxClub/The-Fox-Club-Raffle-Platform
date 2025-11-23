@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "../../components/ui/Dialog";
 import { useState } from "react";
-import { mockWalletNFTs } from "../../../public/dummydata/WalletNFTs";
+import { mockWalletNFTs } from "../../dummydata/WalletNFTs";
 
 const CreateRaffle = () => {
   const [selectedNFT, setSelectedNFT] = useState<any>(null);

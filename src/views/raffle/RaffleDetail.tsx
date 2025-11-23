@@ -13,8 +13,8 @@ import {
   Ticket,
   AlertCircle,
 } from "lucide-react";
-import { allRaffle } from "../../../public/dummydata/mockRaffleDetail";
-import type { RaffleType } from "../../../public/dummydata/mockRaffleDetail";
+import { allRaffle } from "../../dummydata/mockRaffleDetail";
+import type { RaffleType } from "../../dummydata/mockRaffleDetail";
 
 const RaffleDetail = () => {
   const id = 1;

@@ -1,6 +1,3 @@
-import card1 from "../../public/assets/card1.jpg";
-import card2 from "../../public/assets/card2.jpg";
-
 interface Raffle {
   id: number;
   title: string;
@@ -22,7 +19,7 @@ export const featuredRaffles: Raffle[] = [
     price: "0.5 SOL",
     sold: 78,
     total: 100,
-    image: card1,
+    image: "/assets/card1.jpg",
     tokenType: "SOL",
     isVerified: true,
   },
@@ -34,7 +31,7 @@ export const featuredRaffles: Raffle[] = [
     price: "10 USDC",
     sold: 342,
     total: 500,
-    image: card2,
+    image: "/assets/card2.jpg",
     tokenType: "USDC",
     isVerified: true,
   },

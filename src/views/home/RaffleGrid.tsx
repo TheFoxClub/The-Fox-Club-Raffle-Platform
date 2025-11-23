@@ -6,7 +6,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-import { raffleData } from "../../../public/dummydata/mockRaffles";
+import { raffleData } from "../../dummydata/mockRaffles";
 
 export const RaffleGrid = () => {
   return (

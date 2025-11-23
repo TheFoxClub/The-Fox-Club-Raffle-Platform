@@ -92,15 +92,7 @@ export const Header = () => {
                   <Wallet className="h-4 w-4" />
                   {shortenAddress(publicKey?.toBase58() || "")}
                 </Button>
-              ) : (
-                <Button
-                  variant="secondary"
-                  className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
-                >
-                  <Wallet className="h-4 w-4" />
-                  Connect Wallet
-                </Button>
-              )}
+              ) : null}
             </MyConnectWalletButton>
             {user.isAuthenticated && (
               <Button

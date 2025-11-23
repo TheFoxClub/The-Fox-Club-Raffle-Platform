@@ -1,5 +1,3 @@
-import card1 from "../assets/card1.jpg";
-
 export interface RaffleType {
   id: number;
   image: string;
@@ -21,7 +19,7 @@ export interface RaffleType {
 export const allRaffle = [
   {
     id: 1,
-    image: card1,
+    image: "/assets/card1.jpg",
     title: "Legendary Fox Raffle",
     description:
       "Win exclusive access to The Fox Club Founders tier with lifetime benefits including early access to all raffles, reduced fees, exclusive community channels, and special NFT airdrops. This is a one-time opportunity to join the elite members of The Fox Club.",

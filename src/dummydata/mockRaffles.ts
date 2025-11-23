@@ -1,16 +1,10 @@
-import type { RaffleCardProps } from "../../src/views/home/RaffleCard";
-import card1 from "../assets/card1.jpg";
-import card2 from "../assets/card2.jpg";
-import card3 from "../assets/card3.jpg";
-import card4 from "../assets/card4.jpg";
-import card5 from "../assets/card5.jpg";
-import card6 from "../assets/card5.jpg";
+import type { RaffleCardProps } from "../views/home/RaffleCard";
 
 // Export the data array
 export const raffleData: RaffleCardProps[] = [
   {
     id: 1,
-    image: card1,
+    image: "/assets/card1.jpg",
     title: "Legendary Fox Founder Pass",
     price: "0.5",
     sold: 78,
@@ -22,7 +16,7 @@ export const raffleData: RaffleCardProps[] = [
   },
   {
     id: 2,
-    image: card2,
+    image: "/assets/card2.jpg",
     title: "5000 USDC Grand Prize",
     price: "10",
     sold: 342,
@@ -34,7 +28,7 @@ export const raffleData: RaffleCardProps[] = [
   },
   {
     id: 3,
-    image: card3,
+    image: "/assets/card3.jpg",
     title: "Rare Solana NFT Bundle",
     price: "0.25",
     sold: 145,
@@ -46,7 +40,7 @@ export const raffleData: RaffleCardProps[] = [
   },
   {
     id: 4,
-    image: card4,
+    image: "/assets/card4.jpg",
     title: "Premium Hardware Wallet",
     price: "5",
     sold: 89,
@@ -58,7 +52,7 @@ export const raffleData: RaffleCardProps[] = [
   },
   {
     id: 5,
-    image: card5,
+    image: "/assets/card5.jpg",
     title: "Fox Club Merchandise Pack",
     price: "0.1",
     sold: 256,
@@ -70,7 +64,7 @@ export const raffleData: RaffleCardProps[] = [
   },
   {
     id: 6,
-    image: card6,
+    image: "/assets/card6.jpg",
     title: "1000 BONK Token Airdrop",
     price: "1000",
     sold: 678,

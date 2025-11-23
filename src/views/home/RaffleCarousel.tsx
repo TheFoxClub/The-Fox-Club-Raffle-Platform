@@ -8,7 +8,7 @@ import {
   Coins,
   Users,
 } from "lucide-react";
-import { featuredRaffles } from "../../../public/dummydata/featuredRaffles";
+import { featuredRaffles } from "../../dummydata/featuredRaffles";
 
 export default function RaffleCarousel() {
   const [index, setIndex] = useState(0);
