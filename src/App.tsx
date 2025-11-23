@@ -6,6 +6,7 @@ import Profile from "./views/profile/Profile";
 import CreateRaffle from "./views/raffle/CreateRaffle";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import "./index.css";
 import RaffleDetail from "./views/raffle/RaffleDetail";
 
 function App() {

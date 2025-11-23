@@ -91,7 +91,7 @@ const raffleData: RaffleCardProps[] = [
 
 export const RaffleGrid = () => {
   return (
-    <Tabs defaultValue="live" className="space-y-2 mt-8">
+    <Tabs defaultValue="live" className="space-y-2 z-20 mt-10">
       <TabsList className="glass-card p-1 w-full sm:w-auto">
         <TabsTrigger value="live" className="gap-2 flex-1 sm:flex-none">
           <Flame className="h-4 w-4" />

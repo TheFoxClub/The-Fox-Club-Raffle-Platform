@@ -119,7 +119,7 @@ const RaffleDetail = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border/50">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border-50">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Trophy className="h-4 w-4" />
@@ -232,6 +232,7 @@ const RaffleDetail = () => {
               <div className="flex items-center gap-3 mt-2">
                 <Button
                   variant="outline"
+                  className="bg-background-50"
                   size="icon"
                   onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
                 >
@@ -243,10 +244,11 @@ const RaffleDetail = () => {
                   onChange={(e) =>
                     setTicketCount(Math.max(1, parseInt(e.target.value) || 1))
                   }
-                  className="flex h-10 w-full rounded-md text-center border border-border rounded-md text-lg p-2 font-bold md:text-sm"
+                  className="flex h-10 w-full rounded-md text-center border border-border bg-background-50 rounded-md text-lg p-2 font-bold md:text-sm"
                 />
                 <Button
                   variant="outline"
+                  className="bg-background-50"
                   size="icon"
                   onClick={() => setTicketCount(ticketCount + 1)}
                 >
@@ -255,7 +257,7 @@ const RaffleDetail = () => {
               </div>
             </div>
             {/* Total Cost */}
-            <div className="flex items-center glass-card justify-between border-primary/30 p-4 rounded-lg bg-primary/10">
+            <div className="flex items-center glass-card justify-between border-primary-30 p-4 rounded-lg bg-primary-10">
               <span className="font-semibold text-muted-foreground">
                 Total Cost
               </span>
@@ -271,7 +273,7 @@ const RaffleDetail = () => {
             </Button>
 
             {/* Info */}
-            <div className="glass-card border-accent/30 rounded-lg flex gap-3 p-4">
+            <div className="glass-card border-accent-30 rounded-lg flex gap-3 p-4">
               <AlertCircle className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
               <div className="text-sm space-y-1">
                 <p className="font-semibold">NFT Holder Discount</p>
