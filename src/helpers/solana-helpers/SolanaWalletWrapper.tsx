@@ -1,5 +1,8 @@
 import React from "react";
-import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
+import {
+  ConnectionProvider,
+  WalletProvider,
+} from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import {
   LedgerWalletAdapter,
@@ -10,14 +13,17 @@ import {
 } from "@solana/wallet-adapter-wallets";
 import { useMemo } from "react";
 import { SOLANA_RPC_HOST, SOLANA_NETWORK } from "./config";
-// require("@solana/wallet-adapter-react-ui/styles.css");
+import "@solana/wallet-adapter-react-ui/styles.css";
 
 interface SolanaWalletWrapperProps {
   children: React.ReactNode;
   autoConnect: boolean;
 }
 
-const SolanaWalletWrapper: React.FC<SolanaWalletWrapperProps> = ({ children, autoConnect }) => {
+const SolanaWalletWrapper: React.FC<SolanaWalletWrapperProps> = ({
+  children,
+  autoConnect,
+}) => {
   const endpoint = useMemo(() => SOLANA_RPC_HOST, []);
 
   const wallets = useMemo(
@@ -28,7 +34,7 @@ const SolanaWalletWrapper: React.FC<SolanaWalletWrapperProps> = ({ children, aut
       new SolflareWalletAdapter({ network: SOLANA_NETWORK }),
       new SolongWalletAdapter(),
     ],
-    [],
+    []
   );
 
   return (

@@ -1,17 +1,18 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
-import { Wallet, Trophy, PlusCircle, User } from "lucide-react";
+import { Wallet, Trophy, PlusCircle, User, LogOut } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
 import logo from "../../assets/foxclub_logo.png";
-// import { useState } from "react";
 import MyConnectWalletButton from "../../helpers/wallet-hooks/MyConnectWalletButton";
 import { useWallet } from "../../helpers/solana-helpers/solana-hooks";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import SolanaSignIn from "../../helpers/solana-helpers/SolanaSignIn";
+import { handleLogout } from "../../config/api";
 
 export const Header = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { publicKey, connected } = useWallet();
   const user = useSelector((state: RootState) => state.user);
 
@@ -19,6 +20,11 @@ export const Header = () => {
 
   const shortenAddress = (address: string, start = 4, end = 4) =>
     `${address.slice(0, start)}...${address.slice(-end)}`;
+
+  const logout = async () => {
+    await handleLogout();
+    navigate("/");
+  };
 
   return (
     <nav className="sticky top-0 z-50 glass-card border-b border-border/50 w-full">
@@ -74,16 +80,6 @@ export const Header = () => {
             </Link>
           )}
 
-          {/* <Button
-              onClick={handleWalletConnect}
-              className="gap-2 gradient-primary glow-primary"
-            >
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                {isWalletConnected ? walletAddress : "Connect Wallet"}
-              </span>
-            </Button> */}
-
           <div className="flex items-center gap-2">
             {user.isAuthenticated ? null : connected ? <SolanaSignIn /> : null}
 
@@ -106,6 +102,18 @@ export const Header = () => {
                 </Button>
               )}
             </MyConnectWalletButton>
+            {user.isAuthenticated && (
+              <Button
+                variant="secondary"
+                className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
+                onClick={logout}
+                title="Logout"
+                aria-label="Logout"
+              >
+                Logout
+                <LogOut className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 

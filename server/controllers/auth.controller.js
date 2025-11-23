@@ -54,38 +54,16 @@ class AuthController {
     const user = await User.findOne({
       raw: true,
       where: { id: req.payload.id, pubkey: req.payload.pubkey },
-      attributes: [
-        "id",
-        "blockchainNetwork",
-        "pubkey",
-        "totalLoadCurrency",
-        "totalSpendCurrency",
-        "totalRewardCurrency",
-        "totalClaimCurrency",
-      ],
+      attributes: ["id", "blockchainNetwork", "pubkey"],
     });
 
     if (user) {
-      // const balance = await UserController.getBalanceFromUserData(user);
-      // const totalPendingCurrency = await getAllPendingCurrencyAmount(user.id);
-
-      // async function fetchAdminLoadedCurrency(userId) {
-      //   const totalLoadedCurrency =
-      //     await UserCurrencyTransaction.getTotalLoadedCurrency(userId);
-      //   return totalLoadedCurrency;
-      // }
-
-      // const adminLoadedCurrency = await fetchAdminLoadedCurrency(user.id);
-
       return respond(res, httpStatus.OK, "Successful", {
         user: {
           ...user,
-          // balance: balance,
-          // totalPendingCurrency,
           isAuthenticated: true,
           isAdmin: ADMIN_PUBKEY.includes(user.pubkey),
           adminPubkey: user.pubkey ? user.pubkey : undefined,
-          // adminLoadedCurrency,
         },
       });
     } else {
@@ -102,7 +80,7 @@ class AuthController {
     const blockchainNetwork = req.query.blockchainNetwork;
     //hex to base58
     const bytes = Buffer.from(pubkey, "hex");
-    const pubkeyBase58 = base58.default.encode(bytes);
+    const pubkeyBase58 = base58.encode(bytes);
 
     let isValid = false;
 
@@ -136,23 +114,11 @@ class AuthController {
         });
       }
 
-      const balance = await UserController.getBalanceFromUserData(dbUser);
-
       const authUser = auth.toAuthJSON({
         pubkey: pubkeyBase58,
         id: dbUser.id,
       });
 
-      const totalPendingCurrency = await getAllPendingCurrencyAmount(dbUser.id);
-
-      const userData = {
-        totalLoadCurrency: dbUser.totalLoadCurrency,
-        totalSpendCurrency: dbUser.totalSpendCurrency,
-        totalRewardCurrency: dbUser.totalRewardCurrency,
-        totalClaimCurrency: dbUser.totalClaimCurrency,
-        totalPendingCurrency,
-        balance: balance,
-      };
       const token = authUser.token;
 
       res.cookie("token", token, {
@@ -165,7 +131,6 @@ class AuthController {
       return respond(res, httpStatus.OK, "Logged In!", {
         user: {
           ...authUser,
-          ...userData,
           isAdmin: ADMIN_PUBKEY.includes(authUser.pubkey),
         },
       });
