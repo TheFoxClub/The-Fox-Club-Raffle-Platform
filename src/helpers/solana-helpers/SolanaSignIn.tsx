@@ -4,6 +4,7 @@ import { useSelector } from "react-redux";
 import { type RootState, useAppDispatch } from "../../redux/store";
 import { loginUser } from "../../redux/actions/userAction";
 import { unwrapResult } from "@reduxjs/toolkit";
+import Button from "../../components/ui/Button";
 
 const SolanaSignIn = () => {
   const dispatch = useAppDispatch();
@@ -62,12 +63,14 @@ const SolanaSignIn = () => {
   }
 
   return (
-    <button
-      className="btn btn-sm rounded border-0 neon-success neon-button"
+    <Button
+      variant="default"
+      size="sm"
       onClick={signIn}
+      className="rounded glow-primary"
     >
       Sign In
-    </button>
+    </Button>
   );
 };
 

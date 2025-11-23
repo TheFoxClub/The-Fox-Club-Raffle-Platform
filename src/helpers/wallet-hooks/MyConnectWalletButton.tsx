@@ -1,21 +1,25 @@
 import React from "react";
 import SolanaConnectWallet from "../solana-helpers/SolanaConnectWallet";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { WalletMultiButton } from "../../components/reusable/WalletMultiButton";
 
 interface MyConnectWalletButtonProps {
   className?: string;
   disabled?: boolean;
-  children?: any;
+  disableMenu?: boolean;
+  children?: React.ReactNode;
 }
 
 const MyConnectWalletButton: React.FC<MyConnectWalletButtonProps> = ({
   className,
   disabled,
+  disableMenu = false,
   children,
 }) => {
   if (children) {
     return (
-      <WalletMultiButton disabled={disabled}>{children}</WalletMultiButton>
+      <WalletMultiButton disabled={disabled} disableMenu={disableMenu}>
+        {children}
+      </WalletMultiButton>
     );
   }
 

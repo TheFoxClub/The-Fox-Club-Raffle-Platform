@@ -3,7 +3,7 @@ import Button from "../ui/Button";
 import { Wallet, Trophy, PlusCircle, User } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
 import logo from "../../assets/foxclub_logo.png";
-import { useState } from "react";
+// import { useState } from "react";
 import MyConnectWalletButton from "../../helpers/wallet-hooks/MyConnectWalletButton";
 import { useWallet } from "../../helpers/solana-helpers/solana-hooks";
 import { useSelector } from "react-redux";

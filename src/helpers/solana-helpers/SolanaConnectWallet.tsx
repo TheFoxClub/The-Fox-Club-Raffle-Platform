@@ -1,20 +1,17 @@
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { WalletMultiButton } from "../../components/reusable/WalletMultiButton";
 import React from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
-import SolanaSignIn from "./SolanaSignIn";
+
 interface SolanaConnectWalletProps {
   className?: string;
-  disabled: boolean;
+  disabled?: boolean;
 }
 
 const SolanaConnectWallet: React.FC<SolanaConnectWalletProps> = ({
   className,
   disabled,
 }) => {
-  const { connected } = useWallet();
   return (
-    <div className="d-flex justify-content-center">
-      {/* {connected && <SolanaSignIn />} */}
+    <div className="flex justify-center">
       <WalletMultiButton className={className} disabled={disabled} />
     </div>
   );
