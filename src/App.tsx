@@ -7,30 +7,48 @@ import CreateRaffle from "./views/raffle/CreateRaffle";
 import RaffleView from "./views/raffle/RaffleView";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import MyWalletWrapper from "./helpers/wallet-hooks/MyWalletWrapper";
+import { useSelector } from "react-redux";
+import type { RootState } from "./redux/store";
+import Loading from "./components/reusable/Loading";
+// import { UmiProvider } from "./helpers/umi/UmiProvider";
 
 function App() {
+  // let endpoint = "https://api.devnet.solana.com";
+
+  // if (import.meta.env.REACT_APP_SOLANA_RPC_POOL_DAS_API) {
+  //   endpoint = import.meta.env.REACT_APP_SOLANA_RPC_POOL_DAS_API;
+  // }
+
+  const isLoading = useSelector((state: RootState) => state.isLoading);
+
   return (
     <Router>
-      <Layout>
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/create" element={<CreateRaffle />} />
-          <Route path="/raffle/:id" element={<RaffleView />} />
-        </Routes>
-      </Layout>
+      <MyWalletWrapper autoConnect>
+        {isLoading && <Loading />}
+        {/* <UmiProvider endpoint={endpoint}> */}
+        <Layout>
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/create" element={<CreateRaffle />} />
+            <Route path="/raffle/:id" element={<RaffleView />} />
+          </Routes>
+        </Layout>
+        {/* </UmiProvider> */}
+      </MyWalletWrapper>
     </Router>
   );
 }

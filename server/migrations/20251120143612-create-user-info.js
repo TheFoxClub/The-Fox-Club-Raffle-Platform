@@ -2,22 +2,25 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("users", {
+    await queryInterface.createTable("user_infos", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER,
       },
-      pubkey: {
-        type: Sequelize.STRING,
-        allowNull: false,
-        unique: true,
-      },
-      blockchainNetwork: {
+      userId: {
         type: Sequelize.INTEGER,
-        defaultValue: 1,
-        comment: "1 -> solana, 2 -> polygon",
+        references: {
+          model: "users",
+          key: "id",
+        },
+      },
+      username: {
+        type: Sequelize.STRING,
+      },
+      description: {
+        type: Sequelize.TEXT("long"),
       },
       createdAt: {
         allowNull: false,
@@ -30,6 +33,6 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("users");
+    await queryInterface.dropTable("user_infos");
   },
 };
