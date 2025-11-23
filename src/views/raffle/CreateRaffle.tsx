@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from "../../components/ui/Dialog";
 import { useState } from "react";
+import { mockWalletNFTs } from "../../../public/dummydata/WalletNFTs";
 
 const CreateRaffle = () => {
   const [selectedNFT, setSelectedNFT] = useState<any>(null);
@@ -23,33 +24,6 @@ const CreateRaffle = () => {
   ];
 
   const [selectedToken, setSelectedToken] = useState("sol");
-
-  const walletNFTs = [
-    {
-      id: 1,
-      name: "Fox Club #1234",
-      collection: "The Fox Club",
-      image:
-        "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400",
-      mint: "7xKXtg...",
-    },
-    {
-      id: 2,
-      name: "Fox Club #5678",
-      collection: "The Fox Club",
-      image:
-        "https://images.unsplash.com/photo-1474511320723-9a56873867b5?w=400",
-      mint: "8yLZuh...",
-    },
-    {
-      id: 3,
-      name: "Fox Club #9012",
-      collection: "The Fox Club",
-      image:
-        "https://images.unsplash.com/photo-1516728778615-2d590ea1855e?w=400",
-      mint: "9zMAvj...",
-    },
-  ];
 
   const handleSelectNFT = (nft: any) => {
     setSelectedNFT(nft);
@@ -167,7 +141,7 @@ const CreateRaffle = () => {
                     <DialogTitle>Select NFT from Your Wallet</DialogTitle>
                   </DialogHeader>
                   <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-                    {walletNFTs.map((nft) => (
+                    {mockWalletNFTs.map((nft) => (
                       <button
                         key={nft.id}
                         type="button"

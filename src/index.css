@@ -109,6 +109,10 @@
     background-color: hsl(var(--primary));
   }
 
+  .bg-muted {
+    background-color: hsl(var(--muted));
+  }
+
   .bg-popover {
     background-color: hsl(var(--popover));
   }
@@ -121,6 +125,9 @@
     background-color: hsl(var(--destructive) / 0.8);
   }
 
+  .data-[state="active"].bg-background {
+    background-color: hsl(var(--background));
+  }
   .bg-background-50 {
     background-color: hsl(var(--background) / 0.5);
   }
@@ -179,6 +186,9 @@
   .bg-destructive {
     background-color: hsl(var(--destructive));
   }
+  .hover\:border-primary-50:hover {
+    border-color: hsl(var(--primary) / 0.5);
+  }
   .hover\:bg-destructive-90:hover {
     background-color: hsl(var(--destructive) / 0.9);
   }
@@ -194,6 +204,9 @@
     border-color: hsl(var(--border) / 0.5);
   }
 
+  .border-primary {
+    border-color: hsl(var(--primary));
+  }
   .border-input {
     border-color: hsl(var(--input));
   }

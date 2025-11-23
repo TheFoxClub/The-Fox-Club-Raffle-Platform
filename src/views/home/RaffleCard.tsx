@@ -31,7 +31,7 @@ export const RaffleCard = ({
   const progress = (sold / total) * 100;
 
   return (
-    <Card className="glass-card group hover:border-primary/50 transition-all duration-300 hover:glow-primary overflow-hidden border-primary/30">
+    <Card className="glass-card group hover:border-primary-50 transition-all duration-300 hover:glow-primary overflow-hidden border-primary/30">
       <div className="relative aspect-video overflow-hidden">
         <img
           src={image}
