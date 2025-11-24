@@ -13,6 +13,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "userId",
         targetKey: "id",
       });
+      this.hasOne(models.RaffleDetail, {
+        sourceKey: "id",
+        foreignKey: "raffleId",
+      });
     }
   }
   raffle.init(
