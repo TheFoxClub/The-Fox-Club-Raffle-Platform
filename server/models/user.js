@@ -8,6 +8,10 @@ module.exports = (sequelize, DataTypes) => {
         sourceKey: "id",
         foreignKey: "userId",
       });
+      this.hasMany(models.Raffle, {
+        sourceKey: "id",
+        foreignKey: "userId",
+      });
     }
   }
   user.init(
