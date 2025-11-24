@@ -11,16 +11,25 @@ module.exports = {
       },
       userId: {
         type: Sequelize.INTEGER,
+        unique: true,
         references: {
           model: "users",
           key: "id",
         },
+        onDelete: "CASCADE",
+        onUpdate: "CASCADE",
       },
       username: {
         type: Sequelize.STRING,
       },
       description: {
         type: Sequelize.TEXT("long"),
+      },
+      email: {
+        type: Sequelize.STRING,
+      },
+      photoUrl: {
+        type: Sequelize.STRING,
       },
       createdAt: {
         allowNull: false,
