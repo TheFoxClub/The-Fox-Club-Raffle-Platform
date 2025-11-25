@@ -190,7 +190,7 @@ const CreateRaffle = () => {
                 options={tokenOptions}
                 value={selectedToken} // <-- Pass the state value here
                 onValueChange={setSelectedToken}
-                className="bg-background/50"
+                className="bg-background-50 mt-2"
               />
             </div>
 
