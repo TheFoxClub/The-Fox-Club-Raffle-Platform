@@ -66,7 +66,7 @@
   .gradient-primary {
     background: var(--gradient-primary);
   }
-     
+
   .gradient-accent {
     background: var(--gradient-accent);
   }
@@ -163,6 +163,9 @@
     background-color: hsl(var(--primary) / 0.1);
   }
 
+  .text-secondary {
+    color: hsl(var(--secondary));
+  }
   .text-accent {
     color: hsl(var(--accent));
   }
