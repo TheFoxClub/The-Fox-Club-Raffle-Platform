@@ -1,7 +1,7 @@
 "use strict";
 const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
-  class UserInfo extends Model {
+  class user_info extends Model {
     static associate(models) {
       this.belongsTo(models.User, {
         foreignKey: "userId",
@@ -9,31 +9,18 @@ module.exports = (sequelize, DataTypes) => {
       });
     }
   }
-  UserInfo.init(
+  user_info.init(
     {
-      userId: {
-        type: DataTypes.INTEGER,
-        unique: true,
-      },
-      description: DataTypes.TEXT("long"),
+      userId: DataTypes.INTEGER,
+      description: DataTypes.TEXT(),
       username: DataTypes.STRING,
-      email: {
-        type: DataTypes.STRING,
-        allowNull: true,
-        validate: {
-          isEmail: true,
-        },
-      },
-      photoUrl: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
+      email: DataTypes.STRING,
+      photoUrl: DataTypes.STRING,
     },
     {
       sequelize,
-      modelName: "UserInfo",
-      tableName: "user_infos",
+      modelName: "user_info",
     }
   );
-  return UserInfo;
+  return user_info;
 };
