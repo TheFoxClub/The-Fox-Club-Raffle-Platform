@@ -22,6 +22,17 @@ module.exports = {
       description: {
         type: Sequelize.TEXT("long"),
       },
+      email: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        validate: {
+          isEmail: true,
+        },
+      },
+      photoUrl: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,

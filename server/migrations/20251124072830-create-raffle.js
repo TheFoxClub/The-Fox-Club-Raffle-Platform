@@ -43,7 +43,7 @@ module.exports = {
       tokenType: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        comment: "1 - SOL, 2 - USDC, 3 - mint address",
+        comment: "0 - SOL, 1 - SPL token, 2 - SPL token 2022, 3 - USDC",
       },
       numberOfWinners: {
         type: Sequelize.INTEGER,
@@ -60,7 +60,7 @@ module.exports = {
       },
       endedAt: {
         type: Sequelize.DATE,
-        allowNull: false,
+        allowNull: true,
       },
       status: {
         type: Sequelize.INTEGER,

@@ -46,13 +46,14 @@ const getTokenFromCookies = (req) => {
 };
 
 const auth = {
-  toAuthJSON: ({ pubkey, id }) => {
+  toAuthJSON: ({ pubkey, id, role }) => {
     const generateJWT = () => {
       const expireAfter = 2 * 60 * 60; // **IN SECONDS**
       return jsonwebtoken.sign(
         {
           id,
           pubkey,
+          role,
           exp: parseInt(new Date().getTime() / 1000 + expireAfter, 10),
         },
         JWT_SECRET
@@ -62,6 +63,7 @@ const auth = {
     return {
       id,
       pubkey,
+      role,
       token: generateJWT(),
     };
   },

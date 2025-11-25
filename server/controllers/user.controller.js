@@ -10,56 +10,7 @@ const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
 // const { getPendingClaimedEmbers } = require("../services/currency");
 
-const handleError = async (res, err) => {
-  logger.error(err);
-  return respond(
-    res,
-    httpStatus.INTERNAL_SERVER_ERROR,
-    parseSequelizeErrors(err)
-  );
-};
-
-const updateUserInfo = async (req, res) => {
-  if (req.body.userId !== req.payload.id)
-    return handleError(res, new Error("Unauthorized user"));
-  const userInfo = {
-    userId: req.body.userId,
-    description: req.body.description,
-  };
-
-  try {
-    const count = await UserInfo.update(userInfo, {
-      where: {
-        userId: req.payload.id,
-      },
-    });
-
-    return count[0];
-  } catch (err) {
-    handleError(res, err);
-    return -1;
-  }
-};
-
-const updateUser = async (req, res) => {
-  if (req.body.userId !== req.payload.id)
-    return handleError(res, new Error("Unauthorized user"));
-  try {
-    const count = await User.update(
-      { username: req.body.username },
-      {
-        where: {
-          id: req.payload.id,
-        },
-      }
-    );
-
-    return count[0];
-  } catch (err) {
-    handleError(res, err);
-    return -1;
-  }
-};
+// handling implementations. Keep controller methods centralized.
 class UserController {
   // static async getBalanceFromUserData(user) {
   //   // const pendingClaimedEmbers = await getPendingClaimedEmbers(user.id);
@@ -93,7 +44,14 @@ class UserController {
         include: [
           {
             model: UserInfo,
-            attributes: ["id", "userId", "description", "username"],
+            attributes: [
+              "id",
+              "email",
+              "userId",
+              "description",
+              "username",
+              "photoUrl",
+            ],
             required: false,
           },
         ],
@@ -116,6 +74,8 @@ class UserController {
       userId: req.payload.id,
       description: req.body.description,
       username: req.body.username,
+      email: req.body.email,
+      photoUrl: req.body.photoUrl,
     };
 
     try {
@@ -137,6 +97,8 @@ class UserController {
         userId: req.payload.id,
         description: req.body.description,
         username: req.body.username,
+        email: req.body.email,
+        photoUrl: req.body.photoUrl,
       };
 
       const existingUserInfo = await UserInfo.findOne({
@@ -162,28 +124,6 @@ class UserController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(err)
-      );
-    }
-  }
-
-  static async getUserRewardTokens(req, res) {
-    const { type } = req.body;
-    try {
-      const tokens = await UserReward.findAll({
-        where: {
-          type,
-        },
-        attributes: ["tokenAddress"],
-      });
-      return respond(res, httpStatus.OK, "Successful!", {
-        tokens: tokens.map((t) => t.tokenAddress),
-      });
-    } catch (error) {
-      console.error("Error fetching user reward tokens:", error);
-      return respond(
-        res,
-        httpStatus.INTERNAL_SERVER_ERROR,
-        "Error fetching tokens"
       );
     }
   }

@@ -30,6 +30,7 @@ module.exports = (sequelize, DataTypes) => {
       ticketsSold: DataTypes.INTEGER,
       tokenType: DataTypes.INTEGER,
       numberOfWinners: DataTypes.INTEGER,
+      status: DataTypes.INTEGER,
       startDate: DataTypes.DATE,
       endDate: DataTypes.DATE,
       endedAt: DataTypes.DATE,
