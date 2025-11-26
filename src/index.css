@@ -100,6 +100,9 @@
   .text-muted-foreground {
     color: hsl(var(--muted-foreground));
   }
+  .text-foreground {
+    color: hsl(var(--foreground));
+  }
 
   .text-popover-foreground {
     color: hsl(var(--popover-foreground));
