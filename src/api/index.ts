@@ -1,8 +1,10 @@
 /**
  * API Calls - Simple Model for Making API Requests
  *
+ * This file uses AXIOS (configured in ../config/server.ts)
+ *
  * HOW TO USE:
- * 1. Import what you need: import { getCategories, getRaffles } from '@/api';
+ * 1. Import what you need: import { getCategories, getRaffles } from '../api';
  * 2. Call in your component: const response = await getCategories();
  * 3. Check response.success before using response.data
  *
@@ -12,6 +14,8 @@
  * 3. Use it in your component!
  */
 
+// These are axios-based request functions from server.ts
+// Re-exported so you can use them directly: import { getRequest } from '../api';
 import {
   getRequest,
   postRequest,
@@ -19,6 +23,14 @@ import {
   patchRequest,
   deleteRequest,
 } from "../config/server";
+
+export {
+  getRequest,
+  postRequest,
+  putRequest,
+  patchRequest,
+  deleteRequest,
+};
 
 // ============================================
 // EXAMPLE API CALLS (Use these as templates!)

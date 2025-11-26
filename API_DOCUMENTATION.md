@@ -2,6 +2,8 @@
 
 Simple guide for making API calls in this project.
 
+**Tech Stack:** This project uses **Axios** for HTTP requests.
+
 ---
 
 ## Quick Start
@@ -250,10 +252,32 @@ src/
 ├── api/
 │   └── index.ts      <-- All API calls go here
 ├── config/
-│   └── server.ts     <-- Base config (don't modify)
+│   └── server.ts     <-- Axios config (don't modify)
 └── components/
     └── YourComponent.tsx  <-- Use API calls here
 ```
+
+---
+
+## How Axios is Configured
+
+The axios instance is set up in `src/config/server.ts`:
+
+```typescript
+// Already configured - you don't need to touch this!
+import axios from "axios";
+
+const server = axios.create({
+  baseURL: import.meta.env.VITE_BASE_API_URL,  // From .env file
+  headers: { "Content-Type": "application/json" },
+  withCredentials: true,  // Sends cookies with requests
+});
+
+// Auto-adds auth token to all requests
+// Auto-handles 401 errors (redirects to login)
+```
+
+The helper functions (`getRequest`, `postRequest`, etc.) wrap axios and return a consistent response format.
 
 ---
 
