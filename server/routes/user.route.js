@@ -1,15 +1,12 @@
 const express = require("express");
 const UserController = require("../controllers/user.controller");
 const router = express.Router();
+const auth = require("../config/auth");
 
+// Get User Info
+router.get("/info", auth.bearer, UserController.getUserInfo);
 
-// GET /user?userId=123
-router.get("/info/:userId", UserController.getUserInfo);
-
-// POST /user/info
-router.post("/info", UserController.postUserInfo);
-
-// PUT /user/info (update)
-router.put("/info", UserController.updateUserInfo);
+// Create or Update User Info
+router.put("/info", auth.bearer, UserController.createOrUpdateUserInfo);
 
 module.exports = router;
