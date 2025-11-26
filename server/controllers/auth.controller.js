@@ -117,6 +117,7 @@ class AuthController {
       const authUser = auth.toAuthJSON({
         pubkey: pubkeyBase58,
         id: dbUser.id,
+        role: ADMIN_PUBKEY.includes(dbUser.pubkey) ? "admin" : "customer",
       });
 
       const token = authUser.token;

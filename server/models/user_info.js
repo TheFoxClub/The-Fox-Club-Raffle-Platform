@@ -11,12 +11,11 @@ module.exports = (sequelize, DataTypes) => {
   }
   user_info.init(
     {
-      userId: {
-        type: DataTypes.INTEGER,
-        unique: true,
-      },
-      description: DataTypes.TEXT("long"),
+      userId: DataTypes.INTEGER,
+      description: DataTypes.TEXT(),
       username: DataTypes.STRING,
+      email: DataTypes.STRING,
+      photoUrl: DataTypes.STRING,
     },
     {
       sequelize,
