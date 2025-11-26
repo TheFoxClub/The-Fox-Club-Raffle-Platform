@@ -9,11 +9,11 @@ router.post("/create", auth.bearer, RaffleController.createRaffle);
 //Get active / live raffles
 router.get("/live", RaffleController.getLiveRaffles);
 
-// Get a raffle by ID with Raffle Details
-router.get("/:id", RaffleController.getRaffleById);
-
 // Get Featured Raffles
 router.get("/featured", RaffleController.getFeaturedRaffles);
+
+// Get a raffle by ID with Raffle Details
+router.get("/:id", RaffleController.getRaffleById);
 
 // Get Raffles by User ID
 router.get("/user/:userId", auth.bearer, RaffleController.getRafflesByUserId);
