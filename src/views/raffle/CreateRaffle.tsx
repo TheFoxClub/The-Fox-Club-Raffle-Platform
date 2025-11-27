@@ -11,23 +11,99 @@ import {
 } from "../../components/ui/Dialog";
 import { useState } from "react";
 import { mockWalletNFTs } from "../../dummydata/WalletNFTs";
+import { useNavigate } from "react-router-dom";
+import server from "../../config/server";
+import { toast } from "react-toastify";
 
 const CreateRaffle = () => {
+  const navigate = useNavigate();
   const [selectedNFT, setSelectedNFT] = useState<any>(null);
   const [isNFTDialogOpen, setIsNFTDialogOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [ticketPrice, setTicketPrice] = useState<number | "">("");
+  const [totalTickets, setTotalTickets] = useState<number | "">("");
+  const [numberOfWinners, setNumberOfWinners] = useState(1);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedToken, setSelectedToken] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const tokenOptions = [
-    { value: "sol", label: "SOL" },
-    { value: "usdc", label: "USDC" },
-    { value: "bonk", label: "BONK" },
-    { value: "usdt", label: "USDT" },
+    { value: "SOL", label: "SOL" },
+    { value: "USDC", label: "USDC" },
+    { value: "BONK", label: "BONK" },
+    { value: "USDT", label: "USDT" },
   ];
-
-  const [selectedToken, setSelectedToken] = useState("sol");
 
   const handleSelectNFT = (nft: any) => {
     setSelectedNFT(nft);
     setIsNFTDialogOpen(false);
+  };
+
+  const validateForm = () => {
+    if (!selectedNFT) return toast.error("Please select an NFT.");
+    if (!title.trim()) return toast.error("Title is required.");
+    if (!description.trim()) return toast.error("Description is required.");
+    if (!ticketPrice || Number(ticketPrice) <= 0)
+      return toast.error("Ticket price must be greater than 0.");
+    if (!totalTickets || Number(totalTickets) <= 0)
+      return toast.error("Total tickets must be greater than 0.");
+    if (!numberOfWinners || Number(numberOfWinners) <= 0)
+      return toast.error("Number of winners must be at least 1.");
+    if (Number(numberOfWinners) > Number(totalTickets))
+      return toast.error("Number of winners cannot exceed total tickets.");
+    if (!startDate || !endDate)
+      return toast.error("Start and end dates are required.");
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (start >= end) return toast.error("Start date must be before end date.");
+    if (start < new Date())
+      return toast.error("Start date cannot be in the past.");
+    if (!selectedToken) return toast.error("Please select a token type.");
+    return null;
+  };
+
+  const handleCreateRaffle = async () => {
+    const error = validateForm();
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        title: title.trim(),
+        description: description.trim(),
+        imageUrl: selectedNFT?.image,
+        totalTickets: Number(totalTickets),
+        ticketPrice: Number(ticketPrice),
+        tokenType: selectedToken,
+        numberOfWinners,
+        startDate,
+        endDate,
+        requiresNftVerification: false,
+        verifiedCollectionRequired: selectedNFT?.collection,
+        additionalJson: {
+          created: "user",
+          category: "raffle",
+          notes: "",
+        },
+      };
+
+      const res = await server.post("/raffle/create", payload);
+
+      toast.success("Raffle created successfully!");
+      navigate("/");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Failed to create raffle");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,6 +145,8 @@ const CreateRaffle = () => {
             <div>
               <input
                 type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Rare Fox NFT Giveway"
                 className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
               />
@@ -81,7 +159,8 @@ const CreateRaffle = () => {
             </label>
             <div>
               <Textarea
-                id="description"
+                value={description}
+                onChange={(e: any) => setDescription(e.target.value)}
                 placeholder="Describe your raffle, prizes, and any special conditions..."
                 rows={5}
                 className="bg-background-50 mt-2"
@@ -177,6 +256,8 @@ const CreateRaffle = () => {
               <div>
                 <input
                   type="number"
+                  value={ticketPrice}
+                  onChange={(e) => setTicketPrice(Number(e.target.value))}
                   placeholder="0.5"
                   step="0.01"
                   className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
@@ -188,7 +269,7 @@ const CreateRaffle = () => {
               <label className="text-sm font-medium">Token Type *</label>
               <Select
                 options={tokenOptions}
-                value={selectedToken} // <-- Pass the state value here
+                value={selectedToken}
                 onValueChange={setSelectedToken}
                 className="bg-background-50 mt-2"
               />
@@ -199,6 +280,8 @@ const CreateRaffle = () => {
               <div>
                 <input
                   type="number"
+                  value={totalTickets}
+                  onChange={(e) => setTotalTickets(Number(e.target.value))}
                   placeholder="100"
                   className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
                 />
@@ -210,6 +293,8 @@ const CreateRaffle = () => {
               <div>
                 <input
                   type="number"
+                  value={numberOfWinners}
+                  onChange={(e) => setNumberOfWinners(Number(e.target.value))}
                   placeholder="1"
                   defaultValue="1"
                   className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
@@ -231,6 +316,8 @@ const CreateRaffle = () => {
               <div>
                 <input
                   type="datetime-local"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
                 />
               </div>
@@ -241,6 +328,8 @@ const CreateRaffle = () => {
               <div>
                 <input
                   type="datetime-local"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                   className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
                 />
               </div>
@@ -253,11 +342,13 @@ const CreateRaffle = () => {
           </Button>
 
           <Button
+            onClick={handleCreateRaffle}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
+            disabled={loading}
           >
             <PlusCircle className="h-4 w-4" />
-            Create Raffle
+            {loading ? "Creating..." : "Create Raffle"}
           </Button>
         </div>
       </div>
