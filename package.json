@@ -13,6 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@metaplex-foundation/digital-asset-standard-api": "^2.0.0",
     "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
     "@metaplex-foundation/umi-signer-wallet-adapters": "^1.4.1",
     "@radix-ui/react-progress": "^1.1.8",
