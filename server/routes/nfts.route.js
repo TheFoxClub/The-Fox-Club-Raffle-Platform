@@ -10,4 +10,7 @@ router.get(
   HolderController.getUserNftsFromCollection
 );
 
+// Get all NFTs of a user
+router.get("/:pubkey", auth.bearer, HolderController.getUserNfts);
+
 module.exports = router;
