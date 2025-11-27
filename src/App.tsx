@@ -13,6 +13,7 @@ import Loading from "./components/reusable/Loading";
 // import { UmiProvider } from "./helpers/umi/UmiProvider";
 import "./index.css";
 import RaffleDetail from "./views/raffle/RaffleDetail";
+import EditProfile from "./views/profile/EditProfile";
 
 function App() {
   // let endpoint = "https://api.devnet.solana.com";
@@ -44,6 +45,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/EditProfile" element={<EditProfile />} />
             <Route path="/create" element={<CreateRaffle />} />
             <Route path="/raffle/:id" element={<RaffleDetail />} />
           </Routes>
