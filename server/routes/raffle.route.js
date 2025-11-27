@@ -9,6 +9,9 @@ router.post("/create", auth.bearer, RaffleController.createRaffle);
 //Get active / live raffles
 router.get("/live", RaffleController.getLiveRaffles);
 
+//Get Ended Raffle
+router.get("/ended", RaffleController.getEndedRaffles);
+
 // Get Featured Raffles
 router.get("/featured", RaffleController.getFeaturedRaffles);
 

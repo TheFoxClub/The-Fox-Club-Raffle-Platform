@@ -50,6 +50,48 @@ class RaffleController {
     }
   }
 
+  static async getEndedRaffles(req, res) {
+    try {
+      const raffles = await Raffle.findAll({
+        where: {
+          status: RAFFLE_STATUS.ENDED,
+        },
+        include: [
+          {
+            model: RaffleDetail,
+            attributes: [
+              "isFeatured",
+              "featuredPosition",
+              "requiresNftVerification",
+              "verifiedCollectionRequired",
+            ],
+          },
+          {
+            model: User,
+            attributes: ["id", "pubkey"],
+          },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Ended raffles retrieved successfully",
+        {
+          raffles,
+        }
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
   static async getFeaturedRaffles(req, res) {
     try {
       const raffles = await Raffle.findAll({
