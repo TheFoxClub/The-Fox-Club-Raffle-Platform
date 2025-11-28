@@ -96,8 +96,16 @@ const CreateRaffle = () => {
 
       const res = await server.post("/raffle/create", payload);
 
-      toast.success("Raffle created successfully!");
-      navigate("/");
+      if (res.data.success) {
+        toast.success(res.data.message);
+
+        // Access the created raffle
+        const createdRaffle = res.data.data.raffle;
+        console.log("Created raffle ID:", createdRaffle.id);
+
+        // Navigate to raffle detail page if needed
+        navigate(`/raffle/${createdRaffle.id}`);
+      }
     } catch (error: any) {
       console.error(error);
       toast.error(error.response?.data?.message || "Failed to create raffle");
