@@ -47,7 +47,7 @@ export const Header = () => {
           <Link to="/">
             <Button
               variant={isActive("/") ? "default" : "ghost"}
-              className="gap-2"
+              className="gap-2 cursor-pointer"
             >
               <Trophy className="h-4 w-4" /> Raffles
             </Button>
@@ -55,7 +55,7 @@ export const Header = () => {
           <Link to="/leaderboard">
             <Button
               variant={isActive("/leaderboard") ? "default" : "ghost"}
-              className="gap-2"
+              className="gap-2 cursor-pointer"
             >
               <Trophy className="h-4 w-4" /> Leaderboard
             </Button>
@@ -63,7 +63,7 @@ export const Header = () => {
           <Link to="/profile">
             <Button
               variant={isActive("/profile") ? "default" : "ghost"}
-              className="gap-2"
+              className="gap-2 cursor-pointer"
             >
               <User className="h-4 w-4" /> Profile
             </Button>
@@ -74,7 +74,10 @@ export const Header = () => {
         <div className="flex items-center gap-2 relative">
           {connected && (
             <Link to="/create">
-              <Button variant="outline" className="gap-2 hidden sm:flex">
+              <Button
+                variant="outline"
+                className="gap-2 hidden sm:flex cursor-pointer"
+              >
                 <PlusCircle className="h-4 w-4" /> Create Raffle
               </Button>
             </Link>
@@ -87,7 +90,7 @@ export const Header = () => {
               {connected ? (
                 <Button
                   variant="secondary"
-                  className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
                 >
                   <Wallet className="h-4 w-4" />
                   {shortenAddress(publicKey?.toBase58() || "")}
@@ -97,7 +100,7 @@ export const Header = () => {
             {user.isAuthenticated && (
               <Button
                 variant="secondary"
-                className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
                 onClick={logout}
                 title="Logout"
                 aria-label="Logout"
@@ -114,7 +117,7 @@ export const Header = () => {
           <Link to="/" className="flex-1">
             <Button
               variant={isActive("/") ? "default" : "ghost"}
-              className="w-full gap-2"
+              className="w-full gap-2 cursor-pointer"
               size="sm"
             >
               <Trophy className="h-4 w-4" /> Raffles
@@ -123,7 +126,7 @@ export const Header = () => {
           <Link to="/leaderboard" className="flex-1">
             <Button
               variant={isActive("/leaderboard") ? "default" : "ghost"}
-              className="w-full gap-2"
+              className="w-full gap-2 cursor-pointer"
               size="sm"
             >
               <Trophy className="h-4 w-4" /> Leaders
@@ -132,7 +135,7 @@ export const Header = () => {
           <Link to="/profile" className="flex-1">
             <Button
               variant={isActive("/profile") ? "default" : "ghost"}
-              className="w-full gap-2"
+              className="w-full gap-2 cursor-pointer"
               size="sm"
             >
               <User className="h-4 w-4" /> Profile

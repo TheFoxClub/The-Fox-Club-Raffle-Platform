@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
 import Button from "../../components/ui/Button";
@@ -13,39 +14,125 @@ import {
   Ticket,
   AlertCircle,
 } from "lucide-react";
-import { allRaffle } from "../../dummydata/mockRaffleDetail";
-import type { RaffleType } from "../../dummydata/mockRaffleDetail";
+// import { allRaffle } from "../../dummydata/mockRaffleDetail";
+// import type { RaffleType } from "../../dummydata/mockRaffleDetail";
+import server from "../../config/server";
+import { toast } from "react-toastify";
+
+export interface RaffleType {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  price: number;
+  tokenType: string;
+  total: number;
+  sold: number;
+  winners: number;
+  endTime: string;
+  created: string;
+  host: string;
+  hostReputation: number;
+  isVerified: boolean;
+  isFeatured: boolean;
+  prizeValue: string;
+}
+
+function formatDateOnly(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toISOString().split("T")[0];
+}
+
+function formatCountdown(endDate: string) {
+  const end = new Date(endDate).getTime();
+  const now = Date.now();
+  let diff = end - now;
+
+  if (diff <= 0) return "Ended";
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  diff %= 1000 * 60 * 60 * 24;
+
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  diff %= 1000 * 60 * 60;
+
+  const minutes = Math.floor(diff / (1000 * 60));
+
+  return `${days}d ${hours}h ${minutes}m`;
+}
 
 const RaffleDetail = () => {
-  const id = 1;
+  const { id } = useParams<{ id: string }>();
 
   const [raffle, setRaffle] = useState<RaffleType | null>(null);
   const [loading, setLoading] = useState(true);
   const [ticketCount, setTicketCount] = useState(1);
+  const TOKEN_MAP: Record<number, string> = {
+    0: "SOL",
+    1: "USDC",
+    2: "BONK",
+    3: "USDT",
+  };
 
   useEffect(() => {
     // simulate fetching raffle data
     const fetchRaffle = async () => {
-      // Replace this with API call if needed
-      const data = allRaffle.find((item) => item.id === id) || null;
-      setRaffle(data);
-      setLoading(false);
+      if (!id) return;
+      try {
+        setLoading(true);
+        const res = await server.get(`/raffle/${id}`);
+        if (res.data.success) {
+          const data = res.data.data.raffle;
+
+          const mappedRaffle: RaffleType = {
+            id: data.id,
+            title: data.title,
+            description: data.description,
+            image: data.imageUrl,
+            price: Number(data.ticketPrice),
+            tokenType: TOKEN_MAP[data.tokenType] || "UNKNOWN",
+            total: data.totalTickets,
+            sold: data.ticketsSold,
+            winners: data.numberOfWinners,
+            endTime: formatCountdown(data.endDate),
+            created: formatDateOnly(data.createdAt),
+            host: data.userName || "Admin",
+            hostReputation: data.userReputation || 100,
+            isVerified: data.raffle_detail.requiresNftVerification,
+            isFeatured: data.raffle_detail.isFeatured,
+            prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
+          };
+
+          setRaffle(mappedRaffle);
+        } else {
+          toast.error(res.data.message || "Failed to fetch raffle");
+        }
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error.response?.data?.message || "Failed to fetch raffle");
+      } finally {
+        setLoading(false);
+      }
     };
-
     fetchRaffle();
-  }, []);
+  }, [id]);
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Loading raffle details...</p>
+        Loading raffle details...
       </div>
     );
-  }
 
-  if (!raffle) {
-    return <div>Loading raffle...</div>;
-  }
+  if (!raffle)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Raffle not found.
+      </div>
+    );
+
+  const ticketsLeft = Math.max(raffle.total - raffle.sold, 0);
+  const totalCost = (raffle.price * ticketCount).toFixed(2);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -87,7 +174,7 @@ const RaffleDetail = () => {
                   <Trophy className="h-4 w-4" />
                   Prize Value
                 </div>
-                <p className="font-bold text-lg">{raffle.prizeValue}</p>
+                <p className="font-bold text-lg">~{raffle.prizeValue}</p>
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
@@ -145,13 +232,12 @@ const RaffleDetail = () => {
                 <div className="flex items-center gap-3">
                   <User className="h-4 w-4 text-muted foreground" />
                   <span className="text-sm text-muted-foreground">
-                    {" "}
                     {raffle.sold} / {raffle.total} tickets sold
                   </span>
                 </div>
 
                 <span className="text-accent font-semibold">
-                  {raffle.total - raffle.sold} left
+                  {ticketsLeft} left
                 </span>
               </div>
               <Progress
@@ -164,11 +250,9 @@ const RaffleDetail = () => {
             <div className="flex items-center justify-between glass-card p-4 rounded-lg mb-4">
               <div className="flex items-center gap-3">
                 <Coins className="h-5 w-5 text-accent" />
-                <span className="text-sm text-muted-foreground">
-                  Ticket Price
-                </span>
+                <span className="text-muted-foreground">Ticket Price</span>
               </div>
-              <span className="text-muted-foreground text-xl font-bold">
+              <span className="text-xl font-bold">
                 {raffle.price} {raffle.tokenType}
               </span>
             </div>
@@ -178,7 +262,7 @@ const RaffleDetail = () => {
             <div className="flex items-center justify-between glass-card p-4 rounded-lg mb-6">
               <div className="flex items-center gap-3">
                 <Clock className="h-5 w-5 text-primary" />
-                <span className="text-sm text-muted-foreground">Ends In</span>
+                <span className="text-muted-foreground">Ends In</span>
               </div>
               <span className="text-muted-foreground text-xl font-bold">
                 {raffle.endTime}
@@ -224,7 +308,7 @@ const RaffleDetail = () => {
                 Total Cost
               </span>
               <span className="text-2xl font-bold text-primary">
-                {(raffle.price * ticketCount).toFixed(2)} {raffle.tokenType}
+                {totalCost} {raffle.tokenType}
               </span>
             </div>
 

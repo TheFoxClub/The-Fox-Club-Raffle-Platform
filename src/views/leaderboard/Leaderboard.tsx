@@ -75,7 +75,7 @@ const Leaderboard = () => {
               options={timeOptions}
               value={selectedTime}
               onValueChange={setSelectedTime}
-              className="bg-background-50 mr-6"
+              className="bg-background-50 mr-6 cursor-pointer"
             />
           </div>
         </Card>
