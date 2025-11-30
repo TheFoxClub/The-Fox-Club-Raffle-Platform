@@ -23,4 +23,20 @@ router.put(
   AdminController.toggleSuspendStatus
 );
 
+// Upload Verified Collection
+router.post(
+  "/verified-collection",
+  auth.bearer,
+  isAdmin,
+  AdminController.createOrUpdateVerifiedCollection
+);
+
+//Get Verified Collections
+router.get(
+  "/verified-collection",
+  auth.bearer,
+  isAdmin,
+  AdminController.getAllVerifiedCollections
+);
+
 module.exports = router;

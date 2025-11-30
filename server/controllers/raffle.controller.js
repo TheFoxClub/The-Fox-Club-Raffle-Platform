@@ -5,6 +5,7 @@ const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
 const { Op } = require("sequelize");
 const { TOKEN_TYPE, RAFFLE_STATUS } = require("../config/data");
+const { ClockFading } = require("lucide-react");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -472,6 +473,96 @@ class RaffleController {
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(err)
       );
+    }
+  }
+
+  static async filterRaffles(req, res) {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      const { status, tokenType, price, collection, search = "" } = req.query;
+
+      console.log("req query: ", req.query);
+
+      let whereClause = {};
+
+      // Filter by status
+      if (status) {
+        const statusMap = {
+          live: RAFFLE_STATUS.LIVE,
+          ended: RAFFLE_STATUS.ENDED,
+          upcoming: RAFFLE_STATUS.UPCOMING,
+        };
+        if (statusMap[status.toLowerCase()] !== undefined) {
+          whereClause.status = statusMap[status.toLowerCase()];
+        }
+      }
+
+      // Filter by token type
+      if (tokenType && tokenType !== "all") {
+        const tokenMap = {
+          sol: TOKEN_TYPE.SOLANA,
+          usdc: TOKEN_TYPE.USDC,
+          token: TOKEN_TYPE.SPL_TOKEN,
+        };
+        if (tokenMap[tokenType.toLowerCase()] !== undefined) {
+          whereClause.tokenType = tokenMap[tokenType.toLowerCase()];
+        }
+      }
+
+      // Filter by verified collection
+      if (collection === "verified") {
+        const verifiedAddresses = await VerifiedCollection.findAll({
+          attributes: ["address"],
+        });
+        const addresses = verifiedAddresses.map((v) => v.address);
+        whereClause["$RaffleDetail.collectionAddress$"] = {
+          [Op.in]: addresses,
+        };
+      }
+
+      // Search by title
+      if (search) {
+        // whereClause.title = { [Op.iLike]: `%${search}%` }; // case-insensitive
+        whereClause.title = { [Op.like]: `%${search}%` };
+      }
+
+      // Determine order by price
+      let order = [["createdAt", "DESC"]];
+      if (price === "lowtohigh") order = [["ticketPrice", "ASC"]];
+      if (price === "hightolow") order = [["ticketPrice", "DESC"]];
+
+      // Query raffles
+      const { count, rows: raffles } = await Raffle.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: RaffleDetail,
+          },
+          {
+            model: User,
+            attributes: ["id", "pubkey"],
+          },
+        ],
+        order,
+        limit,
+        offset,
+      });
+
+      return respond(res, httpStatus.OK, "Raffles retrieved successfully", {
+        raffles,
+        pagination: {
+          total: count,
+          page,
+          limit,
+          totalPages: Math.ceil(count / limit),
+        },
+      });
+    } catch (err) {
+      logger.error(err);
+      return respond(res, httpStatus.INTERNAL_SERVER_ERROR, err.message);
     }
   }
 }
