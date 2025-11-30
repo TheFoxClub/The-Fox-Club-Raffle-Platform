@@ -303,7 +303,7 @@ const RaffleDetail = () => {
               </div>
             </div>
             {/* Total Cost */}
-            <div className="flex items-center glass-card justify-between border-primary-30 p-4 rounded-lg bg-primary-10">
+            <div className="flex items-center glass-card justify-between border-primary/30 p-4 rounded-lg bg-primary-10">
               <span className="font-semibold text-muted-foreground">
                 Total Cost
               </span>
@@ -319,8 +319,8 @@ const RaffleDetail = () => {
             </Button>
 
             {/* Info */}
-            <div className="glass-card border-accent-30 rounded-lg flex gap-3 p-4">
-              <AlertCircle className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
+            <div className="glass-card border-accent/1030 rounded-lg flex gap-3 p-4">
+              <AlertCircle className="h-5 w-5 text-accent shrink-0 mt-0.5" />
               <div className="text-sm space-y-1">
                 <p className="font-semibold">NFT Holder Discount</p>
                 <p className="text-muted-foreground">
