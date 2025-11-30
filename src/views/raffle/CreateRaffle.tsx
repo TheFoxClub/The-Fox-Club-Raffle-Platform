@@ -42,7 +42,7 @@ const CreateRaffle = () => {
       </div>
 
       <div className="space-y-6">
-        <div className="glass-card p-4 space-y-2 rounded-lg border border-accent-30 bg-card shadow-sm mb-6">
+        <div className="glass-card p-4 space-y-2 rounded-lg border border-accent/30 bg-card shadow-sm mb-6">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-accent" />
             <span text-sm font-medium>
@@ -61,7 +61,7 @@ const CreateRaffle = () => {
           </div>
         </div>
 
-        <div className="glass-card border bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
+        <div className="glass-card border bg-card rounded-lg border-border shadow-sm p-6 space-y-6">
           <h1 className="text-2xl font-bold">Basic Information</h1>
 
           <div>
@@ -70,8 +70,8 @@ const CreateRaffle = () => {
               <input
                 type="text"
                 placeholder="e.g., Rare Fox NFT Giveway"
-                className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
-              />
+                className="border focus:border-primary border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
+              />  
             </div>
           </div>
 
@@ -92,7 +92,7 @@ const CreateRaffle = () => {
           <div>
             <label className="text-sm font-medium mb-2">Prize NFT *</label>
             {selectedNFT ? (
-              <div className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50">
+              <div className="relative border-2 border-primary/30 rounded-lg p-4 bg-background-50">
                 <button
                   type="button"
                   onClick={() => setSelectedNFT(null)}
@@ -153,7 +153,7 @@ const CreateRaffle = () => {
                           alt={nft.name}
                           className="w-full aspect-square object-cover"
                         />
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background-90 to-transparent p-3">
+                        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-background via-background-90 to-transparent p-3">
                           <p className="font-semibold text-sm">{nft.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {nft.collection}
@@ -168,7 +168,7 @@ const CreateRaffle = () => {
           </div>
         </div>
 
-        <div className="glass-card border bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
+        <div className="glass-card bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
           <h1 className="text-2xl font-bold">Raffle Settings</h1>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -179,7 +179,7 @@ const CreateRaffle = () => {
                   type="number"
                   placeholder="0.5"
                   step="0.01"
-                  className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
+                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base md:text-sm bg-background/50 outline-none"
                 />
               </div>
             </div>
@@ -200,7 +200,7 @@ const CreateRaffle = () => {
                 <input
                   type="number"
                   placeholder="100"
-                  className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
+                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
               </div>
             </div>
@@ -212,14 +212,14 @@ const CreateRaffle = () => {
                   type="number"
                   placeholder="1"
                   defaultValue="1"
-                  className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
+                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="glass-card border bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
+        <div className="glass-card bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             <h1 className="text-2xl font-bold">Duration</h1>
@@ -231,7 +231,7 @@ const CreateRaffle = () => {
               <div>
                 <input
                   type="datetime-local"
-                  className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
+                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
               </div>
             </div>
@@ -241,7 +241,7 @@ const CreateRaffle = () => {
               <div>
                 <input
                   type="datetime-local"
-                  className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
+                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
               </div>
             </div>

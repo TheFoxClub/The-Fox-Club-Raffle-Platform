@@ -27,7 +27,7 @@ export const Header = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 glass-card border-b border-border/50 w-full">
+    <nav className="sticky top-0 z-50 bg-background border-b border-border/50 w-full backdrop-blur-sm">
       <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3 group">

@@ -60,7 +60,7 @@ const Leaderboard = () => {
           </p>
         </div>
 
-        <Card className="glass-card p-6 border border-accent-30 rounded-lg">
+        <Card className="glass-card p-6 border border-accent/30 rounded-lg">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Award className="h-10 w-10 text-accent" />
