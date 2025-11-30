@@ -15,6 +15,9 @@ router.get("/ended", RaffleController.getEndedRaffles);
 // Get Featured Raffles
 router.get("/featured", RaffleController.getFeaturedRaffles);
 
+// Filter Raffles with search term, status, token-type, price, collection, page, limit
+router.get("/filter", auth.bearer, RaffleController.filterRaffles);
+
 // Get a raffle by ID with Raffle Details
 router.get("/:id", RaffleController.getRaffleById);
 

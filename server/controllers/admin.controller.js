@@ -1,4 +1,10 @@
-const { Raffle, RaffleDetail, User, UserInfo } = require("../models");
+const {
+  Raffle,
+  RaffleDetail,
+  User,
+  UserInfo,
+  VerifiedCollection,
+} = require("../models");
 const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
@@ -183,6 +189,87 @@ class AdminController {
           ? "Raffle suspended successfully"
           : "Raffle resumed successfully",
         { raffle }
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async createOrUpdateVerifiedCollection(req, res) {
+    try {
+      const { address, addresses } = req.body;
+      let records = [];
+
+      if (address) {
+        const [record, created] = await VerifiedCollection.findOrCreate({
+          where: { address },
+          defaults: { address },
+        });
+        if (!created) {
+          await record.update({ address });
+        }
+        records.push(record);
+      }
+
+      if (Array.isArray(addresses) && addresses.length > 0) {
+        for (const addr of addresses) {
+          const [record, created] = await VerifiedCollection.findOrCreate({
+            where: { address: addr },
+            defaults: { address: addr },
+          });
+          if (!created) {
+            await record.update({ address: addr });
+          }
+          records.push(record);
+        }
+      }
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Verified collection(s) created/updated successfully!",
+        { data: records }
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async getAllVerifiedCollections(req, res) {
+    try {
+      const { page = 1, limit = 50 } = req.query;
+      const offset = (page - 1) * limit;
+
+      const { count, rows: collections } =
+        await VerifiedCollection.findAndCountAll({
+          order: [["createdAt", "DESC"]],
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+        });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Verified collections retrieved successfully",
+        {
+          collections,
+          pagination: {
+            total: count,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(count / limit),
+          },
+        }
       );
     } catch (err) {
       logger.error(err);
