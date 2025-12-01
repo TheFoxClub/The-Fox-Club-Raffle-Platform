@@ -1,126 +1,215 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { cn } from "../../lib/utils";
 
-const cn = (...classes: (string | undefined | null | false)[]) =>
-  classes.filter(Boolean).join(" ");
-
-// --- Types ---
-interface SelectOption {
-  value: string;
-  label: string;
+interface SelectContextType {
+  value: string | undefined;
+  setValue: (v: string) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  registerItem: (val: string, label: React.ReactNode) => void;
+  unregisterItem: (val: string) => void;
+  itemsRef: React.MutableRefObject<Map<string, React.ReactNode>>;
 }
+const SelectContext = React.createContext<SelectContextType | null>(null);
 
 interface SelectProps {
-  options: SelectOption[];
-  value: string;
-  placeholder?: string;
+  value?: string;
+  defaultValue?: string;
   onValueChange?: (value: string) => void;
-  className?: string; // Class for the trigger button
-  contentClassName?: string; // Class for the dropdown content div
+  children: React.ReactNode;
 }
 
-const Select: React.FC<SelectProps> = ({
-  options,
-  value,
-  placeholder = "Select an option",
-  className,
-  contentClassName,
-  onValueChange,
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+export const Select: React.FC<SelectProps> = ({ value: controlledValue, defaultValue, onValueChange, children }) => {
+  const [internalValue, setInternalValue] = useState<string | undefined>(defaultValue);
+  const isControlled = controlledValue !== undefined;
+  const value = isControlled ? controlledValue : internalValue;
 
-  // Determine the display label for the current 'value' prop
-  const displayLabel = useMemo(() => {
-    const selectedOption = options.find((opt) => opt.value === value);
-    return selectedOption ? selectedOption.label : placeholder;
-  }, [value, options, placeholder]);
+  const [open, setOpen] = useState(false);
+  const itemsRef = useRef(new Map<string, React.ReactNode>());
 
-  // Handler for when an item is clicked
-  const handleSelect = (newValue: string) => {
-    // Notify the parent component of the change
-    onValueChange?.(newValue);
-    setIsOpen(false);
-  };
+  const setValue = useCallback(
+    (v: string) => {
+      if (!isControlled) setInternalValue(v);
+      onValueChange?.(v);
+      setOpen(false);
+    },
+    [isControlled, onValueChange]
+  );
 
-  // Logic to close the dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
+  const registerItem = useCallback((val: string, label: React.ReactNode) => {
+    itemsRef.current.set(val, label);
+  }, []);
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+  const unregisterItem = useCallback((val: string) => {
+    itemsRef.current.delete(val);
   }, []);
 
   return (
-    <div ref={wrapperRef} className="relative z-[51]">
-      {/* Select Trigger (Mimics SelectTrigger and SelectValue) */}
-      <button
-        type="button"
-        className={cn(
-          "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-          className
-        )}
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-      >
-        <span className="line-clamp-1">{displayLabel}</span>
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 opacity-50 transition-transform duration-200",
-            isOpen && "rotate-180"
-          )}
-        />
-      </button>
-
-      {/* Select Content (Mimics SelectContent) */}
-      {isOpen && (
-        <div
-          className={cn(
-            "absolute z-100 max-h-96 mt-1 w-full min-w-[8rem] overflow-hidden rounded-md border bg-popover border-input text-popover-foreground shadow-md transition-all duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-            contentClassName
-          )}
-          style={{ transformOrigin: "top" }}
-          role="listbox"
-        >
-          <ul className="p-1 max-h-[200px] overflow-y-auto">
-            {options.map((option) => (
-              <li
-                key={option.value}
-                onClick={() => handleSelect(option.value)}
-                role="option"
-                aria-selected={value === option.value}
-                className={cn(
-                  "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-accent hover:text-accent-foreground transition-colors",
-                  value === option.value &&
-                    "text-accent-foreground font-semibold"
-                )}
-                tabIndex={0}
-              >
-                {/* Item Indicator (Mimics SelectItemIndicator) */}
-                {value === option.value && (
-                  <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                    <Check className="h-4 w-4" />
-                  </span>
-                )}
-                {/* Item Text */}
-                {option.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+    <SelectContext.Provider value={{ value, setValue, open, setOpen, registerItem, unregisterItem, itemsRef }}>
+      <div className="relative">{children}</div>
+    </SelectContext.Provider>
   );
 };
+
+interface SelectGroupProps {
+  children: React.ReactNode;
+}
+
+export const SelectGroup: React.FC<SelectGroupProps> = ({ children }) => (
+  <div className="select-group">{children}</div>
+);
+
+interface SelectValueProps {
+  placeholder?: string;
+}
+
+export const SelectValue: React.FC<SelectValueProps> = ({ placeholder = "Select an option" }) => {
+  const ctx = React.useContext(SelectContext);
+  if (!ctx) return null;
+  const map = ctx.itemsRef.current;
+  let display: React.ReactNode = placeholder;
+  if (ctx.value && map) display = map.get(ctx.value) ?? placeholder;
+  return <span className="line-clamp-1">{display}</span>;
+};
+
+interface SelectTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
+  ({ className, children, ...props }, ref) => {
+    const ctx = React.useContext(SelectContext);
+    if (!ctx) return null;
+
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className={cn(
+          "flex h-10 w-full items-center justify-between rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 ring-offset-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+          className
+        )}
+        onClick={() => ctx.setOpen(!ctx.open)}
+        aria-expanded={ctx.open}
+        aria-haspopup="listbox"
+        {...props}
+      >
+        {children}
+        <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform duration-200", ctx.open && "rotate-180")} />
+      </button>
+    );
+  }
+);
+SelectTrigger.displayName = "SelectTrigger";
+
+interface SelectContentProps extends React.HTMLAttributes<HTMLDivElement> {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
+  ({ className, children, ...props }, ref) => {
+    const ctx = React.useContext(SelectContext);
+    const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+          ctx?.setOpen(false);
+        }
+      };
+      if (ctx?.open) document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [ctx]);
+
+    if (!ctx) return null;
+    if (!ctx.open) return null;
+
+    return (
+      <div
+        ref={(node) => {
+          wrapperRef.current = node;
+          if (typeof ref === "function") ref(node);
+          else if (ref) ref.current = node;
+        }}
+        className={cn(
+          "absolute z-50 mt-1 max-h-96 min-w-[8rem] w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 text-zinc-100 shadow-md",
+          className
+        )}
+        role="listbox"
+        {...props}
+      >
+        <div className="p-1 max-h-[200px] overflow-y-auto">{children}</div>
+      </div>
+    );
+  }
+);
+SelectContent.displayName = "SelectContent";
+
+interface SelectLabelProps extends React.HTMLAttributes<HTMLDivElement> {
+  className?: string;
+}
+
+export const SelectLabel = React.forwardRef<HTMLDivElement, SelectLabelProps>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold text-zinc-400", className)} {...props} />
+  )
+);
+SelectLabel.displayName = "SelectLabel";
+
+export interface SelectItemProps extends React.LiHTMLAttributes<HTMLLIElement> {
+  value: string;
+  children?: React.ReactNode;
+}
+
+export const SelectItem = React.forwardRef<HTMLLIElement, SelectItemProps>(
+  ({ className, children, value, ...props }, ref) => {
+    const ctx = React.useContext(SelectContext);
+
+    useEffect(() => {
+      ctx?.registerItem(value, children);
+      return () => ctx?.unregisterItem(value);
+    }, [value, children, ctx]);
+
+    const selected = ctx?.value === value;
+
+    return (
+      <li
+        ref={ref}
+        role="option"
+        aria-selected={selected}
+        tabIndex={0}
+        onClick={() => ctx?.setValue(value)}
+        className={cn(
+          "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-zinc-800 hover:text-zinc-100 transition-colors",
+          selected && "text-orange-500 font-semibold",
+          className
+        )}
+        {...props}
+      >
+        {selected && (
+          <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+            <Check className="h-4 w-4" />
+          </span>
+        )}
+        {children}
+      </li>
+    );
+  }
+);
+SelectItem.displayName = "SelectItem";
+
+interface SelectSeparatorProps extends React.HTMLAttributes<HTMLHRElement> {
+  className?: string;
+}
+
+export const SelectSeparator = React.forwardRef<HTMLHRElement, SelectSeparatorProps>(
+  ({ className, ...props }, ref) => (
+    <hr ref={ref} className={cn("-mx-1 my-1 h-px bg-zinc-700", className)} {...props} />
+  )
+);
+SelectSeparator.displayName = "SelectSeparator";
 
 export default Select;

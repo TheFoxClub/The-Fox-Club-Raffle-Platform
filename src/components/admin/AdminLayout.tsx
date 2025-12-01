@@ -1,0 +1,158 @@
+import { useState, type ReactNode } from "react";
+import { Link, useLocation, NavLink, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Ticket,
+  Shield,
+  Coins,
+  Settings,
+  Gift,
+  TrendingUp,
+  Trophy,
+  LogOut,
+  Menu,
+  Bell,
+  ChevronLeft,
+  Home
+} from "lucide-react";
+import Button from "../ui/Button";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../redux/store";
+import { handleLogout } from "../../config/api";
+
+interface AdminLayoutProps {
+  children: ReactNode;
+}
+
+const menuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+  { icon: Ticket, label: "Raffles", path: "/admin/raffles" },
+  { icon: Shield, label: "Collections", path: "/admin/collections" },
+  { icon: Coins, label: "Tokens", path: "/admin/tokens" },
+  { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
+  { icon: Gift, label: "Rewards", path: "/admin/rewards" },
+  { icon: Trophy, label: "Leaderboards", path: "/admin/leaderboards" },
+  { icon: TrendingUp, label: "Analytics", path: "/admin/analytics" },
+];
+
+export function AdminLayout({ children }: AdminLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user);
+
+  const isActive = (path: string) => {
+    if (path === "/admin") return location.pathname === path;
+    return location.pathname.startsWith(path);
+  };
+
+  const shortenAddress = (address: string, start = 4, end = 4) =>
+    `${address.slice(0, start)}...${address.slice(-end)}`;
+
+  const logout = async () => {
+    await handleLogout();
+    navigate("/");
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside
+        className={`${
+          sidebarOpen ? "w-64" : "w-20"
+        } glass-card border-r border-border/50 transition-all duration-300 flex flex-col fixed h-full z-50`}
+      >
+        {/* Logo */}
+        <div className="p-4 border-b border-border/50 flex items-center justify-between">
+          {sidebarOpen && (
+            <Link to="/admin" className="flex items-center gap-2">
+              <span className="text-xl font-bold text-orange-500">🦊</span>
+              <span className="text-sm font-bold text-gradient">ADMIN</span>
+            </Link>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="ml-auto"
+          >
+            {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {menuItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                isActive(item.path)
+                  ? "bg-gradient-primary text-white glow-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <item.icon className="h-5 w-5 shrink-0" />
+              {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Back to Site & Logout */}
+        <div className="p-4 border-t border-border/50 space-y-2">
+          <Link to="/">
+            <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all w-full">
+              <Home className="h-5 w-5" />
+              {sidebarOpen && <span className="text-sm font-medium">Back to Site</span>}
+            </button>
+          </Link>
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-destructive hover:bg-destructive/10 transition-all w-full"
+          >
+            <LogOut className="h-5 w-5" />
+            {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className={`flex-1 ${sidebarOpen ? "ml-64" : "ml-20"} transition-all duration-300`}>
+        {/* Top Bar */}
+        <header className="glass-card border-b border-border/50 sticky top-0 z-40">
+          <div className="flex items-center justify-between px-6 py-4">
+            <h1 className="text-xl font-bold">
+              {menuItems.find((item) => isActive(item.path))?.label || "Dashboard"}
+            </h1>
+
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
+              </Button>
+
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm font-medium">
+                    {user.isAdmin ? "Admin" : "User"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {user.pubkey ? shortenAddress(user.pubkey) : "Not connected"}
+                  </p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold">
+                  {user.isAdmin ? "A" : "U"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="p-6">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

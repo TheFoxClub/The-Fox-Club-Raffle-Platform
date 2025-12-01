@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
-import { Wallet, Trophy, PlusCircle, User, LogOut } from "lucide-react";
+import { Wallet, Trophy, PlusCircle, User, LogOut, Shield } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
 import logo from "../../../public/assets/foxclub_logo.png";
 import MyConnectWalletButton from "../../helpers/wallet-hooks/MyConnectWalletButton";
@@ -68,6 +68,16 @@ export const Header = () => {
               <User className="h-4 w-4" /> Profile
             </Button>
           </Link>
+          {user.isAdmin && (
+            <Link to="/admin">
+              <Button
+                variant={location.pathname.startsWith("/admin") ? "default" : "ghost"}
+                className="gap-2 cursor-pointer"
+              >
+                <Shield className="h-4 w-4" /> Admin
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Wallet & Create Button */}
@@ -141,6 +151,17 @@ export const Header = () => {
               <User className="h-4 w-4" /> Profile
             </Button>
           </Link>
+          {user.isAdmin && (
+            <Link to="/admin" className="flex-1">
+              <Button
+                variant={location.pathname.startsWith("/admin") ? "default" : "ghost"}
+                className="w-full gap-2 cursor-pointer"
+                size="sm"
+              >
+                <Shield className="h-4 w-4" /> Admin
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </nav>

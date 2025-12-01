@@ -15,6 +15,17 @@ import "./index.css";
 import RaffleDetail from "./views/raffle/RaffleDetail";
 import EditProfile from "./views/profile/EditProfile";
 
+// Admin imports
+import { AdminLayout } from "./components/admin/AdminLayout";
+import AdminDashboard from "./views/admin/AdminDashboard";
+import AdminRaffles from "./views/admin/AdminRaffles";
+import AdminCollections from "./views/admin/AdminCollections";
+import AdminTokens from "./views/admin/AdminTokens";
+import AdminFees from "./views/admin/AdminFees";
+import AdminRewards from "./views/admin/AdminRewards";
+import AdminLeaderboards from "./views/admin/AdminLeaderboards";
+import AdminAnalytics from "./views/admin/AdminAnalytics";
+
 function App() {
   // let endpoint = "https://api.devnet.solana.com";
 
@@ -29,27 +40,134 @@ function App() {
       <MyWalletWrapper autoConnect>
         {isLoading && <Loading />}
         {/* <UmiProvider endpoint={endpoint}> */}
-        <Layout>
-          <ToastContainer
-            position="top-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+        />
+        <Routes>
+          {/* Public routes with main Layout */}
+          <Route
+            path="/"
+            element={
+              <Layout>
+                <Home />
+              </Layout>
+            }
           />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/EditProfile" element={<EditProfile />} />
-            <Route path="/create" element={<CreateRaffle />} />
-            <Route path="/raffle/:id" element={<RaffleDetail />} />
-          </Routes>
-        </Layout>
+          <Route
+            path="/leaderboard"
+            element={
+              <Layout>
+                <Leaderboard />
+              </Layout>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <Layout>
+                <Profile />
+              </Layout>
+            }
+          />
+          <Route
+            path="/profile/EditProfile"
+            element={
+              <Layout>
+                <EditProfile />
+              </Layout>
+            }
+          />
+          <Route
+            path="/create"
+            element={
+              <Layout>
+                <CreateRaffle />
+              </Layout>
+            }
+          />
+          <Route
+            path="/raffle/:id"
+            element={
+              <Layout>
+                <RaffleDetail />
+              </Layout>
+            }
+          />
+
+          {/* Admin routes with AdminLayout */}
+          <Route
+            path="/admin"
+            element={
+              <AdminLayout>
+                <AdminDashboard />
+              </AdminLayout>
+            }
+          />
+          <Route
+            path="/admin/raffles"
+            element={
+              <AdminLayout>
+                <AdminRaffles />
+              </AdminLayout>
+            }
+          />
+          <Route
+            path="/admin/collections"
+            element={
+              <AdminLayout>
+                <AdminCollections />
+              </AdminLayout>
+            }
+          />
+          <Route
+            path="/admin/tokens"
+            element={
+              <AdminLayout>
+                <AdminTokens />
+              </AdminLayout>
+            }
+          />
+          <Route
+            path="/admin/fees"
+            element={
+              <AdminLayout>
+                <AdminFees />
+              </AdminLayout>
+            }
+          />
+          <Route
+            path="/admin/rewards"
+            element={
+              <AdminLayout>
+                <AdminRewards />
+              </AdminLayout>
+            }
+          />
+          <Route
+            path="/admin/leaderboards"
+            element={
+              <AdminLayout>
+                <AdminLeaderboards />
+              </AdminLayout>
+            }
+          />
+          <Route
+            path="/admin/analytics"
+            element={
+              <AdminLayout>
+                <AdminAnalytics />
+              </AdminLayout>
+            }
+          />
+        </Routes>
         {/* </UmiProvider> */}
       </MyWalletWrapper>
     </Router>
