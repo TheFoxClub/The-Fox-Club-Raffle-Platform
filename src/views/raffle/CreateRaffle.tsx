@@ -9,8 +9,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../../components/ui/Dialog";
-import { useState } from "react";
-import { mockWalletNFTs } from "../../dummydata/WalletNFTs";
+import { useState, useEffect } from "react";
+// import { mockWalletNFTs } from "../../dummydata/WalletNFTs";
 import { useNavigate } from "react-router-dom";
 import server from "../../config/server";
 import { toast } from "react-toastify";
@@ -20,11 +20,24 @@ import type { RootState } from "../../redux/store";
 
 const CreateRaffle = () => {
   const navigate = useNavigate();
-
   const user = useSelector((state: RootState) => state.user);
 
   const [selectedNFTs, setSelectedNFTs] = useState<any[]>([]);
+  const [selectedTokens, setSelectedTokens] = useState<
+    { mint: string; name: string; amount: number; amountToUse: number }[]
+  >([]);
+
   const [isNFTDialogOpen, setIsNFTDialogOpen] = useState(false);
+  const [isTokenDialogOpen, setIsTokenDialogOpen] = useState(false);
+
+  const [nftCandidates, setNftCandidates] = useState<any[]>([]);
+  const [nftLoading, setNftLoading] = useState(false);
+
+  const [tokenCandidates, setTokenCandidates] = useState<
+    { mint: string; name: string; amount: number }[]
+  >([]);
+  const [tokenLoading, setTokenLoading] = useState(false);
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [ticketPrice, setTicketPrice] = useState<number | "">("");
@@ -32,32 +45,35 @@ const CreateRaffle = () => {
   const [numberOfWinners, setNumberOfWinners] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedToken, setSelectedToken] = useState<any>(null);
+  const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const [errors, setErrors] = useState<{
+    [key: string]: string | undefined;
     title?: string;
     description?: string;
+    prize?: string;
     selectedNFT?: string;
+    selectedToken?: string;
     ticketPrice?: string;
     totalTickets?: string;
     numberOfWinners?: string;
     startDate?: string;
     endDate?: string;
-    selectedToken?: string;
+    selectedTokenType?: string;
     startDateError?: string;
     endDateError?: string;
   }>({});
 
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLDivElement>(null);
-  const selectedNFTRef = useRef<HTMLDivElement>(null);
+  const prizeRef = useRef<HTMLDivElement | null>(null);
   const ticketPriceRef = useRef<HTMLInputElement>(null);
   const totalTicketsRef = useRef<HTMLInputElement>(null);
   const numberOfWinnersRef = useRef<HTMLInputElement>(null);
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
-  const selectedTokenRef = useRef<HTMLDivElement>(null);
+  const selectedTokenTypeRef = useRef<HTMLDivElement>(null);
 
   const tokenOptions = [
     { value: "SOL", label: "SOL" },
@@ -71,14 +87,146 @@ const CreateRaffle = () => {
       setSelectedNFTs((prev) => [...prev, nft]);
     }
     // setIsNFTDialogOpen(false);
-    setErrors((prev) => ({ ...prev, selectedNFT: undefined }));
+    setErrors((prev) => ({
+      ...prev,
+      selectedNFT: undefined,
+      prize: undefined,
+    }));
+  };
+
+  const removeNFT = (id: any) => {
+    setSelectedNFTs((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  //fetch NFTs when NFT dialog opens
+  useEffect(() => {
+    if (!isNFTDialogOpen) return;
+
+    const fetchNfts = async () => {
+      if (!user?.pubkey) {
+        setNftCandidates([]);
+        return;
+      }
+      try {
+        setNftLoading(true);
+        const res = await server.get(`/nfts/${user.pubkey}`);
+        const nftsFromApi: any[] = res.data?.data?.nfts || [];
+
+        const mapped = await Promise.all(
+          nftsFromApi.map(async (nftItem: any, idx: number) => {
+            const mint = nftItem.mint ?? `unknown-${idx}`;
+            let name = nftItem.name ?? `NFT ${mint.slice(0, 6)}...`;
+            let collection =
+              (nftItem.grouping && nftItem.grouping[0]?.group_value) || "";
+            let image: string | undefined = undefined;
+
+            const uri = nftItem.uri || nftItem.uri?.toString?.();
+            if (uri) {
+              try {
+                const metaRes = await fetch(uri);
+                if (metaRes.ok) {
+                  const meta = await metaRes.json();
+                  if (meta.image) image = meta.image;
+                  if (meta.name) name = meta.name;
+                  if (!collection && meta.collection)
+                    collection = meta.collection;
+                }
+              } catch (err) {}
+            }
+            return {
+              id: mint,
+              mint,
+              name,
+              collection,
+              image,
+              raw: nftItem,
+            };
+          })
+        );
+
+        setNftCandidates(mapped);
+      } catch (err) {
+        console.error("Failed to fetch NFTs", err);
+        setNftCandidates([]);
+      } finally {
+        setNftLoading(false);
+      }
+    };
+    fetchNfts();
+  }, [isNFTDialogOpen, user?.pubkey]);
+
+  //fetch tokens when token modal opens(and user present)
+  useEffect(() => {
+    if (!isTokenDialogOpen) return;
+    const fetchTokens = async () => {
+      if (!user?.pubkey) {
+        setTokenCandidates([]);
+        return;
+      }
+
+      try {
+        setTokenLoading(true);
+        const res = await server.get(`/tokens/${user.pubkey}`);
+        const spl = res.data?.message?.splTokens || [];
+        const mapped = spl.map((t: any, idx: number) => {
+          const info = t.account?.data?.parsed?.info;
+          const mint = info?.mint || `unknown-${idx}`;
+          const amount = info?.tokenAmount?.uiAmount ?? 0;
+          const name = info?.tokenAmount?.decimals
+            ? `Token ${mint.slice(0, 6)}...`
+            : "Unknown Token";
+          return { mint, name, amount };
+        });
+        setTokenCandidates(mapped);
+      } catch (err) {
+        console.error("Failed to fetch tokens", err);
+        setTokenCandidates([]);
+      } finally {
+        setTokenLoading(false);
+      }
+    };
+
+    fetchTokens();
+  }, [isTokenDialogOpen, user?.pubkey]);
+
+  const handleSelectToken = (token: {
+    mint: string;
+    name: string;
+    amount: number;
+  }) => {
+    if (!selectedTokens.some((t) => t.mint === token.mint)) {
+      setSelectedTokens((prev) => [...prev, { ...token, amountToUse: 0 }]);
+    }
+    setErrors((prev) => ({
+      ...prev,
+      selectedToken: undefined,
+      prize: undefined,
+      [`token-${token.mint}`]: undefined,
+    }));
+  };
+
+  const removeToken = (mint: string) => {
+    setSelectedTokens((prev) => prev.filter((t) => t.mint !== mint));
   };
 
   const validateForm = () => {
-    const newErrors: typeof errors = {};
+    const newErrors: any = {};
 
-    if (selectedNFTs.length === 0)
-      newErrors.selectedNFT = "Please select at least one NFT";
+    if (selectedNFTs.length === 0 && selectedTokens.length === 0) {
+      newErrors.prize = "Please select at least one NFT or token";
+    }
+
+    selectedTokens.forEach((t) => {
+      if (t.amountToUse <= 0) {
+        newErrors[`token-${t.mint}`] = "Amount must be greater than 0";
+      }
+      if (t.amountToUse > t.amount) {
+        newErrors[
+          `token-${t.mint}`
+        ] = `Cannot exceed available amount (${t.amount})`;
+      }
+    });
+
     if (!title.trim()) newErrors.title = "Title is required";
     if (!description.trim()) newErrors.description = "Description is required";
     if (!ticketPrice || Number(ticketPrice) <= 0)
@@ -91,7 +239,8 @@ const CreateRaffle = () => {
       newErrors.numberOfWinners = "Cannot exceed total tickets";
     if (!startDate) newErrors.startDate = "Start date is required";
     if (!endDate) newErrors.endDate = "End date is required";
-    if (!selectedToken) newErrors.selectedToken = "Please select a token";
+    if (!selectedTokenType)
+      newErrors.selectedTokenType = "Please select a token";
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -116,8 +265,8 @@ const CreateRaffle = () => {
           behavior: "smooth",
           block: "center",
         });
-      else if (newErrors.selectedNFT)
-        selectedNFTRef.current?.scrollIntoView({
+      else if (newErrors.prize)
+        prizeRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
@@ -146,8 +295,8 @@ const CreateRaffle = () => {
           behavior: "smooth",
           block: "center",
         });
-      else if (newErrors.selectedToken)
-        selectedTokenRef.current?.scrollIntoView({
+      else if (newErrors.selectedTokenType)
+        selectedTokenTypeRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
@@ -174,12 +323,16 @@ const CreateRaffle = () => {
         images: selectedNFTs.map((nft) => nft.image),
         totalTickets: Number(totalTickets),
         ticketPrice: Number(ticketPrice),
-        tokenType: selectedToken,
+        tokenType: selectedTokenType,
         numberOfWinners,
         startDate,
         endDate,
         requiresNftVerification: false,
         verifiedCollections: selectedNFTs.map((nft) => nft.collection),
+        tokens: selectedTokens.map((t) => ({
+          mint: t.mint,
+          amount: t.amountToUse,
+        })),
         additionalJson: {
           created: "user",
           category: "raffle",
@@ -277,78 +430,64 @@ const CreateRaffle = () => {
             </div>
           </div>
 
-          <div ref={selectedNFTRef}>
-            <label className="text-sm font-medium mb-2">Prize NFT *</label>
-            {selectedNFT ? (
-              <div className="relative border-2 border-primary/30 rounded-lg p-4 bg-background-50">
-                <button
-                  type="button"
-                  onClick={() => setSelectedNFT(null)}
-                  className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+          <div ref={prizeRef}>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="text-sm font-medium mb-2">Prize NFT *</label>
+
+                {/* Select Button (Always Visible) */}
+                <Dialog
+                  open={isNFTDialogOpen}
+                  onOpenChange={setIsNFTDialogOpen}
                 >
-                  <X className="h-4 w-4" />
-                </button>
-                <div className="flex gap-4 items-center">
-                  <img
-                    src={selectedNFT.image}
-                    alt={selectedNFT.name}
-                    className="w-24 h-24 rounded-lg object-cover"
-                  />
-                  <div>
-                    <p className="font-semibold">{selectedNFT.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedNFT.collection}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Mint: {selectedNFT.mint}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            <div ref={selectedNFTRef}>
-              <label className="text-sm font-medium mb-2">Prize NFT *</label>
+                  <DialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-32 border-2 border-dashed hover:border-primary-50 hover:bg-background-50"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Wallet className="h-8 w-8" />
+                        <span className="font-semibold">
+                          Choose NFT from Wallet
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Select from verified collections
+                        </span>
+                      </div>
+                    </Button>
+                  </DialogTrigger>
 
-              {/* Select Button (Always Visible) */}
-              <Dialog open={isNFTDialogOpen} onOpenChange={setIsNFTDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full h-32 border-2 border-dashed hover:border-primary-50 hover:bg-background-50"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <Wallet className="h-8 w-8" />
-                      <span className="font-semibold">
-                        Choose NFT from Wallet
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        Select from verified collections
-                      </span>
-                    </div>
-                  </Button>
-                </DialogTrigger>
+                  {/* Modal */}
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Select NFT from Your Wallet</DialogTitle>
+                    </DialogHeader>
 
-                {/* Modal */}
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Select NFT from Your Wallet</DialogTitle>
-                  </DialogHeader>
+                    {nftLoading ? (
+                      <p className="text-center py-6 text-muted-foreground">
+                        Loading NFTs...
+                      </p>
+                    ) : nftCandidates.length === 0 ? (
+                      <p className="text-center py-6 text-muted-foreground">
+                        No NFTs found in your wallet
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
+                        {nftCandidates.map((nft) => {
+                          const isSelected = selectedNFTs.some(
+                            (item) => item.id === nft.id
+                          );
 
-                  <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-                    {mockWalletNFTs.map((nft) => {
-                      const isSelected = selectedNFTs.some(
-                        (item) => item.id === nft.id
-                      );
-
-                      return (
-                        <button
-                          key={nft.id}
-                          type="button"
-                          onClick={() => !isSelected && handleSelectNFT(nft)}
-                          disabled={isSelected}
-                          className={`
+                          return (
+                            <button
+                              key={nft.id}
+                              type="button"
+                              onClick={() =>
+                                !isSelected && handleSelectNFT(nft)
+                              }
+                              disabled={isSelected}
+                              className={`
                 group relative overflow-hidden rounded-lg border-2 transition-all
                 ${
                   isSelected
@@ -356,48 +495,151 @@ const CreateRaffle = () => {
                     : "border-border hover:border-primary hover:scale-105"
                 }
               `}
-                        >
-                          <img
-                            src={nft.image}
-                            alt={nft.name}
-                            className="w-full aspect-square object-cover"
-                          />
+                            >
+                              <img
+                                src={nft.image}
+                                alt={nft.name}
+                                className="w-full aspect-square object-cover"
+                              />
 
-                          {/* Footer Overlay */}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background-90 to-transparent p-3">
-                            <p className="font-semibold text-sm">{nft.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {nft.collection}
-                            </p>
-                          </div>
+                              {/* Footer Overlay */}
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background-90 to-transparent p-3">
+                                <p className="font-semibold text-sm truncate">
+                                  {nft.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {nft.collection}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {nft.mint}
+                                </p>
+                              </div>
 
-                          {/* Selected Badge */}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                              Selected
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex justify-end mt-4">
+                              {/* Selected Badge */}
+                              {isSelected && (
+                                <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                                  Selected
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="flex justify-end mt-4">
+                      <Button
+                        className="gradient-primary"
+                        onClick={() => setIsNFTDialogOpen(false)}
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2">
+                  Prize Token *
+                </label>
+                <Dialog
+                  open={isTokenDialogOpen}
+                  onOpenChange={setIsTokenDialogOpen}
+                >
+                  <DialogTrigger asChild>
                     <Button
-                      className="gradient-primary"
-                      onClick={() => setIsNFTDialogOpen(false)}
+                      type="button"
+                      variant="outline"
+                      className="w-full h-32 border-2 border-dashed hover:border-primary-50 hover:bg-background-50"
                     >
-                      Done
+                      <div className="flex flex-col items-center gap-2">
+                        <Wallet className="h-8 w-8" />
+                        <span className="font-semibold">
+                          Choose Token from Wallet
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Select from verified collections
+                        </span>
+                      </div>
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+
+                  {/* Modal */}
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Select Token from Your Wallet</DialogTitle>
+                    </DialogHeader>
+
+                    {tokenLoading ? (
+                      <p> Loading tokens...</p>
+                    ) : tokenCandidates.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <p className="text-muted-foreground text-sm">
+                          No tokens found in your wallet
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
+                        {tokenCandidates.map((token) => {
+                          const isSelected = selectedTokens.some(
+                            (t) => t.mint === token.mint
+                          );
+
+                          return (
+                            <button
+                              key={token.mint}
+                              type="button"
+                              onClick={() =>
+                                !isSelected && handleSelectToken(token)
+                              }
+                              disabled={isSelected}
+                              className={`
+                group relative overflow-hidden rounded-lg border-2 transition-all
+                ${
+                  isSelected
+                    ? "border-green-500 opacity-50 cursor-not-allowed"
+                    : "border-border hover:border-primary hover:scale-105"
+                }
+              `}
+                            >
+                              <div className="flex flex-col gap-1">
+                                <p className="font-semibold text-sm truncate">
+                                  {token.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  Mint: {token.mint}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  Amount: {token.amount}
+                                </p>
+                              </div>
+
+                              {/* Selected Badge */}
+                              {isSelected && (
+                                <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                                  Selected
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end mt-4">
+                      <Button
+                        className="gradient-primary"
+                        onClick={() => setIsTokenDialogOpen(false)}
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
 
               {/* Error Message */}
-              {errors.selectedNFT && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.selectedNFT}
-                </p>
+              {errors.prize && (
+                <p className="text-red-500 text-sm mt-1">{errors.prize}</p>
               )}
 
               {/* ---------------- SELECTED NFT LIST ---------------- */}
@@ -411,11 +653,7 @@ const CreateRaffle = () => {
                       {/* Remove Single NFT */}
                       <button
                         type="button"
-                        onClick={() =>
-                          setSelectedNFTs((prev) =>
-                            prev.filter((item) => item.id !== nft.id)
-                          )
-                        }
+                        onClick={() => removeNFT(nft.id)}
                         className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
                       >
                         <X className="h-4 w-4" />
@@ -428,11 +666,13 @@ const CreateRaffle = () => {
                           className="w-24 h-24 rounded-lg object-cover"
                         />
                         <div>
-                          <p className="font-semibold">{nft.name}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="font-semibold break-words break-all">
+                            {nft.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground break-words break-all">
                             {nft.collection}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1 break-words break-all">
                             Mint: {nft.mint}
                           </p>
                         </div>
@@ -441,14 +681,68 @@ const CreateRaffle = () => {
                   ))}
                 </div>
               )}
-            </div>
 
-            <div ref={selectedNFTRef}>
-              <div ref={selectedNFTRef}>
-                <label className="text-sm font-medium mb-2">
-                  Prize Token *
-                </label>
-              </div>
+              {selectedTokens.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {selectedTokens.map((t) => (
+                    <div
+                      key={t.mint}
+                      className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => removeToken(t.mint)}
+                        className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      <div className="flex flex-col gap-2 break-all">
+                        <div className="flex-1">
+                          <p className="font-semibold break-all">{t.name}</p>
+                          <p className="text-xs text-muted-foreground break-all">
+                            Mint: {t.mint}
+                          </p>
+                          <p className="text-xs text-muted-foreground break-all">
+                            Amount: {t.amount}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-xs font-medium">Amount</label>
+                          <input
+                            type="number"
+                            value={t.amountToUse}
+                            min={0}
+                            max={t.amount}
+                            onChange={(e) => {
+                              const value = Number(e.target.value);
+                              setSelectedTokens((prev) =>
+                                prev.map((token) =>
+                                  token.mint === t.mint
+                                    ? { ...token, amountToUse: value }
+                                    : token
+                                )
+                              );
+                              // Clear error if any
+                              setErrors((prev) => ({
+                                ...prev,
+                                [`token-${t.mint}`]: undefined,
+                              }));
+                            }}
+                            placeholder="Amount to use"
+                            className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
+                          />
+                          {errors[`token-${t.mint}`] && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors[`token-${t.mint}`]}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -482,23 +776,23 @@ const CreateRaffle = () => {
               </div>
             </div>
 
-            <div ref={selectedTokenRef}>
+            <div ref={selectedTokenTypeRef}>
               <label className="text-sm font-medium">Token Type *</label>
               <Select
                 options={tokenOptions}
-                value={selectedToken}
+                value={selectedTokenType}
                 onValueChange={(val) => {
-                  setSelectedToken(val);
+                  setSelectedTokenType(val);
                   setErrors((prev) => ({
                     ...prev,
-                    selectedToken: undefined,
+                    selectedTokenType: undefined,
                   }));
                 }}
                 className="bg-background-50 mt-2"
               />
-              {errors.selectedToken && (
+              {errors.selectedTokenType && (
                 <p className="text-red-500 text-sm mt-1">
-                  {errors.selectedToken}
+                  {errors.selectedTokenType}
                 </p>
               )}
             </div>
