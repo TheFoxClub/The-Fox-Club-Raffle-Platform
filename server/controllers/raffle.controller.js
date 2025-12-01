@@ -1,10 +1,21 @@
-const { Raffle, RaffleDetail, User, UserInfo } = require("../models");
+const {
+  Raffle,
+  RaffleDetail,
+  User,
+  UserInfo,
+  RaffleReward,
+} = require("../models");
 const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
 const { Op } = require("sequelize");
-const { TOKEN_TYPE, RAFFLE_STATUS } = require("../config/data");
+const {
+  TOKEN_TYPE,
+  RAFFLE_STATUS,
+  RAFFLE_REWARD_TYPES,
+  mapEnumValue,
+} = require("../config/data");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -152,6 +163,10 @@ class RaffleController {
         return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
       }
 
+      const userId = raffle.userId;
+
+      const userData = await User.findOne({ where: { id: userId } });
+
       // Calculate progress percentage
       const progressPercentage =
         raffle.totalTickets > 0
@@ -160,6 +175,7 @@ class RaffleController {
 
       return respond(res, httpStatus.OK, "Raffle retrieved successfully", {
         raffle,
+        userData,
         progressPercentage,
       });
     } catch (err) {
@@ -204,6 +220,86 @@ class RaffleController {
     }
   }
 
+  // static async createRaffle(req, res) {
+  //   try {
+  //     const userId = req.payload?.id;
+
+  //     const {
+  //       title,
+  //       description,
+  //       imageUrl,
+  //       totalTickets,
+  //       ticketPrice,
+  //       tokenType,
+  //       numberOfWinners,
+  //       startDate,
+  //       endDate,
+  //       // RaffleDetail fields
+  //       requiresNftVerification,
+  //       verifiedCollectionRequired,
+  //       additionalJson,
+  //     } = req.body;
+
+  //     if (!title || !totalTickets || !ticketPrice || !startDate || !endDate) {
+  //       return respond(
+  //         res,
+  //         httpStatus.BAD_REQUEST,
+  //         "Missing required fields: title, totalTickets, ticketPrice, startDate, endDate"
+  //       );
+  //     }
+
+  //     if (new Date(startDate) >= new Date(endDate)) {
+  //       return respond(
+  //         res,
+  //         httpStatus.BAD_REQUEST,
+  //         "Start date must be before end date"
+  //       );
+  //     }
+
+  //     const raffle = await Raffle.create({
+  //       userId,
+  //       title,
+  //       description,
+  //       imageUrl,
+  //       totalTickets,
+  //       ticketPrice,
+  //       ticketsSold: 0,
+  //       tokenType: TOKEN_TYPE[tokenType] || TOKEN_TYPE.SOLANA,
+  //       numberOfWinners: numberOfWinners || 1,
+  //       startDate,
+  //       endDate,
+  //     });
+
+  //     await RaffleDetail.create({
+  //       raffleId: raffle.id,
+  //       isFeatured: false,
+  //       requiresNftVerification: requiresNftVerification || false,
+  //       verifiedCollectionRequired: verifiedCollectionRequired || null,
+  //       additionalJson: additionalJson || null,
+  //     });
+
+  //     const createdRaffle = await Raffle.findOne({
+  //       where: { id: raffle.id },
+  //       include: [
+  //         {
+  //           model: RaffleDetail,
+  //         },
+  //       ],
+  //     });
+
+  //     return respond(res, httpStatus.OK, "Raffle created successfully", {
+  //       raffle: createdRaffle,
+  //     });
+  //   } catch (err) {
+  //     logger.error(err);
+  //     return respond(
+  //       res,
+  //       httpStatus.INTERNAL_SERVER_ERROR,
+  //       parseSequelizeErrors(err)
+  //     );
+  //   }
+  // }
+
   static async createRaffle(req, res) {
     try {
       const userId = req.payload?.id;
@@ -215,13 +311,13 @@ class RaffleController {
         totalTickets,
         ticketPrice,
         tokenType,
-        numberOfWinners,
         startDate,
         endDate,
-        // RaffleDetail fields
+        numberOfWinners,
         requiresNftVerification,
         verifiedCollectionRequired,
         additionalJson,
+        rewards,
       } = req.body;
 
       if (!title || !totalTickets || !ticketPrice || !startDate || !endDate) {
@@ -229,6 +325,14 @@ class RaffleController {
           res,
           httpStatus.BAD_REQUEST,
           "Missing required fields: title, totalTickets, ticketPrice, startDate, endDate"
+        );
+      }
+
+      if (!Array.isArray(rewards) || rewards.length === 0) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "At least one reward is required"
         );
       }
 
@@ -240,6 +344,8 @@ class RaffleController {
         );
       }
 
+      const totalWinners = numberOfWinners || rewards.length;
+
       const raffle = await Raffle.create({
         userId,
         title,
@@ -249,7 +355,7 @@ class RaffleController {
         ticketPrice,
         ticketsSold: 0,
         tokenType: TOKEN_TYPE[tokenType] || TOKEN_TYPE.SOLANA,
-        numberOfWinners: numberOfWinners || 1,
+        numberOfWinners: totalWinners,
         startDate,
         endDate,
       });
@@ -262,17 +368,35 @@ class RaffleController {
         additionalJson: additionalJson || null,
       });
 
+      const rewardsToInsert = rewards.map((r) => ({
+        raffleId: raffle.id,
+        rewardType: RAFFLE_REWARD_TYPES[r.rewardType],
+        rewardName: r.rewardName,
+        mintAddress: r.mintAddress,
+        amount: r.amount,
+        imageUrl: r.imageUrl,
+        metadataJson: r.metadataJson,
+      }));
+
+      await RaffleReward.bulkCreate(rewardsToInsert);
+
       const createdRaffle = await Raffle.findOne({
         where: { id: raffle.id },
-        include: [
-          {
-            model: RaffleDetail,
-          },
-        ],
+        include: [{ model: RaffleDetail }, { model: RaffleReward }],
       });
 
+      const raffleData = createdRaffle.get({ plain: true });
+
+      raffleData.tokenType = mapEnumValue(TOKEN_TYPE, raffleData.tokenType);
+      raffleData.status = mapEnumValue(RAFFLE_STATUS, raffleData.status);
+
+      raffleData.raffle_rewards = raffleData.raffle_rewards.map((reward) => ({
+        ...reward,
+        rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+      }));
+
       return respond(res, httpStatus.OK, "Raffle created successfully", {
-        raffle: createdRaffle,
+        raffle: raffleData,
       });
     } catch (err) {
       logger.error(err);
@@ -472,6 +596,96 @@ class RaffleController {
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(err)
       );
+    }
+  }
+
+  static async filterRaffles(req, res) {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      const { status, tokenType, price, collection, search = "" } = req.query;
+
+      console.log("req query: ", req.query);
+
+      let whereClause = {};
+
+      // Filter by status
+      if (status) {
+        const statusMap = {
+          live: RAFFLE_STATUS.LIVE,
+          ended: RAFFLE_STATUS.ENDED,
+          upcoming: RAFFLE_STATUS.UPCOMING,
+        };
+        if (statusMap[status.toLowerCase()] !== undefined) {
+          whereClause.status = statusMap[status.toLowerCase()];
+        }
+      }
+
+      // Filter by token type
+      if (tokenType && tokenType !== "all") {
+        const tokenMap = {
+          sol: TOKEN_TYPE.SOLANA,
+          usdc: TOKEN_TYPE.USDC,
+          token: TOKEN_TYPE.SPL_TOKEN,
+        };
+        if (tokenMap[tokenType.toLowerCase()] !== undefined) {
+          whereClause.tokenType = tokenMap[tokenType.toLowerCase()];
+        }
+      }
+
+      // Filter by verified collection
+      if (collection === "verified") {
+        const verifiedAddresses = await VerifiedCollection.findAll({
+          attributes: ["address"],
+        });
+        const addresses = verifiedAddresses.map((v) => v.address);
+        whereClause["$RaffleDetail.collectionAddress$"] = {
+          [Op.in]: addresses,
+        };
+      }
+
+      // Search by title
+      if (search) {
+        // whereClause.title = { [Op.iLike]: `%${search}%` }; // case-insensitive
+        whereClause.title = { [Op.like]: `%${search}%` };
+      }
+
+      // Determine order by price
+      let order = [["createdAt", "DESC"]];
+      if (price === "lowtohigh") order = [["ticketPrice", "ASC"]];
+      if (price === "hightolow") order = [["ticketPrice", "DESC"]];
+
+      // Query raffles
+      const { count, rows: raffles } = await Raffle.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: RaffleDetail,
+          },
+          {
+            model: User,
+            attributes: ["id", "pubkey"],
+          },
+        ],
+        order,
+        limit,
+        offset,
+      });
+
+      return respond(res, httpStatus.OK, "Raffles retrieved successfully", {
+        raffles,
+        pagination: {
+          total: count,
+          page,
+          limit,
+          totalPages: Math.ceil(count / limit),
+        },
+      });
+    } catch (err) {
+      logger.error(err);
+      return respond(res, httpStatus.INTERNAL_SERVER_ERROR, err.message);
     }
   }
 }
