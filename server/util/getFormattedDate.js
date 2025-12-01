@@ -1,0 +1,22 @@
+const getFormattedDate = (daysAhead) => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+
+  const pad = (n) => n.toString().padStart(2, "0");
+
+  return (
+    d.getFullYear() +
+    "-" +
+    pad(d.getMonth() + 1) +
+    "-" +
+    pad(d.getDate()) +
+    " " +
+    pad(d.getHours()) +
+    ":" +
+    pad(d.getMinutes()) +
+    ":" +
+    pad(d.getSeconds())
+  );
+};
+
+module.exports = getFormattedDate;
