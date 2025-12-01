@@ -5,7 +5,7 @@ const {
   UserInfo,
   RaffleReward,
 } = require("../models");
-const { status: httpStatus } = require("http-status");
+const { status: httpStatus, default: status } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
@@ -16,6 +16,7 @@ const {
   RAFFLE_REWARD_TYPES,
   mapEnumValue,
 } = require("../config/data");
+const getFormattedDate = require("../util/getFormattedDate");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -320,44 +321,70 @@ class RaffleController {
         rewards,
       } = req.body;
 
-      if (!title || !totalTickets || !ticketPrice || !startDate || !endDate) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Missing required fields: title, totalTickets, ticketPrice, startDate, endDate"
-        );
+      const raffleStatus = req.body.status || RAFFLE_STATUS.UPCOMING;
+
+      const statusEnum = RAFFLE_STATUS[raffleStatus] ?? RAFFLE_STATUS.UPCOMING;
+
+      if (statusEnum !== RAFFLE_STATUS.DRAFT) {
+        if (!title || !totalTickets || !ticketPrice || !startDate || !endDate) {
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "Missing required fields: title, totalTickets, ticketPrice, startDate, endDate"
+          );
+        }
+
+        if (!Array.isArray(rewards) || rewards.length === 0) {
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "At least one reward is required"
+          );
+        }
+
+        if (new Date(startDate) >= new Date(endDate)) {
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "Start date must be before end date"
+          );
+        }
+
+        if (!Array.isArray(rewards) || rewards.length === 0) {
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "At least one reward is required"
+          );
+        }
+
+        if (new Date(startDate) >= new Date(endDate)) {
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "Start date must be before end date"
+          );
+        }
       }
 
-      if (!Array.isArray(rewards) || rewards.length === 0) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "At least one reward is required"
-        );
+      let totalWinners = 1;
+      if (numberOfWinners || rewards) {
+        totalWinners = numberOfWinners || rewards.length;
       }
-
-      if (new Date(startDate) >= new Date(endDate)) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Start date must be before end date"
-        );
-      }
-
-      const totalWinners = numberOfWinners || rewards.length;
 
       const raffle = await Raffle.create({
         userId,
         title,
         description,
         imageUrl,
-        totalTickets,
-        ticketPrice,
+        totalTickets: totalTickets || 0,
+        ticketPrice: ticketPrice || 0,
         ticketsSold: 0,
         tokenType: TOKEN_TYPE[tokenType] || TOKEN_TYPE.SOLANA,
         numberOfWinners: totalWinners,
-        startDate,
-        endDate,
+        startDate: startDate || getFormattedDate(3),
+        endDate: endDate || getFormattedDate(10),
+        status: statusEnum,
       });
 
       await RaffleDetail.create({
@@ -368,18 +395,19 @@ class RaffleController {
         additionalJson: additionalJson || null,
       });
 
-      const rewardsToInsert = rewards.map((r) => ({
-        raffleId: raffle.id,
-        rewardType: RAFFLE_REWARD_TYPES[r.rewardType],
-        rewardName: r.rewardName,
-        mintAddress: r.mintAddress,
-        amount: r.amount,
-        imageUrl: r.imageUrl,
-        metadataJson: r.metadataJson,
-      }));
+      if (rewards) {
+        const rewardsToInsert = rewards.map((r) => ({
+          raffleId: raffle.id,
+          rewardType: RAFFLE_REWARD_TYPES[r.rewardType],
+          rewardName: r.rewardName,
+          mintAddress: r.mintAddress,
+          amount: r.amount,
+          imageUrl: r.imageUrl,
+          metadataJson: r.metadataJson,
+        }));
 
-      await RaffleReward.bulkCreate(rewardsToInsert);
-
+        await RaffleReward.bulkCreate(rewardsToInsert);
+      }
       const createdRaffle = await Raffle.findOne({
         where: { id: raffle.id },
         include: [{ model: RaffleDetail }, { model: RaffleReward }],
@@ -686,6 +714,39 @@ class RaffleController {
     } catch (err) {
       logger.error(err);
       return respond(res, httpStatus.INTERNAL_SERVER_ERROR, err.message);
+    }
+  }
+
+  static async getRaffleDraft(req, res) {
+    try {
+      const userId = req.payload?.id;
+
+      const userData = await User.findOne({ where: { id: userId } });
+
+      const raffle = await Raffle.findOne({
+        where: { userId },
+        include: [{ model: RaffleDetail }, { model: RaffleReward }],
+      });
+
+      raffle.tokenType = mapEnumValue(TOKEN_TYPE, raffle.tokenType);
+      raffle.status = mapEnumValue(RAFFLE_STATUS, raffle.status);
+
+      raffle.raffle_rewards = raffle.raffle_rewards.map((reward) => ({
+        ...reward,
+        rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+      }));
+
+      return respond(res, httpStatus.OK, "Raffle retrieved successfully", {
+        raffle,
+        userData,
+      });
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
     }
   }
 }

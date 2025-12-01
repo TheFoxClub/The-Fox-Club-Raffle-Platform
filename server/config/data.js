@@ -17,11 +17,12 @@ const TOKEN_TYPE = {
 };
 
 const RAFFLE_STATUS = {
-  UPCOMING: 0,
-  LIVE: 1,
-  ENDED: 2,
-  CANCELLED: 3,
-  SUSPENDED: 4,
+  DRAFT: 0,
+  UPCOMING: 1,
+  LIVE: 2,
+  ENDED: 3,
+  CANCELLED: 4,
+  SUSPENDED: 5,
 };
 
 const RAFFLE_FEATURED_STATUS = {
