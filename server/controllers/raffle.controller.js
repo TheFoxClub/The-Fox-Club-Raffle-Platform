@@ -5,7 +5,6 @@ const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
 const { Op } = require("sequelize");
 const { TOKEN_TYPE, RAFFLE_STATUS } = require("../config/data");
-const { ClockFading } = require("lucide-react");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -153,6 +152,10 @@ class RaffleController {
         return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
       }
 
+      const userId = raffle.userId;
+
+      const userData = await User.findOne({ where: { id: userId } });
+
       // Calculate progress percentage
       const progressPercentage =
         raffle.totalTickets > 0
@@ -161,6 +164,7 @@ class RaffleController {
 
       return respond(res, httpStatus.OK, "Raffle retrieved successfully", {
         raffle,
+        userData,
         progressPercentage,
       });
     } catch (err) {
