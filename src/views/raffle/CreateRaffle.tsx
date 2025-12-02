@@ -1,4 +1,11 @@
-import { AlertCircle, Calendar, PlusCircle, Wallet, X } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  PlusCircle,
+  Wallet,
+  X,
+  Upload,
+} from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Textarea } from "../../components/ui/Textarea";
 import Select from "../../components/ui/Select";
@@ -18,13 +25,23 @@ import { useRef } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 
+// Constants for Token Program IDs
+const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+
 const CreateRaffle = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
 
   const [selectedNFTs, setSelectedNFTs] = useState<any[]>([]);
   const [selectedTokens, setSelectedTokens] = useState<
-    { mint: string; name: string; amount: number; amountToUse: number }[]
+    {
+      mint: string;
+      name: string;
+      amount: number;
+      amountToUse: number;
+      programId: string;
+    }[]
   >([]);
 
   const [isNFTDialogOpen, setIsNFTDialogOpen] = useState(false);
@@ -34,9 +51,17 @@ const CreateRaffle = () => {
   const [nftLoading, setNftLoading] = useState(false);
 
   const [tokenCandidates, setTokenCandidates] = useState<
-    { mint: string; name: string; amount: number }[]
+    { mint: string; name: string; programId: string; amount: number }[]
   >([]);
   const [tokenLoading, setTokenLoading] = useState(false);
+
+  // const [raffleImage, setRaffleImage] = useState<File | null>(null);
+  // const [raffleImagePreview, setRaffleImagePreview] = useState<string | null>(
+  //   null
+  // );
+
+  const [savedDraft, setSavedDraft] = useState<any>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -50,23 +75,12 @@ const CreateRaffle = () => {
 
   const [errors, setErrors] = useState<{
     [key: string]: string | undefined;
-    title?: string;
-    description?: string;
-    prize?: string;
-    selectedNFT?: string;
-    selectedToken?: string;
-    ticketPrice?: string;
-    totalTickets?: string;
-    numberOfWinners?: string;
-    startDate?: string;
-    endDate?: string;
-    selectedTokenType?: string;
-    startDateError?: string;
-    endDateError?: string;
   }>({});
 
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLDivElement>(null);
+  const raffleImageRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const prizeRef = useRef<HTMLDivElement | null>(null);
   const ticketPriceRef = useRef<HTMLInputElement>(null);
   const totalTicketsRef = useRef<HTMLInputElement>(null);
@@ -76,27 +90,35 @@ const CreateRaffle = () => {
   const selectedTokenTypeRef = useRef<HTMLDivElement>(null);
 
   const tokenOptions = [
-    { value: "SOL", label: "SOL" },
+    { value: "SOLANA", label: "SOL" },
     { value: "USDC", label: "USDC" },
     { value: "BONK", label: "BONK" },
     { value: "USDT", label: "USDT" },
   ];
 
-  const handleSelectNFT = (nft: any) => {
-    if (!selectedNFTs.some((item) => item.id === nft.id)) {
-      setSelectedNFTs((prev) => [...prev, nft]);
-    }
-    // setIsNFTDialogOpen(false);
-    setErrors((prev) => ({
-      ...prev,
-      selectedNFT: undefined,
-      prize: undefined,
-    }));
-  };
+  useEffect(() => {
+    const totalPrizes = selectedNFTs.length + selectedTokens.length;
 
-  const removeNFT = (id: any) => {
-    setSelectedNFTs((prev) => prev.filter((i) => i.id !== id));
-  };
+    // only auto-set if user hasn't typed anything
+    if (numberOfWinners === 1 || numberOfWinners > totalPrizes) {
+      setNumberOfWinners(totalPrizes > 0 ? totalPrizes : 1);
+    }
+  }, [selectedNFTs, selectedTokens]);
+
+  // const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (!file) return;
+
+  //   setRaffleImage(file);
+  //   setRaffleImagePreview(URL.createObjectURL(file));
+
+  //   setErrors((prev) => ({ ...prev, raffleImage: "" }));
+  // };
+
+  // const handleRemoveImage = () => {
+  //   setRaffleImage(null);
+  //   setRaffleImagePreview(null);
+  // };
 
   //fetch NFTs when NFT dialog opens
   useEffect(() => {
@@ -172,10 +194,11 @@ const CreateRaffle = () => {
           const info = t.account?.data?.parsed?.info;
           const mint = info?.mint || `unknown-${idx}`;
           const amount = info?.tokenAmount?.uiAmount ?? 0;
+          const programId = t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
           const name = info?.tokenAmount?.decimals
             ? `Token ${mint.slice(0, 6)}...`
             : "Unknown Token";
-          return { mint, name, amount };
+          return { mint, name, amount, programId };
         });
         setTokenCandidates(mapped);
       } catch (err) {
@@ -189,10 +212,27 @@ const CreateRaffle = () => {
     fetchTokens();
   }, [isTokenDialogOpen, user?.pubkey]);
 
+  const handleSelectNFT = (nft: any) => {
+    if (!selectedNFTs.some((item) => item.id === nft.id)) {
+      setSelectedNFTs((prev) => [...prev, nft]);
+    }
+    // setIsNFTDialogOpen(false);
+    setErrors((prev) => ({
+      ...prev,
+      selectedNFT: undefined,
+      prize: undefined,
+    }));
+  };
+
+  const removeNFT = (id: any) => {
+    setSelectedNFTs((prev) => prev.filter((i) => i.id !== id));
+  };
+
   const handleSelectToken = (token: {
     mint: string;
     name: string;
     amount: number;
+    programId: string;
   }) => {
     if (!selectedTokens.some((t) => t.mint === token.mint)) {
       setSelectedTokens((prev) => [...prev, { ...token, amountToUse: 0 }]);
@@ -209,7 +249,9 @@ const CreateRaffle = () => {
     setSelectedTokens((prev) => prev.filter((t) => t.mint !== mint));
   };
 
-  const validateForm = () => {
+  const validateForm = (isDraft = false) => {
+    if (isDraft) return true;
+
     const newErrors: any = {};
 
     if (selectedNFTs.length === 0 && selectedTokens.length === 0) {
@@ -229,14 +271,20 @@ const CreateRaffle = () => {
 
     if (!title.trim()) newErrors.title = "Title is required";
     if (!description.trim()) newErrors.description = "Description is required";
+    // if (!raffleImage) {
+    //   newErrors.raffleImage = "Please upload a raffle image.";
+    // }
     if (!ticketPrice || Number(ticketPrice) <= 0)
       newErrors.ticketPrice = "Ticket price must be greater than 0";
     if (!totalTickets || Number(totalTickets) <= 0)
       newErrors.totalTickets = "Total tickets must be greater than 0";
     if (!numberOfWinners || Number(numberOfWinners) <= 0)
       newErrors.numberOfWinners = "Number of winners must be at least 1";
-    if (Number(numberOfWinners) > Number(totalTickets))
-      newErrors.numberOfWinners = "Cannot exceed total tickets";
+    const totalPrizes = selectedNFTs.length + selectedTokens.length;
+    if (numberOfWinners > totalPrizes) {
+      newErrors.numberOfWinners =
+        "Number of winners cannot exceed total prizes";
+    }
     if (!startDate) newErrors.startDate = "Start date is required";
     if (!endDate) newErrors.endDate = "End date is required";
     if (!selectedTokenType)
@@ -267,6 +315,11 @@ const CreateRaffle = () => {
         });
       else if (newErrors.prize)
         prizeRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      else if (newErrors.raffleImage)
+        raffleImageRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
@@ -305,14 +358,13 @@ const CreateRaffle = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleCreateRaffle = async () => {
-    // Check if user is logged in
+  const submitRaffle = async (status: "UPCOMING" | "DRAFT") => {
     if (!user.isAuthenticated) {
-      toast.error("Please sign in first to create a raffle!");
+      toast.error("Please sign in first!");
       return;
     }
 
-    if (!validateForm()) return;
+    if (!validateForm(status === "DRAFT")) return;
 
     try {
       setLoading(true);
@@ -320,48 +372,185 @@ const CreateRaffle = () => {
       const payload = {
         title: title.trim(),
         description: description.trim(),
-        images: selectedNFTs.map((nft) => nft.image),
-        totalTickets: Number(totalTickets),
-        ticketPrice: Number(ticketPrice),
-        tokenType: selectedTokenType,
+        totalTickets,
+        ticketPrice,
+        tokenType: selectedTokenType || "SOLANA",
         numberOfWinners,
         startDate,
         endDate,
+        status,
         requiresNftVerification: false,
-        verifiedCollections: selectedNFTs.map((nft) => nft.collection),
-        tokens: selectedTokens.map((t) => ({
-          mint: t.mint,
-          amount: t.amountToUse,
-        })),
-        additionalJson: {
-          created: "user",
-          category: "raffle",
-          notes: "",
-        },
+        rewards: [
+          ...selectedNFTs.map((nft) => ({
+            rewardType: "NFT",
+            rewardName: nft.name,
+            mintAddress: nft.mint,
+            amount: 1,
+            imageUrl: nft.image || "",
+            metadataJson: JSON.stringify({ collection: nft.collection }),
+          })),
+
+          ...selectedTokens.map((token) => ({
+            rewardType:
+              token.programId === TOKEN_2022_PROGRAM_ID
+                ? "SPL_TOKEN_2022"
+                : "SPL_TOKEN",
+            rewardName: token.name,
+            mintAddress: token.mint,
+            amount: token.amountToUse,
+            imageUrl: "",
+            metadataJson: JSON.stringify({ programId: token.programId }),
+          })),
+        ],
+        additionalJson: { created: "user", category: "raffle" },
       };
 
       const res = await server.post("/raffle/create", payload);
 
       if (res.data.success) {
-        toast.success(res.data.message);
-
-        // Access the created raffle
-        const createdRaffle = res.data.data.raffle;
-        console.log("Created raffle ID:", createdRaffle.id);
-
-        // Navigate to raffle detail page if needed
-        navigate(`/raffle/${createdRaffle.id}`);
+        toast.success(status === "DRAFT" ? "Draft saved!" : "Raffle created!");
       }
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.response?.data?.message || "Failed to create raffle");
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Failed");
     } finally {
       setLoading(false);
     }
   };
 
+  // Minimal draft helpers so UI buttons and actions don't reference missing functions.
+  // Saving as draft simply reuses submitRaffle with status DRAFT.
+  const handleSaveDraft = async () => {
+    await submitRaffle("DRAFT");
+  };
+
+  // Load a draft object into the form. This is a best-effort shallow merge.
+  const loadDraft = (draft: any) => {
+    if (!draft) return;
+    try {
+      setTitle(draft.title || "");
+      setDescription(draft.description || "");
+      setTicketPrice(draft.ticketPrice ?? "");
+      setTotalTickets(draft.totalTickets ?? "");
+      setNumberOfWinners(draft.numberOfWinners ?? 1);
+      setStartDate(draft.startDate || "");
+      setEndDate(draft.endDate || "");
+      setSelectedTokenType(draft.tokenType || null);
+      setSelectedNFTs(draft.selectedNFTs || []);
+      setSelectedTokens(draft.selectedTokens || []);
+    } catch (err) {
+      console.error("Failed to load draft", err);
+    }
+    const loadedNFTs: any[] = [];
+    const loadedTokens: any[] = [];
+
+    if (draft.rewards && Array.isArray(draft.rewards)) {
+      draft.rewards.forEach((reward: any) => {
+        // Parse metadata if it exists as a string
+        let metadata: any = {};
+        try {
+          metadata = reward.metadataJson ? JSON.parse(reward.metadataJson) : {};
+        } catch (e) {
+          console.error("Error parsing metadata", e);
+        }
+
+        if (reward.rewardType === "NFT") {
+          loadedNFTs.push({
+            id: reward.mintAddress, // UI uses 'id'
+            mint: reward.mintAddress,
+            name: reward.rewardName,
+            image: reward.imageUrl,
+            collection: metadata.collection || "",
+            raw: {}, // Raw data might be missing, but that's okay for display
+          });
+        } else if (reward.rewardType.includes("SPL_TOKEN")) {
+          loadedTokens.push({
+            mint: reward.mintAddress,
+            name: reward.rewardName,
+            amountToUse: reward.amount,
+            // We set 'amount' (wallet balance) to the used amount temporarily
+            // so validation passes until the user reconnects wallet/refreshes
+            amount: reward.amount,
+            programId: metadata.programId || TOKEN_PROGRAM_ID,
+          });
+        }
+      });
+    }
+
+    setSelectedNFTs(loadedNFTs);
+    setSelectedTokens(loadedTokens);
+  };
+
+  const deleteDraft = () => {
+    setSavedDraft(null);
+  };
+
+  const fetchDrafts = async () => {
+    if (!user.isAuthenticated) {
+      toast.error("Please sign in to fetch drafts!");
+      return;
+    }
+
+    try {
+      setDraftLoading(true);
+      const res = await server.get("/raffle/draft");
+
+      if (res.data.success && res.data.data) {
+        setSavedDraft(res.data.data);
+        toast.success("Draft loaded successfully!");
+      } else {
+        setSavedDraft(null);
+        toast.info("No saved drafts found.");
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch drafts", err);
+      setSavedDraft(null);
+      toast.error(err.response?.data?.message || "Failed to fetch drafts");
+    } finally {
+      setDraftLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-2 max-w-4xl">
+      <div className="mb-6">
+        {/* Fetch Drafts Button */}
+        <div className="flex justify-end mb-4">
+          <Button
+            onClick={fetchDrafts}
+            disabled={draftLoading || !user.isAuthenticated}
+            variant="outline"
+            className="gap-2"
+          >
+            {draftLoading ? "Loading..." : "Fetch Saved Drafts"}
+          </Button>
+        </div>
+
+        {/* Saved Draft Display */}
+        {savedDraft && (
+          <div className="p-4 border border-accent/50 bg-accent/10 rounded-lg">
+            <p className="font-medium items-center">
+              You have a saved draft:{" "}
+              <strong className="text-foreground">{savedDraft.title}</strong>
+            </p>
+
+            <div className="mt-3 flex gap-3">
+              <button
+                onClick={() => loadDraft(savedDraft)}
+                className="px-4 py-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm transition-colors rounded-md"
+              >
+                Resume Draft
+              </button>
+
+              <button
+                onClick={deleteDraft}
+                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md"
+              >
+                Delete Draft
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
       <div className="text-center">
         <h1 className="text-4xl font-bold text-gradient mb-2">
           Create New Raffle
@@ -444,7 +633,7 @@ const CreateRaffle = () => {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full h-32 border-2 border-dashed hover:border-primary-50 hover:bg-background-50"
+                      className="w-full h-32 border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-background-50 mt-2"
                     >
                       <div className="flex flex-col items-center gap-2">
                         <Wallet className="h-8 w-8" />
@@ -459,18 +648,24 @@ const CreateRaffle = () => {
                   </DialogTrigger>
 
                   {/* Modal */}
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Select NFT from Your Wallet</DialogTitle>
                     </DialogHeader>
 
-                    {nftLoading ? (
+                    {!user.isAuthenticated ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center ">
+                        <p className="text-muted-foreground text-sm mb-4">
+                          Please sign in or log in to view your wallet NFTs.
+                        </p>
+                      </div>
+                    ) : nftLoading ? (
                       <p className="text-center py-6 text-muted-foreground">
                         Loading NFTs...
                       </p>
                     ) : nftCandidates.length === 0 ? (
                       <p className="text-center py-6 text-muted-foreground">
-                        No NFTs found in your wallet
+                        No NFTs found in your wallet.
                       </p>
                     ) : (
                       <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
@@ -499,11 +694,11 @@ const CreateRaffle = () => {
                               <img
                                 src={nft.image}
                                 alt={nft.name}
-                                className="w-full aspect-square object-cover"
+                                className="w-full h-40 object-cover rounded-lg"
                               />
 
                               {/* Footer Overlay */}
-                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background-90 to-transparent p-3">
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background-90 to-transparent p-2">
                                 <p className="font-semibold text-sm truncate">
                                   {nft.name}
                                 </p>
@@ -536,7 +731,48 @@ const CreateRaffle = () => {
                     </div>
                   </DialogContent>
                 </Dialog>
+
+                {/* ---------------- SELECTED NFT LIST ---------------- */}
+                {selectedNFTs.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {selectedNFTs.map((nft) => (
+                      <div
+                        key={nft.id}
+                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
+                      >
+                        {/* Remove Single NFT */}
+                        <button
+                          type="button"
+                          onClick={() => removeNFT(nft.id)}
+                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+
+                        <div className="flex gap-4 items-center">
+                          <img
+                            src={nft.image}
+                            alt={nft.name}
+                            className="w-24 h-24 rounded-lg object-cover"
+                          />
+                          <div>
+                            <p className="font-semibold break-words break-all">
+                              {nft.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground break-words break-all">
+                              {nft.collection}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1 break-words break-all">
+                              Mint: {nft.mint}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
               <div>
                 <label className="text-sm font-medium mb-2">
                   Prize Token *
@@ -549,7 +785,7 @@ const CreateRaffle = () => {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full h-32 border-2 border-dashed hover:border-primary-50 hover:bg-background-50"
+                      className="w-full h-32 border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-background/50 mt-2"
                     >
                       <div className="flex flex-col items-center gap-2">
                         <Wallet className="h-8 w-8" />
@@ -564,13 +800,22 @@ const CreateRaffle = () => {
                   </DialogTrigger>
 
                   {/* Modal */}
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Select Token from Your Wallet</DialogTitle>
                     </DialogHeader>
 
-                    {tokenLoading ? (
-                      <p> Loading tokens...</p>
+                    {!user.isAuthenticated ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <p className="text-muted-foreground text-sm mb-4">
+                          Please sign in or log in to view your wallet Tokens.
+                        </p>
+                      </div>
+                    ) : tokenLoading ? (
+                      <p className="text-center py-6 text-muted-foreground">
+                        {" "}
+                        Loading tokens...
+                      </p>
                     ) : tokenCandidates.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <p className="text-muted-foreground text-sm">
@@ -601,7 +846,7 @@ const CreateRaffle = () => {
                 }
               `}
                             >
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col p-4 gap-1">
                                 <p className="font-semibold text-sm truncate">
                                   {token.name}
                                 </p>
@@ -635,115 +880,118 @@ const CreateRaffle = () => {
                     </div>
                   </DialogContent>
                 </Dialog>
+
+                {selectedTokens.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {selectedTokens.map((t) => (
+                      <div
+                        key={t.mint}
+                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => removeToken(t.mint)}
+                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        <div className="flex flex-col gap-2 break-all">
+                          <div className="flex-1">
+                            <p className="font-semibold break-all">{t.name}</p>
+                            <p className="text-xs text-muted-foreground break-all">
+                              Mint: {t.mint}
+                            </p>
+                            <p className="text-xs text-muted-foreground break-all">
+                              Amount: {t.amount}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="text-xs font-medium">
+                              Amount
+                            </label>
+                            <input
+                              type="number"
+                              value={t.amountToUse}
+                              min={0}
+                              max={t.amount}
+                              onChange={(e) => {
+                                const value = Number(e.target.value);
+                                setSelectedTokens((prev) =>
+                                  prev.map((token) =>
+                                    token.mint === t.mint
+                                      ? { ...token, amountToUse: value }
+                                      : token
+                                  )
+                                );
+                                // Clear error if any
+                                setErrors((prev) => ({
+                                  ...prev,
+                                  [`token-${t.mint}`]: undefined,
+                                }));
+                              }}
+                              placeholder="Amount to use"
+                              className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
+                            />
+                            {errors[`token-${t.mint}`] && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors[`token-${t.mint}`]}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Error Message */}
               {errors.prize && (
                 <p className="text-red-500 text-sm mt-1">{errors.prize}</p>
               )}
-
-              {/* ---------------- SELECTED NFT LIST ---------------- */}
-              {selectedNFTs.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {selectedNFTs.map((nft) => (
-                    <div
-                      key={nft.id}
-                      className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
-                    >
-                      {/* Remove Single NFT */}
-                      <button
-                        type="button"
-                        onClick={() => removeNFT(nft.id)}
-                        className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-
-                      <div className="flex gap-4 items-center">
-                        <img
-                          src={nft.image}
-                          alt={nft.name}
-                          className="w-24 h-24 rounded-lg object-cover"
-                        />
-                        <div>
-                          <p className="font-semibold break-words break-all">
-                            {nft.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground break-words break-all">
-                            {nft.collection}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1 break-words break-all">
-                            Mint: {nft.mint}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {selectedTokens.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {selectedTokens.map((t) => (
-                    <div
-                      key={t.mint}
-                      className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => removeToken(t.mint)}
-                        className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <div className="flex flex-col gap-2 break-all">
-                        <div className="flex-1">
-                          <p className="font-semibold break-all">{t.name}</p>
-                          <p className="text-xs text-muted-foreground break-all">
-                            Mint: {t.mint}
-                          </p>
-                          <p className="text-xs text-muted-foreground break-all">
-                            Amount: {t.amount}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col">
-                          <label className="text-xs font-medium">Amount</label>
-                          <input
-                            type="number"
-                            value={t.amountToUse}
-                            min={0}
-                            max={t.amount}
-                            onChange={(e) => {
-                              const value = Number(e.target.value);
-                              setSelectedTokens((prev) =>
-                                prev.map((token) =>
-                                  token.mint === t.mint
-                                    ? { ...token, amountToUse: value }
-                                    : token
-                                )
-                              );
-                              // Clear error if any
-                              setErrors((prev) => ({
-                                ...prev,
-                                [`token-${t.mint}`]: undefined,
-                              }));
-                            }}
-                            placeholder="Amount to use"
-                            className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
-                          />
-                          {errors[`token-${t.mint}`] && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors[`token-${t.mint}`]}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+          </div>
+
+          <div ref={raffleImageRef} className="flex flex-col gap-2">
+            <label className="font-medium">Raffle Image *</label>
+
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              // onChange={handleImageUpload}
+              className="hidden"
+            />
+            {/* 
+            {raffleImagePreview ? (
+              <div className="relative w-48">
+                <img
+                  src={raffleImagePreview}
+                  alt="Preview"
+                  className="w-full h-32 object-cover rounded border-2 border-primary/50"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute top-2 right-1 bg-red-500 text-white text-xs px-2 py-1 rounded"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : ( */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed cursor-pointer rounded-xl p-6 flex flex-col items-center justify-center gap-3 border-input transition hover:border-primary/50 hover:bg-background-50"
+            >
+              <Upload className="w-5 h-5 mr-2" />
+              <p className="text-sm">Click to upload an image</p>
+            </div>
+            {/* )} */}
+
+            {errors.raffleImage && (
+              <p className="text-red-500 text-sm">{errors.raffleImage}</p>
+            )}
           </div>
         </div>
 
@@ -887,12 +1135,17 @@ const CreateRaffle = () => {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <Button variant="outline" className="w-full">
-            Save as Draft
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleSaveDraft}
+            disabled={loading}
+          >
+            {loading ? "Processing..." : "Save as Draft"}
           </Button>
 
           <Button
-            onClick={handleCreateRaffle}
+            onClick={() => submitRaffle("UPCOMING")}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
             disabled={loading}

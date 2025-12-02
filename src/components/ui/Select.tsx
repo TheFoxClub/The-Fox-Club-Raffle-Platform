@@ -61,7 +61,7 @@ const Select: React.FC<SelectProps> = ({
   }, []);
 
   return (
-    <div ref={wrapperRef} className="relative z-[51]">
+    <div ref={wrapperRef}>
       {/* Select Trigger (Mimics SelectTrigger and SelectValue) */}
       <button
         type="button"

@@ -1,6 +1,6 @@
 import { RaffleCard } from "./RaffleCard";
 import { useEffect, useState } from "react";
-import { Flame, Clock } from "lucide-react";
+import { Flame, Clock, Calendar } from "lucide-react";
 import {
   Tabs,
   TabsContent,
@@ -96,6 +96,10 @@ export const RaffleGrid = () => {
           <Clock className="h-4 w-4" />
           Ended Raffles
         </TabsTrigger>
+        <TabsTrigger value="upcoming" className="gap-2 flex-1 sm:flex-none">
+          <Calendar className="h-4 w-4" />
+          Upcoming Raffles
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="live" className="space-y-6">
@@ -183,6 +187,57 @@ export const RaffleGrid = () => {
             </p>
           </div>
         )}
+      </TabsContent>
+
+      <TabsContent value="upcoming" className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Upcoming Raffles</h2>
+          <span className="text-sm text-muted-foreground">
+            {endedRaffles.length} ended raffles
+          </span>
+        </div>
+        {/* {endedRaffles.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {endedRaffles.map((raffle) => {
+              const mappedRaffle = {
+                id: raffle.id,
+                title: raffle.title,
+                image: raffle.imageUrl,
+                price: raffle.ticketPrice,
+                sold: Number(raffle.ticketSold) || 0,
+                total: Number(raffle.totalTickets) || 0,
+                tokenType:
+                  raffle.tokenType === 0
+                    ? "SOL"
+                    : raffle.tokenType === 1
+                    ? "USDC"
+                    : raffle.tokenType === 2
+                    ? "BONK"
+                    : "USDT",
+                winners: raffle.numberOfWinners,
+                endTime: formatCountdown(raffle.endDate),
+                isVerified: raffle.raffle_detail.requiresNftVerification,
+                isFeatured: raffle.raffle_detail.isFeatured,
+              };
+
+              return (
+                <Link to={`/raffle/${raffle.id}`} key={raffle.id}>
+                  <RaffleCard {...mappedRaffle} />
+                </Link>
+              );
+            })}
+          </div>
+        ) : ( */}
+        <div className="text-center py-16 glass-card">
+          <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-xl font-semibold mb-2">
+            No Upcoming Raffles Yet
+          </h3>
+          <p className="text-muted-foreground">
+            Upcoming raffles will appear here
+          </p>
+        </div>
+        {/* )} */}
       </TabsContent>
     </Tabs>
   );
