@@ -22,7 +22,7 @@ export default function RaffleCarousel() {
   const data = raffles[index];
 
   return (
-    <Card className="glass-card overflow-hidden glow-primary border-primary/30">
+    <Card className=" overflow-hidden glow-primary border-primary/30">
       <div className="relative">
         <div className="grid md:grid-cols-2 gap-0">
           {/* Image */}

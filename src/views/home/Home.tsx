@@ -11,16 +11,8 @@ const Home = () => {
   return (
     <div className="px-4">
       <HeroSection />
-      {/* <div>
-        <button onClick={notifySuccess}>Show success toast</button>
-        <button onClick={notifyError} style={{ marginLeft: 8 }}>
-          Show error toast
-        </button>
-      </div> */}
-
       <RaffleCarousel />
       <RaffleFilter />
-
       <RaffleGrid />
     </div>
   );

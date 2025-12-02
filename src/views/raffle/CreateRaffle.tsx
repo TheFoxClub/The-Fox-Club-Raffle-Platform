@@ -1,5 +1,6 @@
 import { AlertCircle, Calendar, PlusCircle, Wallet, X } from "lucide-react";
 import Button from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
 import Select from "../../components/ui/Select";
 import {
@@ -241,13 +242,13 @@ const CreateRaffle = () => {
           <div ref={titleRef}>
             <label className="text-sm font-medium">Raffle Title *</label>
             <div>
-              <input
+              <Input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Rare Fox NFT Giveway"
-                className="border focus:border-primary border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
-              />  
+                className="mt-2 w-full px-3 py-2 text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
+              />
               {errors.title && (
                 <p className="text-red-500 text-sm mt-1">{errors.title}</p>
               )}
@@ -363,7 +364,7 @@ const CreateRaffle = () => {
             <div ref={ticketPriceRef}>
               <label className="text-sm font-medium">Ticket Price *</label>
               <div>
-                <input
+                <Input
                   type="number"
                   value={ticketPrice}
                   onChange={(e) => {
@@ -372,7 +373,7 @@ const CreateRaffle = () => {
                   }}
                   placeholder="0.5"
                   step="0.01"
-                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base md:text-sm bg-background/50 outline-none"
+                  className="mt-2 w-full text-base md:text-sm bg-background/50 outline-none"
                 />
                 {errors.ticketPrice && (
                   <p className="text-red-500 text-sm mt-1">
@@ -406,12 +407,12 @@ const CreateRaffle = () => {
             <div ref={totalTicketsRef}>
               <label className="text-sm font-medium">Total Tickets *</label>
               <div>
-                <input
+                <Input
                   type="number"
                   value={totalTickets}
                   onChange={(e) => setTotalTickets(Number(e.target.value))}
                   placeholder="100"
-                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
+                  className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
                 {errors.totalTickets && (
                   <p className="text-red-500 text-sm mt-1">
@@ -424,13 +425,13 @@ const CreateRaffle = () => {
             <div ref={numberOfWinnersRef}>
               <label className="text-sm font-medium">Number of Winners *</label>
               <div>
-                <input
+                <Input
                   type="number"
                   value={numberOfWinners}
                   onChange={(e) => setNumberOfWinners(Number(e.target.value))}
                   placeholder="1"
                   defaultValue="1"
-                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
+                  className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
                 {errors.numberOfWinners && (
                   <p className="text-red-500 text-sm mt-1">
@@ -452,11 +453,11 @@ const CreateRaffle = () => {
             <div ref={startDateRef}>
               <label className="text-sm font-medium">Start Date & Time *</label>
               <div>
-                <input
+                <Input
                   type="datetime-local"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
+                  className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
                 {errors.startDate && (
                   <p className="text-red-500 text-sm mt-1">
@@ -474,11 +475,11 @@ const CreateRaffle = () => {
             <div ref={endDateRef}>
               <label className="text-sm font-medium">End Date & Time *</label>
               <div>
-                <input
+                <Input
                   type="datetime-local"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="border border-input focus:border-primary rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
+                  className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
                 {errors.endDate && (
                   <p className="text-red-500 text-sm mt-1">{errors.endDate}</p>

@@ -290,7 +290,7 @@ const RaffleDetail = () => {
                   onChange={(e) =>
                     setTicketCount(Math.max(1, parseInt(e.target.value) || 1))
                   }
-                  className="flex h-10 w-full rounded-md text-center border border-border bg-background-50 rounded-md text-lg p-2 font-bold md:text-sm"
+                  className="flex h-10 w-full rounded-md text-center border border-border bg-background-50 rounded-md text-lg p-2 font-bold md:text-sm focus:ring-offset-2"
                 />
                 <Button
                   variant="outline"

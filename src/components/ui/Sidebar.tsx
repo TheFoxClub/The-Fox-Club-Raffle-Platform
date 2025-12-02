@@ -465,7 +465,7 @@ const SidebarInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
         ref={ref}
         data-sidebar="input"
         className={cn(
-          "h-8 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500",
+          "h-8 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2",
           className
         )}
         {...props}

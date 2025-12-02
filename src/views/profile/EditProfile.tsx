@@ -1,6 +1,7 @@
 import { Card } from "../../components/ui/Card";
 import { User, Upload, X, Save } from "lucide-react";
 import Button from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 import { useState } from "react";
 import { initialData } from "../../dummydata/editProfileData";
 import type { FormDetails } from "../../dummydata/editProfileData";
@@ -70,11 +71,11 @@ const EditProfile = () => {
                 <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Wallet Address
                 </label>
-                <input
+                <Input
                   id="wallet"
                   placeholder="7xKX...9mPq"
                   disabled
-                  className="border border-input rounded-lg mt-2 w-full px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground md:text-sm bg-background-50"
+                  className="mt-2 w-full bg-background-50"
                 />
                 <span className="text-xs text-muted-foreground">
                   Your wallet address cannot be changed
@@ -88,13 +89,13 @@ const EditProfile = () => {
                 >
                   Username
                 </label>
-                <input
+                <Input
                   type="text"
                   id="username"
                   value={formData.username}
                   onChange={handleChange}
                   placeholder="Enter your username"
-                  className="border border-input rounded-lg mt-2 w-full  px-3 py-2 text-base ring-offset-background px-3 py-2 text-base ring-offset-background placeholder:text-foreground md:text-sm md:text-sm bg-background-50"
+                  className="mt-2 w-full bg-background-50"
                 />
               </div>
 
@@ -105,13 +106,13 @@ const EditProfile = () => {
                 >
                   Email
                 </label>
-                <input
+                <Input
                   type="email"
                   id="email"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="your@email.com"
-                  className="border border-input rounded-lg mt-2 w-full  px-3 py-2 text-base ring-offset-background px-3 py-2 text-base ring-offset-background placeholder:text-foreground md:text-sm md:text-sm bg-background-50"
+                  className="mt-2 w-full bg-background-50"
                 />
                 <span className="text-xs text-muted-foreground">
                   Used for important notifications only
@@ -131,7 +132,7 @@ const EditProfile = () => {
                   onChange={handleChange}
                   rows={4}
                   placeholder="Tell us about yourself..."
-                  className="border border-input rounded-lg mt-2 w-full  px-3 py-2 text-base ring-offset-background px-3 py-2 text-base ring-offset-background placeholder:text-foreground md:text-sm md:text-sm bg-background-50"
+                  className="border border-input rounded-lg mt-2 w-full  px-3 py-2 text-base ring-offset-background px-3 py-2 text-base ring-offset-background placeholder:text-foreground md:text-sm md:text-sm bg-background-50 focus:ring-offset-2"
                 />
               </div>
             </div>
@@ -148,12 +149,12 @@ const EditProfile = () => {
                 >
                   Twitter
                 </label>
-                <input
+                <Input
                   id="twitter"
                   value={formData.twitter}
                   onChange={handleChange}
                   placeholder="@username"
-                  className="border border-input rounded-lg mt-2 w-full  px-3 py-2 text-base ring-offset-background px-3 py-2 text-base ring-offset-background placeholder:text-foreground md:text-sm md:text-sm bg-background-50"
+                  className="mt-2 w-full bg-background-50"
                 />
               </div>
 
@@ -164,12 +165,12 @@ const EditProfile = () => {
                 >
                   Discord
                 </label>
-                <input
+                <Input
                   id="discord"
                   value={formData.discord}
                   onChange={handleChange}
                   placeholder="Username#0000"
-                  className="border border-input rounded-lg mt-2 w-full  px-3 py-2 text-base ring-offset-background px-3 py-2 text-base ring-offset-background placeholder:text-foreground md:text-sm md:text-sm bg-background-50"
+                  className="mt-2 w-full bg-background-50"
                 />
               </div>
             </div>

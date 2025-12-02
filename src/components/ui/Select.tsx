@@ -13,14 +13,27 @@ interface SelectContextType {
 }
 const SelectContext = React.createContext<SelectContextType | null>(null);
 
+interface Option {
+  value: string;
+  label: React.ReactNode;
+}
+
 interface SelectProps {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  /**
+   * Optional simple options prop for convenience. If provided and no children are
+   * passed, the Select will render a default trigger and content using these options.
+   */
+  options?: Option[];
+  /** placeholder for the SelectValue when using `options` */
+  placeholder?: string;
+  className?: string;
 }
 
-export const Select: React.FC<SelectProps> = ({ value: controlledValue, defaultValue, onValueChange, children }) => {
+export const Select: React.FC<SelectProps> = ({ value: controlledValue, defaultValue, onValueChange, children, options, placeholder, className }) => {
   const [internalValue, setInternalValue] = useState<string | undefined>(defaultValue);
   const isControlled = controlledValue !== undefined;
   const value = isControlled ? controlledValue : internalValue;
@@ -47,7 +60,24 @@ export const Select: React.FC<SelectProps> = ({ value: controlledValue, defaultV
 
   return (
     <SelectContext.Provider value={{ value, setValue, open, setOpen, registerItem, unregisterItem, itemsRef }}>
-      <div className="relative">{children}</div>
+      <div className="relative">
+        {children}
+        {/* If callers pass `options` directly, render a default trigger + content */}
+        {!children && options && (
+          <>
+            <SelectTrigger className={className}>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </>
+        )}
+      </div>
     </SelectContext.Provider>
   );
 };
