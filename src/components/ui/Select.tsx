@@ -41,6 +41,17 @@ export const Select: React.FC<SelectProps> = ({ value: controlledValue, defaultV
   const [open, setOpen] = useState(false);
   const itemsRef = useRef(new Map<string, React.ReactNode>());
 
+  // If `options` prop is provided (the simple API), pre-register their labels
+  // so `SelectValue` can display the selected label even when the dropdown
+  // hasn't been opened (SelectContent mounts only when open).
+  useEffect(() => {
+    if (!options) return;
+    options.forEach((opt) => itemsRef.current.set(opt.value, opt.label));
+    return () => {
+      options.forEach((opt) => itemsRef.current.delete(opt.value));
+    };
+  }, [options]);
+
   const setValue = useCallback(
     (v: string) => {
       if (!isControlled) setInternalValue(v);

@@ -47,7 +47,7 @@ function formatCountdown(endDate: string) {
   return `${days}d ${hours}h`;
 }
 
-export const RaffleGrid = () => {
+export const RaffleGrid = ({ filters }: { filters?: any }) => {
   const [raffles, SetRaffles] = useState<RaffleData[]>([]);
   const [endedRaffles, setEndedRaffles] = useState<RaffleData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,15 +57,31 @@ export const RaffleGrid = () => {
       try {
         setLoading(true);
 
-        //fetch live raffles
-        const liveRes = await server.get("/raffle/live");
-        if (liveRes.data.success) {
-          SetRaffles(liveRes.data.data.raffles);
-        }
-        //fetch ended raffles
-        const endedRes = await server.get("/raffle/ended");
-        if (endedRes.data.success) {
-          setEndedRaffles(endedRes.data.data.raffles);
+        if (!filters) {
+          //fetch live raffles
+          const liveRes = await server.get("/raffle/live");
+          if (liveRes.data.success) {
+            SetRaffles(liveRes.data.data.raffles);
+          }
+          //fetch ended raffles
+          const endedRes = await server.get("/raffle/ended");
+          if (endedRes.data.success) {
+            setEndedRaffles(endedRes.data.data.raffles);
+          }
+        } else {
+          // fetch filtered raffles
+          const res = await server.get("/raffle/filter", { params: filters });
+          if (res.data.success) {
+            const dataRaffles = res.data.data?.raffles || res.data.data || [];
+            // place results into active or ended tab based on status
+            if (filters.status === "ended") {
+              SetRaffles([]);
+              setEndedRaffles(dataRaffles);
+            } else {
+              SetRaffles(dataRaffles);
+              setEndedRaffles([]);
+            }
+          }
         }
       } catch (error: any) {
         console.error(error);
@@ -75,7 +91,7 @@ export const RaffleGrid = () => {
       }
     };
     fetchRaffles();
-  }, []);
+  }, [filters]);
 
   if (loading) {
     return (
