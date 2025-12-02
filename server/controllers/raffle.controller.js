@@ -104,6 +104,65 @@ class RaffleController {
     }
   }
 
+  static async getUpcomingRaffles(req, res) {
+    try {
+      const raffles = await Raffle.findAll({
+        where: {
+          status: RAFFLE_STATUS.UPCOMING,
+        },
+        include: [
+          {
+            model: RaffleDetail,
+            attributes: [
+              "isFeatured",
+              "featuredPosition",
+              "requiresNftVerification",
+              "verifiedCollectionRequired",
+            ],
+          },
+          {
+            model: User,
+            attributes: ["id", "pubkey"],
+          },
+          {
+            model: RaffleReward,
+          },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      const formattedRaffles = raffles.map((raffle) => {
+        const data = raffle.get({ plain: true });
+
+        data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
+        data.status = mapEnumValue(RAFFLE_STATUS, data.status);
+
+        if (data.raffle_rewards) {
+          data.raffle_rewards = data.raffle_rewards.map((reward) => ({
+            ...reward,
+            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+          }));
+        }
+
+        return data;
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Upcoming raffles retrieved successfully",
+        { raffles: formattedRaffles }
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
   static async getFeaturedRaffles(req, res) {
     try {
       const raffles = await Raffle.findAll({
@@ -637,7 +696,9 @@ class RaffleController {
 
       console.log("req query: ", req.query);
 
-      let whereClause = {};
+      let whereClause = {
+        status: { [Op.ne]: RAFFLE_STATUS.DRAFT },
+      };
 
       // Filter by status
       if (status) {
@@ -702,8 +763,24 @@ class RaffleController {
         offset,
       });
 
+      const formattedRaffles = raffles.map((raffle) => {
+        const data = raffle.get({ plain: true });
+
+        data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
+        data.status = mapEnumValue(RAFFLE_STATUS, data.status);
+
+        if (data.raffle_rewards) {
+          data.raffle_rewards = data.raffle_rewards.map((reward) => ({
+            ...reward,
+            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+          }));
+        }
+
+        return data;
+      });
+
       return respond(res, httpStatus.OK, "Raffles retrieved successfully", {
-        raffles,
+        formattedRaffles,
         pagination: {
           total: count,
           page,
