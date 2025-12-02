@@ -1,5 +1,5 @@
 import { RaffleCard } from "./RaffleCard";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Flame, Clock, Calendar } from "lucide-react";
 import {
   Tabs,
@@ -47,91 +47,111 @@ function formatCountdown(endDate: string) {
   return `${days}d ${hours}h`;
 }
 
-export const RaffleGrid = ({ filters }: { filters?: any }) => {
+type FilterParams = {
+  page?: number;
+  limit?: number;
+  tokenType?: string;
+  search?: string;
+  status?: string;
+};
+
+export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
   const [raffles, SetRaffles] = useState<RaffleData[]>([]);
   const [endedRaffles, setEndedRaffles] = useState<RaffleData[]>([]);
   const [upcomingRaffles, setUpcomingRaffles] = useState<RaffleData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("live");
 
+  // Fetch data for specific tab
+  const fetchRafflesForTab = useCallback(async (tabStatus: string) => {
+    try {
+      let response;
+      
+      if (!filters) {
+        // Use original endpoints when no filters
+        const endpoint = tabStatus === "live" ? "/raffle/live" 
+                      : tabStatus === "ended" ? "/raffle/ended" 
+                      : "/raffle/upcoming";
+        response = await server.get(endpoint);
+      } else {
+        // Use filter endpoint with status
+        const filterParams = { ...filters, status: tabStatus };
+        response = await server.get("/raffle/filter", { params: filterParams });
+      }
+
+      if (response.data.success) {
+        // Handle both old and new response structures
+        const data = Array.isArray(response.data.data?.formattedRaffles) 
+          ? response.data.data.formattedRaffles 
+          : Array.isArray(response.data.data?.raffles) 
+          ? response.data.data.raffles 
+          : [];
+        
+        // Update the appropriate state based on tab
+        if (tabStatus === "live") {
+          SetRaffles(data);
+        } else if (tabStatus === "ended") {
+          setEndedRaffles(data);
+        } else if (tabStatus === "upcoming") {
+          setUpcomingRaffles(data);
+        }
+      } else {
+        // Set empty array for failed requests
+        if (tabStatus === "live") SetRaffles([]);
+        else if (tabStatus === "ended") setEndedRaffles([]);
+        else if (tabStatus === "upcoming") setUpcomingRaffles([]);
+      }
+    } catch (error: unknown) {
+      console.error(`Error fetching ${tabStatus} raffles:`, error);
+      
+      // Set empty array for errors
+      if (tabStatus === "live") SetRaffles([]);
+      else if (tabStatus === "ended") setEndedRaffles([]);
+      else if (tabStatus === "upcoming") setUpcomingRaffles([]);
+      
+      const errorMessage = error instanceof Error && 'response' in error 
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || `Failed to fetch ${tabStatus} raffles`
+        : `Failed to fetch ${tabStatus} raffles`;
+      toast.error(errorMessage);
+    }
+  }, [filters]);
+
+  // Initial load - fetch all tabs
   useEffect(() => {
-    const fetchRaffles = async () => {
+    const fetchAllRaffles = async () => {
       try {
         setLoading(true);
-
-        if (!filters) {
-          //fetch live raffles
-          const liveRes = await server.get("/raffle/live");
-          if (liveRes.data.success) {
-            SetRaffles(Array.isArray(liveRes.data.data?.raffles) ? liveRes.data.data.raffles : []);
-          } else {
-            SetRaffles([]);
-          }
-          //fetch ended raffles
-          const endedRes = await server.get("/raffle/ended");
-          if (endedRes.data.success) {
-            setEndedRaffles(Array.isArray(endedRes.data.data?.raffles) ? endedRes.data.data.raffles : []);
-          } else {
-            setEndedRaffles([]);
-          }
-        } else {
-          // Apply filters using the filter endpoint
-          
-          // Get live raffles with filters
-          const liveFilters = { ...filters, status: 'live' };
-          
-          const liveRes = await server.get("/raffle/filter", { params: liveFilters });
-          if (liveRes.data.success) {
-            const liveData = liveRes.data.data?.raffles || liveRes.data.data || [];
-            SetRaffles(Array.isArray(liveData) ? liveData : []);
-          } else {
-            SetRaffles([]);
-          }
-
-          // Get ended raffles with filters
-          const endedFilters = { ...filters, status: 'ended' };
-          
-          const endedRes = await server.get("/raffle/filter", { params: endedFilters });
-          if (endedRes.data.success) {
-            const endedData = endedRes.data.data?.raffles || endedRes.data.data || [];
-            setEndedRaffles(Array.isArray(endedData) ? endedData : []);
-          } else {
-            setEndedRaffles([]);
-          }
-        }
-        //fetch upcoming raffles
-        if (!filters) {
-          const upcomingRes = await server.get("/raffle/upcoming");
-          if (upcomingRes.data.success) {
-            setUpcomingRaffles(Array.isArray(upcomingRes.data.data?.raffles) ? upcomingRes.data.data.raffles : []);
-          } else {
-            setUpcomingRaffles([]);
-          }
-        } else {
-          // Get upcoming raffles with filters
-          const upcomingFilters = { ...filters, status: 'upcoming' };
-          
-          const upcomingRes = await server.get("/raffle/filter", { params: upcomingFilters });
-          if (upcomingRes.data.success) {
-            const upcomingData = upcomingRes.data.data?.raffles || upcomingRes.data.data || [];
-            setUpcomingRaffles(Array.isArray(upcomingData) ? upcomingData : []);
-          } else {
-            setUpcomingRaffles([]);
-          }
-        }
-      } catch (error: unknown) {
-        console.error(error);
-        SetRaffles([]);
-        setEndedRaffles([]);
-        const errorMessage = error instanceof Error && 'response' in error 
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || "Failed to fetch raffles"
-          : "Failed to fetch raffles";
-        toast.error(errorMessage);
+        
+        // Fetch data for all tabs
+        await Promise.all([
+          fetchRafflesForTab("live"),
+          fetchRafflesForTab("ended"), 
+          fetchRafflesForTab("upcoming")
+        ]);
       } finally {
         setLoading(false);
       }
     };
-    fetchRaffles();
-  }, [filters]);
+    
+    fetchAllRaffles();
+  }, [filters, fetchRafflesForTab]);
+
+  // Handle tab changes - fetch data only for the new tab if not already loaded with current filters
+  const handleTabChange = async (newTab: string) => {
+    setActiveTab(newTab);
+    
+    // Check if we need to fetch data for this tab
+    const hasData = (newTab === "live" && raffles.length > 0) ||
+                   (newTab === "ended" && endedRaffles.length > 0) ||
+                   (newTab === "upcoming" && upcomingRaffles.length > 0);
+    
+    // Only fetch if no data or if this is the first load
+    if (!hasData) {
+      setLoading(true);
+      await fetchRafflesForTab(newTab);
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -142,7 +162,7 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
   }
 
   return (
-    <Tabs defaultValue="live" className="space-y-2 z-20 mt-10">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-2 z-20 mt-10">
       <TabsList className=" p-1 w-full sm:w-auto">
         <TabsTrigger value="live" className="gap-2 flex-1 sm:flex-none">
           <Flame className="h-4 w-4" />
