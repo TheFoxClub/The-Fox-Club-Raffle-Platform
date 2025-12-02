@@ -167,7 +167,7 @@ export default function RaffleFilter({
         />
       </div>
       <Button
-        variant={currentHasAny && !filtersEqualApplied ? "default" : "outline"}
+        variant={currentHasAny && !filtersEqualApplied ? "filter" : "outline"}
         className="w-full border-[hsl(240,6%,20%)]"
         onClick={handlePrimaryButton}
         disabled={!currentHasAny && !appliedHasAny}>
