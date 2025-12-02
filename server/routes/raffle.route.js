@@ -15,6 +15,9 @@ router.get("/live", RaffleController.getLiveRaffles);
 //Get Ended Raffle
 router.get("/ended", RaffleController.getEndedRaffles);
 
+//Get Upcoming Raffle
+router.get("/upcoming", RaffleController.getUpcomingRaffles);
+
 // Get Featured Raffles
 router.get("/featured", RaffleController.getFeaturedRaffles);
 

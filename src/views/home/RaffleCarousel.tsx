@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import {
@@ -8,18 +8,76 @@ import {
   Coins,
   Users,
 } from "lucide-react";
-import { featuredRaffles } from "../../dummydata/featuredRaffles";
+import server from "../../config/server";
+// import { featuredRaffles } from "../../dummydata/featuredRaffles";
+
+interface Raffle {
+  id: number;
+  title: string;
+  description: string;
+  price: string;
+  sold: number;
+  total: number;
+  image: string;
+  tokenType: string;
+  isVerified: boolean;
+}
 
 export default function RaffleCarousel() {
+  const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [index, setIndex] = useState(0);
 
-  const raffles = featuredRaffles;
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      try {
+        const res = await server.get("/raffle/featured");
+        console.log("API response:", res.data);
+
+        if (res.data?.success) {
+          const raw = res.data.data.raffles;
+
+          const mapped = raw.map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            description: r.description,
+            price: r.ticketPrice,
+            sold: Number(r.ticketSold ?? 0),
+            total: Number(r.totalTickets),
+            image: r.imageUrl,
+            tokenType:
+              r.tokenType === 0
+                ? "SOL"
+                : r.tokenType === 1
+                ? "USDC"
+                : r.tokenType === 2
+                ? "BONK"
+                : "USDT",
+            isVerified: r.raffle_detail?.requiresNftVerification ?? false,
+          }));
+
+          setRaffles(mapped);
+        }
+      } catch (error) {
+        console.error("Failed to load featured raffles", error);
+      }
+    };
+    fetchFeatured();
+  }, []);
+
+  //if no raffles loaded yet
+  if (raffles.length === 0) {
+    return (
+      <Card className="glass-card p-10 text-center border-primary/30">
+        Loading featured raffles...
+      </Card>
+    );
+  }
+
+  const data = raffles[index];
 
   const next = () => setIndex((prev) => (prev + 1) % raffles.length);
   const prev = () =>
     setIndex((prev) => (prev - 1 + raffles.length) % raffles.length);
-
-  const data = raffles[index];
 
   return (
     <Card className=" overflow-hidden glow-primary border-primary/30">
@@ -30,7 +88,7 @@ export default function RaffleCarousel() {
             <img
               src={data.image}
               alt={data.title}
-              className="w-full h-full object-cover"
+              className="w-full h-86 object-cover"
             />
             {/* Verified Badge */}
             {data.isVerified && (
