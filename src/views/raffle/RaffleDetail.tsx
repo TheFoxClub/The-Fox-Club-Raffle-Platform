@@ -138,7 +138,7 @@ const RaffleDetail = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card className="glass-card overflow-hidden">
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 overflow-hidden">
             <div className="relative aspect-video">
               <img
                 src={raffle.image}
@@ -154,7 +154,7 @@ const RaffleDetail = () => {
           </Card>
 
           {/* Raffle Info */}
-          <Card className="glass-card p-6 space-y-4">
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
             <div>
               <div className="top-3 left-3 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white mb-3">
                 Featured Raffle
@@ -168,7 +168,7 @@ const RaffleDetail = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border-50">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border/50">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Trophy className="h-4 w-4" />
@@ -201,7 +201,7 @@ const RaffleDetail = () => {
           </Card>
 
           {/* Host Section */}
-          <Card className="glass-card p-6 space-y-4">
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
             <h2 className="text-lg font-bold mb-4">Hosted By</h2>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -222,7 +222,7 @@ const RaffleDetail = () => {
 
         {/* RIGHT SIDE (Sidebar) */}
         <div className="lg:col-span-1">
-          <Card className="glass-card p-6 space-y-4 sticky top-24">
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4 sticky top-24">
             <div>
               <h3 className="text-xl font-bold mb-4">Enter Raffle</h3>
             </div>
@@ -247,7 +247,7 @@ const RaffleDetail = () => {
             </div>
 
             {/* Ticket Price */}
-            <div className="flex items-center justify-between glass-card p-4 rounded-lg mb-4">
+            <div className="flex items-center justify-between bg-card/50 backdrop-blur-xl border border-border/50 p-4 rounded-lg mb-4">
               <div className="flex items-center gap-3">
                 <Coins className="h-5 w-5 text-accent" />
                 <span className="text-muted-foreground">Ticket Price</span>
@@ -259,7 +259,7 @@ const RaffleDetail = () => {
 
             {/* remaining time */}
 
-            <div className="flex items-center justify-between glass-card p-4 rounded-lg mb-6">
+            <div className="flex items-center justify-between bg-card/50 backdrop-blur-xl border border-border/50 p-4 rounded-lg mb-6">
               <div className="flex items-center gap-3">
                 <Clock className="h-5 w-5 text-primary" />
                 <span className="text-muted-foreground">Ends In</span>
@@ -303,7 +303,7 @@ const RaffleDetail = () => {
               </div>
             </div>
             {/* Total Cost */}
-            <div className="flex items-center glass-card justify-between border-primary/30 p-4 rounded-lg bg-primary-10">
+            <div className="flex items-center bg-card/50 backdrop-blur-xl border border-border/50 justify-between border-primary/30 p-4 rounded-lg bg-primary-10">
               <span className="font-semibold text-muted-foreground">
                 Total Cost
               </span>
@@ -319,7 +319,7 @@ const RaffleDetail = () => {
             </Button>
 
             {/* Info */}
-            <div className="glass-card border-accent/1030 rounded-lg flex gap-3 p-4">
+            <div className="bg-card/50 backdrop-blur-xl border border-accent/30 rounded-lg flex gap-3 p-4">
               <AlertCircle className="h-5 w-5 text-accent shrink-0 mt-0.5" />
               <div className="text-sm space-y-1">
                 <p className="font-semibold">NFT Holder Discount</p>

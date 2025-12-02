@@ -1,6 +1,6 @@
 const HeroSection = () => {
   return (
-    <div className="mt-2 py-8 px-4 items-center justify-center text-center">
+    <div className="mt-2 py-6 px-4 items-center justify-center text-center mb-8">
       <h2 className="font-bold text-[3rem] md:text-[3.75rem]">
         <span className="text-gradient">Win Big </span>with Web3 Raffles
       </h2>

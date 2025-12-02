@@ -71,7 +71,9 @@ export const Header = () => {
           {user.isAdmin && (
             <Link to="/admin">
               <Button
-                variant={location.pathname.startsWith("/admin") ? "default" : "ghost"}
+                variant={
+                  location.pathname.startsWith("/admin") ? "default" : "ghost"
+                }
                 className="gap-2 cursor-pointer"
               >
                 <Shield className="h-4 w-4" /> Admin
@@ -81,7 +83,7 @@ export const Header = () => {
         </div>
 
         {/* Wallet & Create Button */}
-        <div className="flex items-center gap-2 relative">
+        <div className="flex items-center gap-2  relative">
           {connected && (
             <Link to="/create">
               <Button
@@ -109,7 +111,7 @@ export const Header = () => {
             </MyConnectWalletButton>
             {user.isAuthenticated && (
               <Button
-                variant="secondary"
+                variant="default"
                 className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
                 onClick={logout}
                 title="Logout"
@@ -154,7 +156,9 @@ export const Header = () => {
           {user.isAdmin && (
             <Link to="/admin" className="flex-1">
               <Button
-                variant={location.pathname.startsWith("/admin") ? "default" : "ghost"}
+                variant={
+                  location.pathname.startsWith("/admin") ? "default" : "ghost"
+                }
                 className="w-full gap-2 cursor-pointer"
                 size="sm"
               >

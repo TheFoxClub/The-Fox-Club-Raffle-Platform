@@ -106,15 +106,15 @@ const CreateRaffle = () => {
     }
   }, [selectedNFTs, selectedTokens]);
 
-  // const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0];
-  //   if (!file) return;
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  //   setRaffleImage(file);
-  //   setRaffleImagePreview(URL.createObjectURL(file));
+    // setRaffleImage(file);
+    // setRaffleImagePreview(URL.createObjectURL(file));
 
-  //   setErrors((prev) => ({ ...prev, raffleImage: "" }));
-  // };
+    setErrors((prev) => ({ ...prev, raffleImage: "" }));
+  };
 
   // const handleRemoveImage = () => {
   //   setRaffleImage(null);
@@ -196,9 +196,10 @@ const CreateRaffle = () => {
           const mint = info?.mint || `unknown-${idx}`;
           const amount = info?.tokenAmount?.uiAmount ?? 0;
           const programId = t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
-          const name = info?.tokenAmount?.decimals
-            ? `Token ${mint.slice(0, 6)}...`
-            : "Unknown Token";
+          const name = t.metadata?.name || `Token ${mint.slice(0, 6)}...`;
+          // const name = info?.tokenAmount?.decimals
+          //   ? `Token ${mint.slice(0, 6)}...`
+          //   : "Unknown Token";
           return { mint, name, amount, programId };
         });
         setTokenCandidates(mapped);
@@ -370,6 +371,19 @@ const CreateRaffle = () => {
     try {
       setLoading(true);
 
+      // let uploadedImageUrl = "";
+
+      // if (raffleImage) {
+      //   const formData = new FormData();
+      //   formData.append("file", raffleImage);
+
+      //   const uploadRes = await server.post("/upload/raffle-image", formData, {
+      //     headers: { "Content-Type": "multipart/form-data" },
+      //   });
+
+      //   uploadedImageUrl = uploadRes.data.url;
+      // }
+
       const payload = {
         title: title.trim(),
         description: description.trim(),
@@ -381,13 +395,14 @@ const CreateRaffle = () => {
         endDate,
         status,
         requiresNftVerification: false,
+        // imageUrl: uploadedImageUrl,
         rewards: [
           ...selectedNFTs.map((nft) => ({
             rewardType: "NFT",
             rewardName: nft.name,
             mintAddress: nft.mint,
             amount: 1,
-            imageUrl: nft.image || "",
+            // imageUrl: uploadedImageUrl,
             metadataJson: JSON.stringify({ collection: nft.collection }),
           })),
 
@@ -410,6 +425,10 @@ const CreateRaffle = () => {
 
       if (res.data.success) {
         toast.success(status === "DRAFT" ? "Draft saved!" : "Raffle created!");
+        if (status === "UPCOMING") {
+          const createdId = res.data.data.raffle.id;
+          navigate(`/raffle/${createdId}`);
+        }
       }
     } catch (e: any) {
       toast.error(e.response?.data?.message || "Failed");
@@ -961,11 +980,11 @@ const CreateRaffle = () => {
               type="file"
               accept="image/*"
               ref={fileInputRef}
-              // onChange={handleImageUpload}
+              onChange={handleImageUpload}
               className="hidden"
             />
-            {/* 
-            {raffleImagePreview ? (
+
+            {/* {raffleImagePreview ? (
               <div className="relative w-48">
                 <img
                   src={raffleImagePreview}
@@ -974,7 +993,7 @@ const CreateRaffle = () => {
                 />
                 <button
                   type="button"
-                  onClick={handleRemoveImage}
+                  // onClick={handleRemoveImage}
                   className="absolute top-2 right-1 bg-red-500 text-white text-xs px-2 py-1 rounded"
                 >
                   Remove

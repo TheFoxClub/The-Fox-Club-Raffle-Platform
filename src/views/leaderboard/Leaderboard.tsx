@@ -60,7 +60,7 @@ const Leaderboard = () => {
           </p>
         </div>
 
-        <Card className=" p-6 border border-accent/30 rounded-lg">
+        <Card className=" p-6 border bg-card border-accent/30 rounded-lg">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Award className="h-10 w-10 text-accent" />
@@ -80,7 +80,7 @@ const Leaderboard = () => {
           </div>
         </Card>
 
-        <Tabs defaultValue="hosts" className="space-y-2 mt-10">
+        <Tabs defaultValue="hosts" className="space-y-6 my-4">
           <TabsList className=" p-1 w-full sm:w-auto">
             <TabsTrigger value="hosts" className="gap-2 flex-1 sm:flex-none">
               <TrendingUp className="h-4 w-4" />
@@ -93,7 +93,7 @@ const Leaderboard = () => {
           </TabsList>
 
           <TabsContent value="hosts" className="space-y-4">
-            <Card className=" p-6">
+            <Card className="bg-card p-6">
               <div className="flex mb-6 items-center gap-2">
                 <TrendingUp className="h-6 w-6 text-accent" />
                 <p className="font-bold text-2xl">Top Hosts by Revenue</p>
@@ -103,7 +103,7 @@ const Leaderboard = () => {
                 {topHosts.map((host) => (
                   <Card
                     key={host.rank}
-                    className={`${getRankCardClass(host.rank)} p-4`}
+                    className={`${getRankCardClass(host.rank)} p-4 bg-card`}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -144,7 +144,7 @@ const Leaderboard = () => {
           </TabsContent>
 
           <TabsContent value="buyers" className="space-y-4">
-            <Card className=" p-6">
+            <Card className="bg-card p-6">
               <div className="flex mb-6 items-center gap-2">
                 <User className="h-6 w-6 text-primary" />
                 <p className="font-bold text-2xl">Top Buyers by Spending</p>
@@ -154,7 +154,7 @@ const Leaderboard = () => {
                 {topBuyers.map((buyer) => (
                   <Card
                     key={buyer.rank}
-                    className={`${getRankCardClass(buyer.rank)} p-4`}
+                    className={`${getRankCardClass(buyer.rank)} bg-card p-4`}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4 flex-1 min-w-0">
