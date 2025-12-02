@@ -6,6 +6,9 @@ const router = express.Router();
 // Create a raffle
 router.post("/create", auth.bearer, RaffleController.createRaffle);
 
+// Get Raffle Draft
+router.get("/draft", auth.bearer, RaffleController.getRaffleDraft);
+
 //Get active / live raffles
 router.get("/live", RaffleController.getLiveRaffles);
 
