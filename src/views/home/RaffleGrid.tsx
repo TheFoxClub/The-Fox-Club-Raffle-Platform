@@ -50,6 +50,7 @@ function formatCountdown(endDate: string) {
 export const RaffleGrid = () => {
   const [raffles, SetRaffles] = useState<RaffleData[]>([]);
   const [endedRaffles, setEndedRaffles] = useState<RaffleData[]>([]);
+  const [upcomingRaffles, setUpcomingRaffles] = useState<RaffleData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,6 +67,11 @@ export const RaffleGrid = () => {
         const endedRes = await server.get("/raffle/ended");
         if (endedRes.data.success) {
           setEndedRaffles(endedRes.data.data.raffles);
+        }
+        //fetch upcoming raffles
+        const upcomingRes = await server.get("/raffle/upcoming");
+        if (upcomingRes.data.success) {
+          setUpcomingRaffles(upcomingRes.data.data.raffles);
         }
       } catch (error: any) {
         console.error(error);
@@ -193,12 +199,12 @@ export const RaffleGrid = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Upcoming Raffles</h2>
           <span className="text-sm text-muted-foreground">
-            {endedRaffles.length} ended raffles
+            {upcomingRaffles.length} upcoming raffles
           </span>
         </div>
-        {/* {endedRaffles.length > 0 ? (
+        {upcomingRaffles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {endedRaffles.map((raffle) => {
+            {upcomingRaffles.map((raffle) => {
               const mappedRaffle = {
                 id: raffle.id,
                 title: raffle.title,
@@ -227,17 +233,17 @@ export const RaffleGrid = () => {
               );
             })}
           </div>
-        ) : ( */}
-        <div className="text-center py-16 glass-card">
-          <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-xl font-semibold mb-2">
-            No Upcoming Raffles Yet
-          </h3>
-          <p className="text-muted-foreground">
-            Upcoming raffles will appear here
-          </p>
-        </div>
-        {/* )} */}
+        ) : (
+          <div className="text-center py-16 glass-card">
+            <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-xl font-semibold mb-2">
+              No Upcoming Raffles Yet
+            </h3>
+            <p className="text-muted-foreground">
+              Upcoming raffles will appear here
+            </p>
+          </div>
+        )}
       </TabsContent>
     </Tabs>
   );
