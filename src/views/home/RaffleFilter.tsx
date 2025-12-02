@@ -52,7 +52,7 @@ export default function RaffleFilter({
   ];
 
   const selectBaseClass = "bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]";
-  const selectActiveClass = "bg-orange-600 border-orange-500 text-white";
+  const selectActiveClass = "bg-secondary border-orange-500 text-white";
 
   const handleClearFilters = () => {
     setStatusFilter("");

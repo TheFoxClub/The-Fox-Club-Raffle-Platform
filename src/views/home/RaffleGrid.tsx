@@ -61,30 +61,40 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
           //fetch live raffles
           const liveRes = await server.get("/raffle/live");
           if (liveRes.data.success) {
-            SetRaffles(liveRes.data.data.raffles);
+            SetRaffles(Array.isArray(liveRes.data.data?.raffles) ? liveRes.data.data.raffles : []);
+          } else {
+            SetRaffles([]);
           }
           //fetch ended raffles
           const endedRes = await server.get("/raffle/ended");
           if (endedRes.data.success) {
-            setEndedRaffles(endedRes.data.data.raffles);
+            setEndedRaffles(Array.isArray(endedRes.data.data?.raffles) ? endedRes.data.data.raffles : []);
+          } else {
+            setEndedRaffles([]);
           }
         } else {
           // fetch filtered raffles
           const res = await server.get("/raffle/filter", { params: filters });
           if (res.data.success) {
             const dataRaffles = res.data.data?.raffles || res.data.data || [];
+            const validRaffles = Array.isArray(dataRaffles) ? dataRaffles : [];
             // place results into active or ended tab based on status
             if (filters.status === "ended") {
               SetRaffles([]);
-              setEndedRaffles(dataRaffles);
+              setEndedRaffles(validRaffles);
             } else {
-              SetRaffles(dataRaffles);
+              SetRaffles(validRaffles);
               setEndedRaffles([]);
             }
+          } else {
+            SetRaffles([]);
+            setEndedRaffles([]);
           }
         }
       } catch (error: any) {
         console.error(error);
+        SetRaffles([]);
+        setEndedRaffles([]);
         toast.error(error.response?.data?.message || "Failed to fetch raffles");
       } finally {
         setLoading(false);
@@ -122,11 +132,11 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Live Raffles</h2>
           <span className="text-sm text-muted-foreground">
-            {raffles.length} active raffles
+            {Array.isArray(raffles) ? raffles.length : 0} active raffles
           </span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {raffles.map((raffle) => {
+          {Array.isArray(raffles) && raffles.map((raffle) => {
             const mappedRaffle = {
               id: raffle.id,
               title: raffle.title,
@@ -160,10 +170,10 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Ended Raffles</h2>
           <span className="text-sm text-muted-foreground">
-            {endedRaffles.length} ended raffles
+            {Array.isArray(endedRaffles) ? endedRaffles.length : 0} ended raffles
           </span>
         </div>
-        {endedRaffles.length > 0 ? (
+        {Array.isArray(endedRaffles) && endedRaffles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {endedRaffles.map((raffle) => {
               const mappedRaffle = {
@@ -209,7 +219,7 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Upcoming Raffles</h2>
           <span className="text-sm text-muted-foreground">
-            {endedRaffles.length} ended raffles
+            0 upcoming raffles
           </span>
         </div>
         {/* {endedRaffles.length > 0 ? (

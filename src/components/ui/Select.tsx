@@ -225,7 +225,7 @@ export const SelectItem = React.forwardRef<HTMLLIElement, SelectItemProps>(
         onClick={() => ctx?.setValue(value)}
         className={cn(
           "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-zinc-800 hover:text-zinc-100 transition-colors",
-          selected && "text-orange-500 font-semibold",
+          selected && "text-secondary font-semibold",
           className
         )}
         {...props}

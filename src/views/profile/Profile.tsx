@@ -54,9 +54,9 @@ const Profile = () => {
   return (
     <div className="container mx-auto px-4 py-2">
       <div className="space-y-8">
-        <Card className="glass-card p-6 md:p-8">
+        <Card className=" p-6 md:p-8">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <div className="flex items-center justify-center glow-primary h-24 w-24 rounded-full gradient-primary">
+            <div className="flex items-center justify-center bg-gradient-primary h-24 w-24 rounded-full gradient-primary">
               <User className="h-12 w-12" />
             </div>
 
@@ -64,7 +64,7 @@ const Profile = () => {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <h1 className="text-3xl font-bold">{wallet}</h1>
-                  <div className="top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
+                  <div className="top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 hover:bg-primary hover:text-white py-1 rounded-full flex items-center gap-2 text-sm">
                     <CheckCircle size={12} /> Verified
                   </div>
                 </div>
@@ -101,31 +101,31 @@ const Profile = () => {
             </div>
 
             <Link to="/profile/EditProfile">
-              <Button variant="outline">Edit Profile</Button>
+              <Button variant="outline" >Edit Profile</Button>
             </Link>
           </div>
         </Card>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="glass-card text-center p-6 space-y-2">
+          <Card className=" text-center p-6 space-y-2">
             <Coins className="h-8 w-8 mx-auto text-accent" />
             <p className="text-2xl font-bold">{totalSpent} SOL</p>
             <p className="text-sm text-muted-foreground">Total Spent</p>
           </Card>
 
-          <Card className="glass-card text-center p-6 space-y-2">
+          <Card className=" text-center p-6 space-y-2">
             <Trophy className="h-8 w-8 mx-auto text-primary" />
             <p className="text-2xl font-bold">{rafflesWon}</p>
             <p className="text-sm text-muted-foreground">Raffles Won</p>
           </Card>
 
-          <Card className="glass-card text-center p-6 space-y-2">
+          <Card className=" text-center p-6 space-y-2">
             <Ticket className="h-8 w-8 mx-auto text-secondary" />
             <p className="text-2xl font-bold">{ticketsPurchased}</p>
             <p className="text-sm text-muted-foreground">Tickets Bought</p>
           </Card>
 
-          <Card className="glass-card text-center p-6 space-y-2">
+          <Card className=" text-center p-6 space-y-2">
             <TrendingUp className="h-8 w-8 mx-auto text-green-500" />
             <p className="text-2xl font-bold">{reputation}%</p>
             <p className="text-sm text-muted-foreground">Reputation</p>
@@ -134,7 +134,7 @@ const Profile = () => {
 
         {/* Tabs section */}
         <Tabs defaultValue="purchasedTickets" className="space-y-2 mt-10">
-          <TabsList className="glass-card p-1 w-full sm:w-auto">
+          <TabsList className=" p-1 w-full sm:w-auto">
             <TabsTrigger
               value="purchasedTickets"
               className="flex-1 md:flex-none"
@@ -151,7 +151,7 @@ const Profile = () => {
 
           <TabsContent value="purchasedTickets" className="space-y-4">
             {purchasedTickets.map((ticket) => (
-              <Card key={ticket.id} className="glass-card p-6">
+              <Card key={ticket.id} className=" p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
@@ -194,7 +194,7 @@ const Profile = () => {
 
           <TabsContent value="hostedRaffles" className="space-y-6">
             {hostedRaffles.map((raffle) => (
-              <Card key={raffle.id} className="glass-card p-6">
+              <Card key={raffle.id} className=" p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
@@ -239,7 +239,7 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="won" className="space-y-4">
-            <Card className="glass-card p-6">
+            <Card className=" p-6">
               <div className="flex items-center gap-4">
                 <Trophy className="h-12 w-12 text-accent" />
                 <div>

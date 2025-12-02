@@ -41,7 +41,7 @@ const EditProfile = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Card className="glass-card p-6 space-y-6">
+          <Card className=" p-6 space-y-6">
             <h1 className="text-2xl font-bold">Profile Picture</h1>
             <div className="flex items-center gap-6">
               <div className="rounded-full h-24 w-24 gradient-primary flex items-center justify-center glow-primary">
@@ -63,7 +63,7 @@ const EditProfile = () => {
           </Card>
 
           {/* Basic Information */}
-          <Card className="glass-card p-6 space-y-6">
+          <Card className=" p-6 space-y-6">
             <h2 className="font-bold text-2xl">Basic Information</h2>
 
             <div className="space-y-4">
@@ -139,7 +139,7 @@ const EditProfile = () => {
           </Card>
 
           {/* social links */}
-          <Card className="glass-card p-6 space-y-6">
+          <Card className=" p-6 space-y-6">
             <h2 className="text-2xl font-bold">Social Links</h2>
             <div className="space-y-4">
               <div className="space-y-2">

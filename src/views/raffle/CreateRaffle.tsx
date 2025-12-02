@@ -562,7 +562,7 @@ const CreateRaffle = () => {
       </div>
 
       <div className="space-y-6">
-        <div className="glass-card p-4 space-y-2 rounded-lg border border-accent/30 bg-card shadow-sm mb-6">
+        <div className=" p-4 space-y-2 rounded-lg border border-accent/30 bg-card shadow-sm mb-6">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-accent" />
             <span text-sm font-medium>
@@ -581,7 +581,7 @@ const CreateRaffle = () => {
           </div>
         </div>
 
-        <div className="glass-card border bg-card rounded-lg border-border shadow-sm p-6 space-y-6">
+        <div className=" border bg-card rounded-lg border-border shadow-sm p-6 space-y-6">
           <h1 className="text-2xl font-bold">Basic Information</h1>
 
           <div ref={titleRef}>
@@ -996,7 +996,7 @@ const CreateRaffle = () => {
           </div>
         </div>
 
-        <div className="glass-card bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
+        <div className=" bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
           <h1 className="text-2xl font-bold">Raffle Settings</h1>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -1085,7 +1085,7 @@ const CreateRaffle = () => {
           </div>
         </div>
 
-        <div className="glass-card bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
+        <div className=" bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             <h1 className="text-2xl font-bold">Duration</h1>
