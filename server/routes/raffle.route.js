@@ -22,7 +22,7 @@ router.get("/upcoming", RaffleController.getUpcomingRaffles);
 router.get("/featured", RaffleController.getFeaturedRaffles);
 
 // Filter Raffles with search term, status, token-type, price, collection, page, limit
-router.get("/filter", auth.bearer, RaffleController.filterRaffles);
+router.get("/filter", RaffleController.filterRaffles);
 
 // Get a raffle by ID with Raffle Details
 router.get("/:id", RaffleController.getRaffleById);

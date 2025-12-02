@@ -36,7 +36,7 @@ export default function RaffleFilter({
 
   const tokenOptions = [
     { value: "sol", label: "SOL" },
-    { value: "usdc", label: "USDC" },
+    { value: "usdt", label: "USDT" },
     { value: "bonk", label: "BONK" },
     { value: "all", label: "All Tokens" },
   ];
@@ -51,7 +51,8 @@ export default function RaffleFilter({
     { value: "all", label: "All Collections" },
   ];
 
-  const selectBaseClass = "bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]";
+  const selectBaseClass =
+    "bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]";
   const selectActiveClass = "bg-secondary border-orange-500 text-white";
 
   const handleClearFilters = () => {
@@ -85,7 +86,13 @@ export default function RaffleFilter({
     // If applied snapshot exists and current filters match it, treat button as Clear
     if (appliedHasAny && filtersEqualApplied) {
       // Clear applied and current selections
-      setAppliedFilters({ status: "", token: "", price: "", collection: "", search: "" });
+      setAppliedFilters({
+        status: "",
+        token: "",
+        price: "",
+        collection: "",
+        search: "",
+      });
       handleClearFilters();
       if (onApplyFilters) onApplyFilters(undefined);
       return;
@@ -145,7 +152,11 @@ export default function RaffleFilter({
           value={tokenFilter || appliedFilters.token}
           onValueChange={setTokenFilter}
           placeholder="Token Type"
-          className={`${tokenFilter || appliedFilters.token ? selectActiveClass : selectBaseClass}`}
+          className={`${
+            tokenFilter || appliedFilters.token
+              ? selectActiveClass
+              : selectBaseClass
+          }`}
         />
 
         {/* 3. Price Range Filter */}
@@ -154,7 +165,11 @@ export default function RaffleFilter({
           value={priceFilter || appliedFilters.price}
           onValueChange={setPriceFilter}
           placeholder="Price Range"
-          className={`${priceFilter || appliedFilters.price ? selectActiveClass : selectBaseClass}`}
+          className={`${
+            priceFilter || appliedFilters.price
+              ? selectActiveClass
+              : selectBaseClass
+          }`}
         />
 
         {/* 4. Collection Filter */}
@@ -163,14 +178,19 @@ export default function RaffleFilter({
           value={collectionFilter || appliedFilters.collection}
           onValueChange={setCollectionFilter}
           placeholder="Collection"
-          className={`${collectionFilter || appliedFilters.collection ? selectActiveClass : selectBaseClass}`}
+          className={`${
+            collectionFilter || appliedFilters.collection
+              ? selectActiveClass
+              : selectBaseClass
+          }`}
         />
       </div>
       <Button
         variant={currentHasAny && !filtersEqualApplied ? "filter" : "outline"}
         className="w-full border-[hsl(240,6%,20%)]"
         onClick={handlePrimaryButton}
-        disabled={!currentHasAny && !appliedHasAny}>
+        disabled={!currentHasAny && !appliedHasAny}
+      >
         {appliedHasAny && filtersEqualApplied
           ? "Clear Filters"
           : "Apply Filters"}
