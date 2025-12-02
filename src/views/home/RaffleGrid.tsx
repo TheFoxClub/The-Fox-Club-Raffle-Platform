@@ -16,11 +16,11 @@ interface RaffleData {
   id: number;
   title: string;
   description: string;
-  imageUrl: string;
+  imageUrl: string | null;
   ticketPrice: string;
-  ticketSold: number;
+  ticketsSold: number;
   totalTickets: number;
-  tokenType: number;
+  tokenType: string;
   numberOfWinners: number;
   startDate: string;
   endDate: string;
@@ -74,34 +74,58 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
             setEndedRaffles([]);
           }
         } else {
-          // fetch filtered raffles
-          const res = await server.get("/raffle/filter", { params: filters });
-          if (res.data.success) {
-            const dataRaffles = res.data.data?.raffles || res.data.data || [];
-            const validRaffles = Array.isArray(dataRaffles) ? dataRaffles : [];
-            // place results into active or ended tab based on status
-            if (filters.status === "ended") {
-              SetRaffles([]);
-              setEndedRaffles(validRaffles);
-            } else {
-              SetRaffles(validRaffles);
-              setEndedRaffles([]);
-            }
+          // Apply filters using the filter endpoint
+          
+          // Get live raffles with filters
+          const liveFilters = { ...filters, status: 'live' };
+          
+          const liveRes = await server.get("/raffle/filter", { params: liveFilters });
+          if (liveRes.data.success) {
+            const liveData = liveRes.data.data?.raffles || liveRes.data.data || [];
+            SetRaffles(Array.isArray(liveData) ? liveData : []);
           } else {
             SetRaffles([]);
+          }
+
+          // Get ended raffles with filters
+          const endedFilters = { ...filters, status: 'ended' };
+          
+          const endedRes = await server.get("/raffle/filter", { params: endedFilters });
+          if (endedRes.data.success) {
+            const endedData = endedRes.data.data?.raffles || endedRes.data.data || [];
+            setEndedRaffles(Array.isArray(endedData) ? endedData : []);
+          } else {
             setEndedRaffles([]);
           }
         }
         //fetch upcoming raffles
-        const upcomingRes = await server.get("/raffle/upcoming");
-        if (upcomingRes.data.success) {
-          setUpcomingRaffles(upcomingRes.data.data.raffles);
+        if (!filters) {
+          const upcomingRes = await server.get("/raffle/upcoming");
+          if (upcomingRes.data.success) {
+            setUpcomingRaffles(Array.isArray(upcomingRes.data.data?.raffles) ? upcomingRes.data.data.raffles : []);
+          } else {
+            setUpcomingRaffles([]);
+          }
+        } else {
+          // Get upcoming raffles with filters
+          const upcomingFilters = { ...filters, status: 'upcoming' };
+          
+          const upcomingRes = await server.get("/raffle/filter", { params: upcomingFilters });
+          if (upcomingRes.data.success) {
+            const upcomingData = upcomingRes.data.data?.raffles || upcomingRes.data.data || [];
+            setUpcomingRaffles(Array.isArray(upcomingData) ? upcomingData : []);
+          } else {
+            setUpcomingRaffles([]);
+          }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(error);
         SetRaffles([]);
         setEndedRaffles([]);
-        toast.error(error.response?.data?.message || "Failed to fetch raffles");
+        const errorMessage = error instanceof Error && 'response' in error 
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || "Failed to fetch raffles"
+          : "Failed to fetch raffles";
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -119,7 +143,7 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
 
   return (
     <Tabs defaultValue="live" className="space-y-2 z-20 mt-10">
-      <TabsList className="glass-card p-1 w-full sm:w-auto">
+      <TabsList className=" p-1 w-full sm:w-auto">
         <TabsTrigger value="live" className="gap-2 flex-1 sm:flex-none">
           <Flame className="h-4 w-4" />
           Live Raffles
@@ -146,18 +170,11 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
             const mappedRaffle = {
               id: raffle.id,
               title: raffle.title,
-              image: raffle.imageUrl,
+              image: raffle.imageUrl || "/placeholder-raffle.png",
               price: raffle.ticketPrice,
-              sold: Number(raffle.ticketSold) || 0,
+              sold: Number(raffle.ticketsSold) || 0,
               total: Number(raffle.totalTickets) || 0,
-              tokenType:
-                raffle.tokenType === 0
-                  ? "SOL"
-                  : raffle.tokenType === 1
-                  ? "USDC"
-                  : raffle.tokenType === 2
-                  ? "BONK"
-                  : "USDT",
+              tokenType: raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
               winners: raffle.numberOfWinners,
               endTime: formatCountdown(raffle.endDate),
               isVerified: raffle.raffle_detail.requiresNftVerification,
@@ -185,18 +202,11 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
               const mappedRaffle = {
                 id: raffle.id,
                 title: raffle.title,
-                image: raffle.imageUrl,
+                image: raffle.imageUrl || "/placeholder-raffle.png",
                 price: raffle.ticketPrice,
-                sold: Number(raffle.ticketSold) || 0,
+                sold: Number(raffle.ticketsSold) || 0,
                 total: Number(raffle.totalTickets) || 0,
-                tokenType:
-                  raffle.tokenType === 0
-                    ? "SOL"
-                    : raffle.tokenType === 1
-                    ? "USDC"
-                    : raffle.tokenType === 2
-                    ? "BONK"
-                    : "USDT",
+                tokenType: raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
                 isVerified: raffle.raffle_detail.requiresNftVerification,
@@ -211,7 +221,7 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
             })}
           </div>
         ) : (
-          <div className="text-center py-16 glass-card">
+          <div className="text-center py-16 ">
             <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">No Ended Raffles Yet</h3>
             <p className="text-muted-foreground">
@@ -225,27 +235,20 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Upcoming Raffles</h2>
           <span className="text-sm text-muted-foreground">
-            {upcomingRaffles.length} upcoming raffles
+            {Array.isArray(upcomingRaffles) ? upcomingRaffles.length : 0} upcoming raffles
           </span>
         </div>
-        {upcomingRaffles.length > 0 ? (
+        {Array.isArray(upcomingRaffles) && upcomingRaffles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {upcomingRaffles.map((raffle) => {
               const mappedRaffle = {
                 id: raffle.id,
                 title: raffle.title,
-                image: raffle.imageUrl,
+                image: raffle.imageUrl || "/placeholder-raffle.png",
                 price: raffle.ticketPrice,
-                sold: Number(raffle.ticketSold) || 0,
+                sold: Number(raffle.ticketsSold) || 0,
                 total: Number(raffle.totalTickets) || 0,
-                tokenType:
-                  raffle.tokenType === 0
-                    ? "SOL"
-                    : raffle.tokenType === 1
-                    ? "USDC"
-                    : raffle.tokenType === 2
-                    ? "BONK"
-                    : "USDT",
+                tokenType: raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
                 isVerified: raffle.raffle_detail.requiresNftVerification,
@@ -260,7 +263,7 @@ export const RaffleGrid = ({ filters }: { filters?: any }) => {
             })}
           </div>
         ) : (
-          <div className="text-center py-16 glass-card">
+          <div className="text-center py-16 ">
             <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">
               No Upcoming Raffles Yet

@@ -35,9 +35,9 @@ export default function RaffleFilter({
   // ];
 
   const tokenOptions = [
-    { value: "sol", label: "SOL" },
-    { value: "usdt", label: "USDT" },
-    { value: "bonk", label: "BONK" },
+    { value: "SOL", label: "SOL" },
+    { value: "USDT", label: "USDT" },
+    { value: "BONK", label: "BONK" },
     { value: "all", label: "All Tokens" },
   ];
 
