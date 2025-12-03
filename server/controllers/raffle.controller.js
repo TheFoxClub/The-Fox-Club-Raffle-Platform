@@ -40,8 +40,27 @@ class RaffleController {
             model: User,
             attributes: ["id", "pubkey"],
           },
+          {
+            model: RaffleReward,
+          },
         ],
         order: [["createdAt", "DESC"]],
+      });
+
+      const formattedRaffles = raffles.map((raffle) => {
+        const data = raffle.get({ plain: true });
+
+        data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
+        data.status = mapEnumValue(RAFFLE_STATUS, data.status);
+
+        if (data.raffle_rewards) {
+          data.raffle_rewards = data.raffle_rewards.map((reward) => ({
+            ...reward,
+            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+          }));
+        }
+
+        return data;
       });
 
       return respond(
@@ -49,7 +68,8 @@ class RaffleController {
         httpStatus.OK,
         "Active raffles retrieved successfully",
         {
-          raffles,
+          // raffles,
+          raffles: formattedRaffles,
         }
       );
     } catch (err) {
@@ -82,8 +102,27 @@ class RaffleController {
             model: User,
             attributes: ["id", "pubkey"],
           },
+          {
+            model: RaffleReward,
+          },
         ],
         order: [["createdAt", "DESC"]],
+      });
+
+      const formattedRaffles = raffles.map((raffle) => {
+        const data = raffle.get({ plain: true });
+
+        data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
+        data.status = mapEnumValue(RAFFLE_STATUS, data.status);
+
+        if (data.raffle_rewards) {
+          data.raffle_rewards = data.raffle_rewards.map((reward) => ({
+            ...reward,
+            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+          }));
+        }
+
+        return data;
       });
 
       return respond(
@@ -91,7 +130,8 @@ class RaffleController {
         httpStatus.OK,
         "Ended raffles retrieved successfully",
         {
-          raffles,
+          // raffles,
+          raffles: formattedRaffles,
         }
       );
     } catch (err) {
@@ -188,8 +228,27 @@ class RaffleController {
             model: User,
             attributes: ["id", "pubkey"],
           },
+          {
+            model: RaffleReward,
+          },
         ],
         order: [[RaffleDetail, "featuredPosition", "ASC"]],
+      });
+
+      const formattedRaffles = raffles.map((raffle) => {
+        const data = raffle.get({ plain: true });
+
+        data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
+        data.status = mapEnumValue(RAFFLE_STATUS, data.status);
+
+        if (data.raffle_rewards) {
+          data.raffle_rewards = data.raffle_rewards.map((reward) => ({
+            ...reward,
+            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+          }));
+        }
+
+        return data;
       });
 
       return respond(
@@ -197,7 +256,8 @@ class RaffleController {
         httpStatus.OK,
         "Featured raffles retrieved successfully",
         {
-          raffles,
+          // raffles,
+          raffles: formattedRaffles,
         }
       );
     } catch (err) {
