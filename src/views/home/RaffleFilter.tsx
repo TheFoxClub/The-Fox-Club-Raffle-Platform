@@ -53,7 +53,7 @@ export default function RaffleFilter({
 
   const selectBaseClass =
     "bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]";
-  const selectActiveClass = "bg-secondary border-orange-500 text-white";
+  const selectActiveClass = "bg-accent border-orange-500 text-white";
 
   const handleClearFilters = () => {
     setStatusFilter("");
@@ -186,8 +186,8 @@ export default function RaffleFilter({
         />
       </div>
       <Button
-        variant={currentHasAny && !filtersEqualApplied ? "filter" : "outline"}
-        className="w-full border-[hsl(240,6%,20%)]"
+        variant={currentHasAny && !filtersEqualApplied ? "ghost" : "outline"}
+        className="w-full border border-border"
         onClick={handlePrimaryButton}
         disabled={!currentHasAny && !appliedHasAny}
       >

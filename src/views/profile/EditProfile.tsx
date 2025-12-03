@@ -2,32 +2,103 @@ import { Card } from "../../components/ui/Card";
 import { User, Upload, X, Save } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
-import { useState } from "react";
-import { initialData } from "../../dummydata/editProfileData";
-import type { FormDetails } from "../../dummydata/editProfileData";
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "../../redux/store";
+import { setUser } from "../../redux/userSlice";
+import server from "../../config/server";
+//import { initialData } from "../../dummydata/editProfileData";
+//import type { FormDetails } from "../../dummydata/editProfileData";
 import { useNavigate } from "react-router-dom";
 import { Textarea } from "../../components/ui/Textarea";
+//import { uploadImage } from "../../api";
+
+type FormData = {
+  username: string;
+  email: string;
+  bio: string;
+  twitter: string;
+  discord: string;
+  // photoUrl?: string;
+};
 
 const EditProfile = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<FormDetails>(initialData);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate("/profile");
-  };
-  const handleCancel = () => {
-    navigate("/profile");
-  };
+  const { user_info, pubkey } = useSelector((state: RootState) => state.user);
 
+  const [formData, setFormData] = useState<FormData>({
+    username: "",
+    email: "",
+    bio: "",
+    twitter: "",
+    discord: "",
+    //  photoUrl: "",
+  });
+
+  // const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (user_info) {
+      setFormData({
+        username: user_info.username || "",
+        email: user_info.email || "",
+        bio: user_info.description || "",
+        twitter: "",
+        discord: "",
+        //  photoUrl: user_info.photoUrl || "",
+      });
+    }
+  }, [user_info]);
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { id, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
+    setFormData((prev) => ({
+      ...prev,
       [id]: value,
     }));
+  };
+
+  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   if (e.target.files && e.target.files[0]) {
+  //     setImageFile(e.target.files[0]);
+  //     setFormData((prev) => ({ ...prev, photoUrl: URL.createObjectURL(e.target.files![0])}));
+  //   }
+  // };
+
+  const handleCancel = () => {
+    navigate("/profile");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+
+    try {
+      const res = await server.put("/user/info", {
+        username: formData.username,
+        email: formData.email,
+        description: formData.bio,
+        // photoUrl: uploadedImageUrl,
+      });
+
+      dispatch(
+        setUser({
+          ...res.data.data,
+          isAuthenticated: true,
+          isLoading: false,
+        })
+      );
+
+      navigate("/profile");
+    } catch (err) {
+      console.error("Error updating profile:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -75,6 +146,7 @@ const EditProfile = () => {
                   id="wallet"
                   placeholder="7xKX...9mPq"
                   disabled
+                  value={pubkey}
                   className="mt-2 w-full bg-background-50"
                 />
                 <span className="text-xs text-muted-foreground">
@@ -181,6 +253,7 @@ const EditProfile = () => {
               variant="outline"
               onClick={handleCancel}
               className="w-full flex-1 rounded-lg gap-4pro"
+              disabled={isSaving}
             >
               <X className="w-5 h-5" />
               Cancel
@@ -190,9 +263,10 @@ const EditProfile = () => {
               type="submit"
               variant="default"
               className="w-full gap-4 flex-1 rounded-lg gradient-primary glow-primary"
+              disabled={isSaving}
             >
               <Save className="h-5 w-5" />
-              Save Changes
+              {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>

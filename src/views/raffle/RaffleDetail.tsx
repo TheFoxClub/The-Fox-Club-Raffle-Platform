@@ -69,9 +69,9 @@ const RaffleDetail = () => {
   const [ticketCount, setTicketCount] = useState(1);
   const TOKEN_MAP: Record<number, string> = {
     0: "SOL",
-    1: "USDC",
+    1: "USDT",
     2: "BONK",
-    3: "USDT",
+    3: "USDC",
   };
 
   useEffect(() => {

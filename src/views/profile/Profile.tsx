@@ -23,33 +23,60 @@ import {
   hostedRaffles,
   purchasedTickets,
 } from "../../dummydata/profileData";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import server from "../../config/server";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState, AppDispatch } from "../../redux/store";
+import { setUser, setLoading } from "../../redux/userSlice";
 import { Link } from "react-router-dom";
 
 const Profile = () => {
-  const [statsArray] = useState(userStats);
-  const [user] = statsArray;
+  const dispatch = useDispatch<AppDispatch>();
+  const { isLoading, pubkey, user_info } = useSelector(
+    (state: RootState) => state.user
+  );
 
-  const {
-    wallet,
-    level,
-    rank,
-    streak,
-    xp,
-    totalSpent,
-    rafflesWon,
-    ticketsPurchased,
-    reputation,
-  } = user || {};
+  //fetch user info from backend
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await server.get("/user/info");
+        const userData = res.data.data.user;
+        dispatch(
+          setUser({
+            ...userData,
+            isAuthenticated: true,
+            isLoading: false,
+          })
+        );
+      } catch (error) {
+        dispatch(setLoading(false));
+        console.error("Error fetching user info:", error);
+      }
+    };
+    fetchUser();
+  }, [dispatch]);
 
-  // Handle loading/empty state gracefully
-  if (!user || Object.keys(user).length === 0) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-300">
         <p>Loading user data...</p>
       </div>
     );
   }
+  const [statsArray] = useState(userStats);
+  const [user] = statsArray;
+
+  const { totalSpent, rafflesWon, ticketsPurchased, reputation } = user || {};
+
+  // // Handle loading/empty state gracefully
+  // if (!user || Object.keys(user).length === 0) {
+  //   return (
+  //     <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-300">
+  //       <p>Loading user data...</p>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="container mx-auto px-4 py-2">
@@ -57,13 +84,21 @@ const Profile = () => {
         <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 md:p-8">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex items-center justify-center bg-gradient-primary h-24 w-24 rounded-full gradient-primary glow-primary">
-              <User className="h-12 w-12" />
+              {user_info?.photoUrl ? (
+                <img
+                  src={user_info.photoUrl}
+                  alt="Profile"
+                  className="h-24 w-24 rounded-full object-cover"
+                />
+              ) : (
+                <User className="h-12 w-12" />
+              )}
             </div>
 
             <div className="flex-1 space-y-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <h1 className="text-3xl font-bold">{wallet}</h1>
+                  <h1 className="text-3xl font-bold">{pubkey}</h1>
                   <div className="top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 hover:bg-primary hover:text-white py-1 rounded-full flex items-center gap-2 text-sm">
                     <CheckCircle size={12} /> Verified
                   </div>
@@ -71,31 +106,27 @@ const Profile = () => {
                 <div className="flex items-center text-sm gap-4 mt-2">
                   <div className="flex items-center gap-1">
                     <Trophy className="h-4 w-4 text-accent" />
-                    <span className="text-muted-foreground">Level {level}</span>
+                    <span className="text-muted-foreground">Level 1</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Award className="h-4 w-4 text-primary" />
-                    <span className="text-muted-foreground">
-                      #{rank} Ranked
-                    </span>
+                    <span className="text-muted-foreground">#1 Ranked</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Flame className="h-4 w-4 text-orange-500" />
-                    <span className="text-muted-foreground">
-                      {streak} Day Streak
-                    </span>
+                    <span className="text-muted-foreground">1 Day Streak</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-muted-foreground">XP Progress</span>
-                <span className="font-semibold">{xp} / 15000 XP</span>
+                <span className="font-semibold">12450 / 15000 XP</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full gradient-primary"
-                  style={{ width: `${(xp / 15000) * 100}%` }}
+                  style={{ width: `${(12450 / 15000) * 100}%` }}
                 />
               </div>
             </div>

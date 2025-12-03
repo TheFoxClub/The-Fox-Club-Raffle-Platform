@@ -92,9 +92,9 @@ const CreateRaffle = () => {
 
   const tokenOptions = [
     { value: "SOLANA", label: "SOL" },
-    { value: "USDC", label: "USDC" },
-    { value: "BONK", label: "BONK" },
     { value: "USDT", label: "USDT" },
+    { value: "BONK", label: "BONK" },
+    { value: "USDC", label: "USDC" },
   ];
 
   useEffect(() => {
