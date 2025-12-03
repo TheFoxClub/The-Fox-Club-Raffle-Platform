@@ -4,6 +4,7 @@ const {
   User,
   UserInfo,
   RaffleReward,
+  VerifiedCollection,
 } = require("../models");
 const { status: httpStatus, default: status } = require("http-status");
 const logger = require("../util/logger");
@@ -754,8 +755,6 @@ class RaffleController {
 
       const { status, tokenType, price, collection, search = "" } = req.query;
 
-      console.log("req query: ", req.query);
-
       let whereClause = {
         status: { [Op.ne]: RAFFLE_STATUS.DRAFT },
       };
@@ -784,24 +783,41 @@ class RaffleController {
         }
       }
 
+      // Search by title
+      if (search) {
+        whereClause.title = { [Op.like]: `%${search}%` };
+      }
+
+      // Prepare include array
+      let include = [
+        { model: RaffleDetail, required: false },
+        { model: User, attributes: ["id", "pubkey"], required: false },
+        { model: RaffleReward, required: false },
+      ];
+
       // Filter by verified collection
       if (collection === "verified") {
         const verifiedAddresses = await VerifiedCollection.findAll({
           attributes: ["address"],
         });
         const addresses = verifiedAddresses.map((v) => v.address);
-        whereClause["$RaffleDetail.collectionAddress$"] = {
-          [Op.in]: addresses,
-        };
+
+        // Override RaffleDetail include to add where clause
+        include = include.map((inc) => {
+          if (inc.model === RaffleDetail) {
+            return {
+              ...inc,
+              required: true, // must join to filter
+              where: {
+                verifiedCollectionRequired: { [Op.in]: addresses },
+              },
+            };
+          }
+          return inc;
+        });
       }
 
-      // Search by title
-      if (search) {
-        // whereClause.title = { [Op.iLike]: `%${search}%` }; // case-insensitive
-        whereClause.title = { [Op.like]: `%${search}%` };
-      }
-
-      // Determine order by price
+      // Determine order
       let order = [["createdAt", "DESC"]];
       if (price === "lowtohigh") order = [["ticketPrice", "ASC"]];
       if (price === "hightolow") order = [["ticketPrice", "DESC"]];
@@ -809,15 +825,7 @@ class RaffleController {
       // Query raffles
       const { count, rows: raffles } = await Raffle.findAndCountAll({
         where: whereClause,
-        include: [
-          {
-            model: RaffleDetail,
-          },
-          {
-            model: User,
-            attributes: ["id", "pubkey"],
-          },
-        ],
+        include,
         order,
         limit,
         offset,
@@ -877,6 +885,112 @@ class RaffleController {
         raffle,
         userData,
       });
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async updateDraftRaffle(req, res) {
+    try {
+      const userId = req.payload?.id;
+      const { raffleId } = req.params;
+
+      const draft = await Raffle.findOne({
+        where: { id: raffleId, userId, status: RAFFLE_STATUS.DRAFT },
+        include: [{ model: RaffleDetail }, { model: RaffleReward }],
+      });
+
+      if (!draft) {
+        return respond(res, httpStatus.NOT_FOUND, "Draft raffle not found");
+      }
+
+      const {
+        title,
+        description,
+        imageUrl,
+        totalTickets,
+        ticketPrice,
+        startDate,
+        endDate,
+        numberOfWinners,
+        requiresNftVerification,
+        verifiedCollectionRequired,
+        additionalJson,
+        rewards,
+        tokenType,
+      } = req.body;
+
+      await draft.update({
+        title: title ?? draft.title,
+        description: description ?? draft.description,
+        imageUrl: imageUrl ?? draft.imageUrl,
+        totalTickets: totalTickets ?? draft.totalTickets,
+        ticketPrice: ticketPrice ?? draft.ticketPrice,
+        startDate: startDate ?? draft.startDate,
+        endDate: endDate ?? draft.endDate,
+        numberOfWinners: numberOfWinners ?? draft.numberOfWinners,
+        tokenType: tokenType ? TOKEN_TYPE[tokenType] : draft.tokenType,
+      });
+
+      await draft.raffle_detail.update({
+        requiresNftVerification:
+          requiresNftVerification ??
+          draft.raffle_detail.requiresNftVerification,
+        verifiedCollectionRequired:
+          verifiedCollectionRequired ??
+          draft.raffle_detail.verifiedCollectionRequired,
+        additionalJson: additionalJson ?? draft.raffle_detail.additionalJson,
+      });
+
+      if (Array.isArray(rewards)) {
+        await RaffleReward.destroy({ where: { raffleId } });
+
+        const rewardsToInsert = rewards.map((r) => ({
+          raffleId,
+          rewardType: RAFFLE_REWARD_TYPES[r.rewardType],
+          rewardName: r.rewardName,
+          mintAddress: r.mintAddress,
+          amount: r.amount,
+        }));
+
+        await RaffleReward.bulkCreate(rewardsToInsert);
+      }
+
+      return respond(res, httpStatus.OK, "Draft Raffle Updated Successfully");
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async deleteDraftRaffle(req, res) {
+    try {
+      const userId = req.payload?.id;
+      const { raffleId } = req.params;
+
+      const draft = await Raffle.findOne({
+        where: { id: raffleId, userId, status: RAFFLE_STATUS.DRAFT },
+      });
+
+      if (!draft) {
+        return respond(res, httpStatus.NOT_FOUND, "Draft Raffle Not Found");
+      }
+
+      await RaffleDetail.destroy({ where: { raffleId } });
+      await RaffleReward.destroy({ where: { raffleId } });
+
+      await draft.destroy();
+
+      return respond(res, httpStatus.OK, "Draft Raffle Deleted Successfully");
     } catch (err) {
       logger.error(err);
       return respond(
