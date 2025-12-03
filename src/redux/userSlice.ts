@@ -1,4 +1,3 @@
-// import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { loginUser, authenticateUser } from "./actions/userAction";
 import { LOGIN_TOKEN } from "../config/constants";
@@ -25,22 +24,35 @@ const user = createSlice({
   name: "user",
   initialState,
   reducers: {
-    setUser: (_, action: PayloadAction<User>) => {
-      return action.payload;
-    },
+    setUser: (_, action: PayloadAction<User>) => action.payload,
+
     setLoading: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = false;
+      state.isLoading = action.payload;
+    },
+
+    // hydrate Redux on refresh
+    hydrateUserState: (state) => {
+      const token = sessionStorage.getItem(LOGIN_TOKEN);
+
+      if (token) {
+        state.token = token;
+        state.isAuthenticated = true;
+        state.isLoading = false; // avoid default "loading" state
+      } else {
+        state.isAuthenticated = false;
+        state.isLoading = false;
+      }
     },
   },
+
   extraReducers: (builder) => {
     builder
-      // Single handler for loginUser.fulfilled
       .addCase(loginUser.fulfilled, (state, { payload }) => {
         const user: User = payload.data.user;
+
         sessionStorage.setItem(LOGIN_TOKEN, user.token);
         toast.success(payload.message);
 
-        // State updates after successful login
         state.id = user.id;
         state.pubkey = user.pubkey;
         state.isAuthenticated = true;
@@ -54,12 +66,14 @@ const user = createSlice({
         state.isAuthenticated = false;
         state.isLoading = false;
         sessionStorage.removeItem(LOGIN_TOKEN);
-        toast.warning(payload.message);
+
+        if (payload?.message) toast.warning(payload.message);
       });
 
     builder
       .addCase(authenticateUser.fulfilled, (state, { payload }) => {
         const user: User = payload.data.user;
+
         state.id = user.id;
         state.isAuthenticated = user.isAuthenticated;
         state.isAdmin = user.isAdmin;
@@ -68,12 +82,12 @@ const user = createSlice({
         state.messages = user.messages;
         state.pubkey = user.pubkey;
       })
-      .addCase(authenticateUser.rejected, (state, { payload }) => {
+      .addCase(authenticateUser.rejected, (state) => {
         state.isAuthenticated = false;
         state.isLoading = false;
       });
   },
 });
 
-export const { setUser, setLoading } = user.actions;
+export const { setUser, setLoading, hydrateUserState } = user.actions;
 export default user.reducer;
