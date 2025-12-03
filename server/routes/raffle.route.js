@@ -6,6 +6,16 @@ const router = express.Router();
 // Create a raffle
 router.post("/create", auth.bearer, RaffleController.createRaffle);
 
+// Update Raffle Draft
+router.put("/draft/:raffleId", auth.bearer, RaffleController.updateDraftRaffle);
+
+// Delete Raffle Draft
+router.delete(
+  "/draft/:raffleId",
+  auth.bearer,
+  RaffleController.deleteDraftRaffle
+);
+
 // Get Raffle Draft
 router.get("/draft", auth.bearer, RaffleController.getRaffleDraft);
 

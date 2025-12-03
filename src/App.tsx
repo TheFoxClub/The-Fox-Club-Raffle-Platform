@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { useAppDispatch } from "./redux/store";
+import { hydrateUserState } from "./redux/userSlice";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Home from "./views/home/Home";
@@ -32,6 +35,12 @@ function App() {
   // if (import.meta.env.REACT_APP_SOLANA_RPC_POOL_DAS_API) {
   //   endpoint = import.meta.env.REACT_APP_SOLANA_RPC_POOL_DAS_API;
   // }
+
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    dispatch(hydrateUserState());
+  }, []);
 
   const isLoading = useSelector((state: RootState) => state.isLoading);
 
