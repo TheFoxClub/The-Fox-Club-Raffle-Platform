@@ -8,6 +8,8 @@ type FilterParams = {
   tokenType?: string;
   search?: string;
   status?: string;
+  price?: string;
+  collection?: string;
 };
 
 export default function RaffleFilter({
@@ -36,7 +38,7 @@ export default function RaffleFilter({
 
   const tokenOptions = [
     { value: "SOL", label: "SOL" },
-    { value: "USDT", label: "USDT" },
+    { value: "USDC", label: "USDC" },
     { value: "BONK", label: "BONK" },
     { value: "all", label: "All Tokens" },
   ];
@@ -112,6 +114,8 @@ export default function RaffleFilter({
     if (tokenFilter && tokenFilter !== "all") params.tokenType = tokenFilter;
     if (searchTerm) params.search = searchTerm;
     if (statusFilter) params.status = statusFilter;
+    if (priceFilter && priceFilter !== "") params.price = priceFilter;
+    if (collectionFilter && collectionFilter !== "all") params.collection = collectionFilter;
 
     if (onApplyFilters) onApplyFilters(params);
   };
