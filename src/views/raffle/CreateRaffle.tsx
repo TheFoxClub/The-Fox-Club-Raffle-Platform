@@ -94,7 +94,7 @@ const CreateRaffle = () => {
     { value: "SOLANA", label: "SOL" },
     { value: "USDC", label: "USDC" },
     { value: "BONK", label: "BONK" },
-    { value: "USDT", label: "USDT" },
+    { value: "USDC", label: "USDC" },
   ];
 
   useEffect(() => {

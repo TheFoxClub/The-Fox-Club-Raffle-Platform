@@ -4,6 +4,7 @@ const {
   User,
   UserInfo,
   RaffleReward,
+  VerifiedCollection,
 } = require("../models");
 const { status: httpStatus, default: status } = require("http-status");
 const logger = require("../util/logger");
@@ -730,7 +731,8 @@ class RaffleController {
           attributes: ["address"],
         });
         const addresses = verifiedAddresses.map((v) => v.address);
-        whereClause["$RaffleDetail.collectionAddress$"] = {
+        // raffle_detail stores the required verified collection address in `verifiedCollectionRequired`
+        whereClause["$RaffleDetail.verifiedCollectionRequired$"] = {
           [Op.in]: addresses,
         };
       }

@@ -51,7 +51,7 @@ export default function RaffleCarousel() {
                 ? "USDC"
                 : r.tokenType === 2
                 ? "BONK"
-                : "USDT",
+                : "USDC",
             isVerified: r.raffle_detail?.requiresNftVerification ?? false,
           }));
 

@@ -71,7 +71,7 @@ const RaffleDetail = () => {
     0: "SOL",
     1: "USDC",
     2: "BONK",
-    3: "USDT",
+    3: "USDC",
   };
 
   useEffect(() => {
