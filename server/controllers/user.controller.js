@@ -16,7 +16,15 @@ class UserController {
         include: [
           {
             model: UserInfo,
-            attributes: ["id", "email", "description", "username", "photoUrl"],
+            attributes: [
+              "id",
+              "email",
+              "description",
+              "username",
+              "photoUrl",
+              // "twitter",
+              // "discord",
+            ],
             required: false,
           },
         ],
@@ -37,7 +45,14 @@ class UserController {
     try {
       const userId = req.payload.id;
 
-      const allowedFields = ["description", "username", "email", "photoUrl"];
+      const allowedFields = [
+        "description",
+        "username",
+        "email",
+        "photoUrl",
+        // "twitter",
+        // "discord",
+      ];
 
       const updates = {};
       for (const field of allowedFields) {
@@ -57,13 +72,26 @@ class UserController {
         await record.update(updates);
       }
 
+      const updatedUserInfo = await UserInfo.findOne({
+        where: { userId },
+        attributes: [
+          "id",
+          "email",
+          "description",
+          "username",
+          "photoUrl",
+          // "twitter",
+          // "discord",
+        ],
+      });
+
       return respond(
         res,
         httpStatus.OK,
         created
           ? "User info created successfully!"
           : "User info updated successfully!",
-        { data: record }
+        { data: updatedUserInfo }
       );
     } catch (err) {
       logger.error(err);
