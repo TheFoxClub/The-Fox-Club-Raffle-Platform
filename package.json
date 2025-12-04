@@ -38,6 +38,7 @@
     "express-session": "^1.18.2",
     "http-status": "^2.1.0",
     "lucide-react": "^0.553.0",
+    "multer": "^2.0.2",
     "mysql2": "^3.15.3",
     "nodemon": "^3.1.11",
     "react": "^19.2.0",

@@ -496,7 +496,7 @@ class RaffleController {
         userId,
         title,
         description,
-        imageUrl,
+        imageUrl: imageUrl || null,
         totalTickets: totalTickets || 0,
         ticketPrice: ticketPrice || 0,
         ticketsSold: 0,

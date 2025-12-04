@@ -54,7 +54,9 @@ app.use(express.json());
 
 app.use("/api", require("./api"));
 app.use("/", express.static("build"));
-app.use("/uploads", express.static("uploads"));
+
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+app.use("/api/upload", require("./routes/upload"));
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../build")));

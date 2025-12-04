@@ -56,10 +56,11 @@ const CreateRaffle = () => {
   >([]);
   const [tokenLoading, setTokenLoading] = useState(false);
 
-  // const [raffleImage, setRaffleImage] = useState<File | null>(null);
-  // const [raffleImagePreview, setRaffleImagePreview] = useState<string | null>(
-  //   null
-  // );
+  const [raffleImage, setRaffleImage] = useState<File | null>(null);
+  const [raffleImagePreview, setRaffleImagePreview] = useState<string | null>(
+    null
+  );
+  const [imageUploading, setImageUploading] = useState(false);
 
   const [savedDraft, setSavedDraft] = useState<any>(null);
   const [draftLoading, setDraftLoading] = useState(false);
@@ -110,16 +111,37 @@ const CreateRaffle = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // setRaffleImage(file);
-    // setRaffleImagePreview(URL.createObjectURL(file));
+    // Validate file type
+    const validTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/jpg",
+    ];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Please upload a valid image file (JPEG, PNG, GIF, WebP)");
+      return;
+    }
 
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+
+    setRaffleImage(file);
+    setRaffleImagePreview(URL.createObjectURL(file));
     setErrors((prev) => ({ ...prev, raffleImage: "" }));
   };
 
-  // const handleRemoveImage = () => {
-  //   setRaffleImage(null);
-  //   setRaffleImagePreview(null);
-  // };
+  const handleRemoveImage = () => {
+    setRaffleImage(null);
+    setRaffleImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   //fetch NFTs when NFT dialog opens
   useEffect(() => {
@@ -302,6 +324,11 @@ const CreateRaffle = () => {
       newErrors.startDateError = "Start date cannot be in the past";
     }
 
+    // Only require image for non-draft submissions
+    if (!raffleImage) {
+      newErrors.raffleImage = "Please upload a raffle image.";
+    }
+
     setErrors(newErrors);
     // Scroll to first error
     if (Object.keys(newErrors).length > 0) {
@@ -371,18 +398,44 @@ const CreateRaffle = () => {
     try {
       setLoading(true);
 
-      // let uploadedImageUrl = "";
+      let uploadedImageUrl = "";
 
-      // if (raffleImage) {
-      //   const formData = new FormData();
-      //   formData.append("file", raffleImage);
+      // Upload image if provided
+      if (raffleImage) {
+        try {
+          setImageUploading(true);
+          const formData = new FormData();
+          formData.append("file", raffleImage);
 
-      //   const uploadRes = await server.post("/upload/raffle-image", formData, {
-      //     headers: { "Content-Type": "multipart/form-data" },
-      //   });
+          const uploadRes = await server.post(
+            "/upload/raffle-image",
+            formData,
+            {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
 
-      //   uploadedImageUrl = uploadRes.data.url;
-      // }
+          if (uploadRes.data.success) {
+            uploadedImageUrl = uploadRes.data.url;
+          } else {
+            throw new Error(uploadRes.data.message || "Image upload failed");
+          }
+        } catch (uploadError: any) {
+          toast.error(`Image upload failed: ${uploadError.message}`);
+          setLoading(false);
+          setImageUploading(false);
+          return;
+        } finally {
+          setImageUploading(false);
+        }
+      } else if (status !== "DRAFT") {
+        // Only require image for non-draft raffles
+        toast.error("Please upload a raffle image");
+        setLoading(false);
+        return;
+      }
 
       const payload = {
         title: title.trim(),
@@ -395,14 +448,14 @@ const CreateRaffle = () => {
         endDate,
         status,
         requiresNftVerification: false,
-        // imageUrl: uploadedImageUrl,
+        imageUrl: uploadedImageUrl,
         rewards: [
           ...selectedNFTs.map((nft) => ({
             rewardType: "NFT",
             rewardName: nft.name,
             mintAddress: nft.mint,
             amount: 1,
-            // imageUrl: uploadedImageUrl,
+            imageUrl: uploadedImageUrl,
             metadataJson: JSON.stringify({ collection: nft.collection }),
           })),
 
@@ -414,7 +467,7 @@ const CreateRaffle = () => {
             rewardName: token.name,
             mintAddress: token.mint,
             amount: token.amountToUse,
-            imageUrl: "",
+            imageUrl: uploadedImageUrl,
             metadataJson: JSON.stringify({ programId: token.programId }),
           })),
         ],
@@ -431,7 +484,7 @@ const CreateRaffle = () => {
         }
       }
     } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed");
+      toast.error(e.response?.data?.message || "Failed to create raffle");
     } finally {
       setLoading(false);
     }
@@ -984,30 +1037,37 @@ const CreateRaffle = () => {
               className="hidden"
             />
 
-            {/* {raffleImagePreview ? (
-              <div className="relative w-48">
+            {raffleImagePreview ? (
+              <div className="relative w-full max-w-md">
                 <img
                   src={raffleImagePreview}
                   alt="Preview"
-                  className="w-full h-32 object-cover rounded border-2 border-primary/50"
+                  className="w-full h-64 object-cover rounded-lg border-2 border-primary/50"
                 />
                 <button
                   type="button"
-                  // onClick={handleRemoveImage}
-                  className="absolute top-2 right-1 bg-red-500 text-white text-xs px-2 py-1 rounded"
+                  onClick={handleRemoveImage}
+                  className="absolute top-2 right-2 bg-red-500 text-white text-xs p-2 rounded-full hover:bg-red-600 transition-colors"
                 >
-                  Remove
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-            ) : ( */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed cursor-pointer rounded-xl p-6 flex flex-col items-center justify-center gap-3 border-input transition hover:border-primary/50 hover:bg-background-50"
-            >
-              <Upload className="w-5 h-5 mr-2" />
-              <p className="text-sm">Click to upload an image</p>
-            </div>
-            {/* )} */}
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed cursor-pointer rounded-xl p-6 flex flex-col items-center justify-center gap-3 border-input transition hover:border-primary/50 hover:bg-background-50"
+              >
+                <Upload className="w-8 h-8 text-muted-foreground" />
+                <p className="text-sm font-medium">Click to upload an image</p>
+                <p className="text-xs text-muted-foreground">
+                  JPEG, PNG, GIF, WebP (max 5MB)
+                </p>
+              </div>
+            )}
+
+            {imageUploading && (
+              <p className="text-sm text-blue-500">Uploading image...</p>
+            )}
 
             {errors.raffleImage && (
               <p className="text-red-500 text-sm">{errors.raffleImage}</p>
