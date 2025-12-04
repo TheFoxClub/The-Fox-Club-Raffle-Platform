@@ -1,7 +1,6 @@
 export const userStats = [
   {
     rank: 23,
-    wallet: "7xKX...9mPq",
     level: 15,
     streak: 12,
     xp: 12450,

@@ -12,6 +12,13 @@ export type User = {
   isLoading: boolean;
   messages?: any[];
   isAdmin?: boolean;
+  user_info?: {
+    id?: number;
+    username?: string;
+    email?: string;
+    description?: string;
+    photoUrl?: string;
+  };
 };
 
 const initialState: User = {

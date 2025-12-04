@@ -2,26 +2,20 @@ import HeroSection from "./HeroSection";
 import RaffleCarousel from "./RaffleCarousel";
 import RaffleFilter from "./RaffleFilter";
 import { RaffleGrid } from "./RaffleGrid";
+import { useState } from "react";
 // import { toast } from "react-toastify";
 
 const Home = () => {
+  const [filters, setFilters] = useState<any | undefined>(undefined);
   // const notifySuccess = () => toast.success("Welcome to the raffle!");
   // const notifyError = () => toast.error("Something went wrong.");
 
   return (
     <div className="px-4">
       <HeroSection />
-      {/* <div>
-        <button onClick={notifySuccess}>Show success toast</button>
-        <button onClick={notifyError} style={{ marginLeft: 8 }}>
-          Show error toast
-        </button>
-      </div> */}
-
       <RaffleCarousel />
-      <RaffleFilter />
-
-      <RaffleGrid />
+      <RaffleFilter onApplyFilters={(p) => setFilters(p)} />
+      <RaffleGrid filters={filters} />
     </div>
   );
 };

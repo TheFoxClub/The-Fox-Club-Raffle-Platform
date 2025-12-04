@@ -67,7 +67,7 @@ const SolanaSignIn = () => {
       variant="default"
       size="sm"
       onClick={signIn}
-      className="rounded glow-primary"
+      className="rounded glow-primary cursor-pointer"
     >
       Sign In
     </Button>

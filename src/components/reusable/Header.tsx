@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
-import { Wallet, Trophy, PlusCircle, User, LogOut } from "lucide-react";
+import { Wallet, Trophy, PlusCircle, User, LogOut, Shield } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
 import logo from "../../../public/assets/foxclub_logo.png";
 import MyConnectWalletButton from "../../helpers/wallet-hooks/MyConnectWalletButton";
@@ -27,7 +27,7 @@ export const Header = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 glass-card border-b border-border/50 w-full">
+    <nav className="sticky top-0 z-50 bg-background border-b border-border/50 w-full backdrop-blur-sm">
       <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3 group">
@@ -47,7 +47,7 @@ export const Header = () => {
           <Link to="/">
             <Button
               variant={isActive("/") ? "default" : "ghost"}
-              className="gap-2"
+              className="gap-2 cursor-pointer"
             >
               <Trophy className="h-4 w-4" /> Raffles
             </Button>
@@ -55,7 +55,7 @@ export const Header = () => {
           <Link to="/leaderboard">
             <Button
               variant={isActive("/leaderboard") ? "default" : "ghost"}
-              className="gap-2"
+              className="gap-2 cursor-pointer"
             >
               <Trophy className="h-4 w-4" /> Leaderboard
             </Button>
@@ -63,18 +63,33 @@ export const Header = () => {
           <Link to="/profile">
             <Button
               variant={isActive("/profile") ? "default" : "ghost"}
-              className="gap-2"
+              className="gap-2 cursor-pointer"
             >
               <User className="h-4 w-4" /> Profile
             </Button>
           </Link>
+          {user.isAdmin && (
+            <Link to="/admin">
+              <Button
+                variant={
+                  location.pathname.startsWith("/admin") ? "default" : "ghost"
+                }
+                className="gap-2 cursor-pointer"
+              >
+                <Shield className="h-4 w-4" /> Admin
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Wallet & Create Button */}
-        <div className="flex items-center gap-2 relative">
+        <div className="flex items-center gap-2  relative">
           {connected && (
             <Link to="/create">
-              <Button variant="outline" className="gap-2 hidden sm:flex">
+              <Button
+                variant="outline"
+                className="gap-2 hidden sm:flex cursor-pointer"
+              >
                 <PlusCircle className="h-4 w-4" /> Create Raffle
               </Button>
             </Link>
@@ -87,7 +102,7 @@ export const Header = () => {
               {connected ? (
                 <Button
                   variant="secondary"
-                  className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
                 >
                   <Wallet className="h-4 w-4" />
                   {shortenAddress(publicKey?.toBase58() || "")}
@@ -96,8 +111,8 @@ export const Header = () => {
             </MyConnectWalletButton>
             {user.isAuthenticated && (
               <Button
-                variant="secondary"
-                className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
+                variant="default"
+                className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
                 onClick={logout}
                 title="Logout"
                 aria-label="Logout"
@@ -114,7 +129,7 @@ export const Header = () => {
           <Link to="/" className="flex-1">
             <Button
               variant={isActive("/") ? "default" : "ghost"}
-              className="w-full gap-2"
+              className="w-full gap-2 cursor-pointer"
               size="sm"
             >
               <Trophy className="h-4 w-4" /> Raffles
@@ -123,7 +138,7 @@ export const Header = () => {
           <Link to="/leaderboard" className="flex-1">
             <Button
               variant={isActive("/leaderboard") ? "default" : "ghost"}
-              className="w-full gap-2"
+              className="w-full gap-2 cursor-pointer"
               size="sm"
             >
               <Trophy className="h-4 w-4" /> Leaders
@@ -132,12 +147,25 @@ export const Header = () => {
           <Link to="/profile" className="flex-1">
             <Button
               variant={isActive("/profile") ? "default" : "ghost"}
-              className="w-full gap-2"
+              className="w-full gap-2 cursor-pointer"
               size="sm"
             >
               <User className="h-4 w-4" /> Profile
             </Button>
           </Link>
+          {user.isAdmin && (
+            <Link to="/admin" className="flex-1">
+              <Button
+                variant={
+                  location.pathname.startsWith("/admin") ? "default" : "ghost"
+                }
+                className="w-full gap-2 cursor-pointer"
+                size="sm"
+              >
+                <Shield className="h-4 w-4" /> Admin
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </nav>

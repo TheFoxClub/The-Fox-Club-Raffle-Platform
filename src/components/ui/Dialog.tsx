@@ -14,11 +14,27 @@ const DialogContext = React.createContext<DialogContextType | undefined>(
 );
 
 // --- 2. Dialog Root (Controller) ---
-const Dialog: React.FC<{
+interface DialogProps {
   children: React.ReactNode;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}> = ({ children, open, onOpenChange }) => {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+const Dialog: React.FC<DialogProps> = ({ children, open: controlledOpen, onOpenChange }) => {
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+
+  const setIsOpen = React.useCallback(
+    (newOpen: boolean) => {
+      if (!isControlled) {
+        setInternalOpen(newOpen);
+      }
+      onOpenChange?.(newOpen);
+    },
+    [isControlled, onOpenChange]
+  );
+
   // SCROLL LOCK: add/remove overflow hidden on body
   React.useEffect(() => {
     const original = document.body.style.overflow;
@@ -28,13 +44,12 @@ const Dialog: React.FC<{
       document.body.style.overflow = original || "";
     }
     return () => {
-      // restore original on unmount
       document.body.style.overflow = original || "";
     };
   }, [open]);
 
   return (
-    <DialogContext.Provider value={{ isOpen: open, setIsOpen: onOpenChange }}>
+    <DialogContext.Provider value={{ isOpen: open, setIsOpen }}>
       {children}
     </DialogContext.Provider>
   );
