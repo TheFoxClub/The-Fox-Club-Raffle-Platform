@@ -97,13 +97,13 @@ const Profile = () => {
 
             <div className="flex-1 space-y-4">
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <h1 className="text-3xl font-bold">{pubkey}</h1>
-                  <div className="top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 hover:bg-primary hover:text-white py-1 rounded-full flex items-center gap-2 text-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
+                  <h1 className="text-2xl sm:text-3xl font-bold break-all">{pubkey}</h1>
+                  <div className="mt-2 sm:mt-0 self-start sm:self-center bg-green-900/30 backdrop-blur-sm text-green-400 px-3 hover:bg-primary hover:text-white py-1 rounded-full flex items-center gap-2 text-sm">
                     <CheckCircle size={12} /> Verified
                   </div>
                 </div>
-                <div className="flex items-center text-sm gap-4 mt-2">
+                <div className="flex flex-wrap items-center text-sm gap-3 mt-2">
                   <div className="flex items-center gap-1">
                     <Trophy className="h-4 w-4 text-accent" />
                     <span className="text-muted-foreground">Level 1</span>
@@ -119,9 +119,9 @@ const Profile = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-sm mb-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm mb-2">
                 <span className="text-muted-foreground">XP Progress</span>
-                <span className="font-semibold">12450 / 15000 XP</span>
+                <span className="font-semibold mt-1 sm:mt-0">12450 / 15000 XP</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
