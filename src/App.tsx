@@ -28,6 +28,8 @@ import AdminFees from "./views/admin/AdminFees";
 import AdminRewards from "./views/admin/AdminRewards";
 import AdminLeaderboards from "./views/admin/AdminLeaderboards";
 import AdminAnalytics from "./views/admin/AdminAnalytics";
+import { ProtectedAdminRoute } from "./components/auth/ProtectedAdminRoute";
+import Forbidden from "./views/errors/Forbidden";
 
 function App() {
   // let endpoint = "https://api.devnet.solana.com";
@@ -42,7 +44,7 @@ function App() {
     dispatch(hydrateUserState());
   }, []);
 
-  const isLoading = useSelector((state: RootState) => state.isLoading);
+  const isLoading = useSelector((state: RootState) => state.user.isLoading);
 
   return (
     <Router>
@@ -111,71 +113,75 @@ function App() {
             }
           />
 
+          <Route path="/forbidden" element={<Forbidden />} />
+
           {/* Admin routes with AdminLayout */}
-          <Route
-            path="/admin"
-            element={
-              <AdminLayout>
-                <AdminDashboard />
-              </AdminLayout>
-            }
-          />
-          <Route
-            path="/admin/raffles"
-            element={
-              <AdminLayout>
-                <AdminRaffles />
-              </AdminLayout>
-            }
-          />
-          <Route
-            path="/admin/collections"
-            element={
-              <AdminLayout>
-                <AdminCollections />
-              </AdminLayout>
-            }
-          />
-          <Route
-            path="/admin/tokens"
-            element={
-              <AdminLayout>
-                <AdminTokens />
-              </AdminLayout>
-            }
-          />
-          <Route
-            path="/admin/fees"
-            element={
-              <AdminLayout>
-                <AdminFees />
-              </AdminLayout>
-            }
-          />
-          <Route
-            path="/admin/rewards"
-            element={
-              <AdminLayout>
-                <AdminRewards />
-              </AdminLayout>
-            }
-          />
-          <Route
-            path="/admin/leaderboards"
-            element={
-              <AdminLayout>
-                <AdminLeaderboards />
-              </AdminLayout>
-            }
-          />
-          <Route
-            path="/admin/analytics"
-            element={
-              <AdminLayout>
-                <AdminAnalytics />
-              </AdminLayout>
-            }
-          />
+          <Route element={<ProtectedAdminRoute />}>
+            <Route
+              path="/admin"
+              element={
+                <AdminLayout>
+                  <AdminDashboard />
+                </AdminLayout>
+              }
+            />
+            <Route
+              path="/admin/raffles"
+              element={
+                <AdminLayout>
+                  <AdminRaffles />
+                </AdminLayout>
+              }
+            />
+            <Route
+              path="/admin/collections"
+              element={
+                <AdminLayout>
+                  <AdminCollections />
+                </AdminLayout>
+              }
+            />
+            <Route
+              path="/admin/tokens"
+              element={
+                <AdminLayout>
+                  <AdminTokens />
+                </AdminLayout>
+              }
+            />
+            <Route
+              path="/admin/fees"
+              element={
+                <AdminLayout>
+                  <AdminFees />
+                </AdminLayout>
+              }
+            />
+            <Route
+              path="/admin/rewards"
+              element={
+                <AdminLayout>
+                  <AdminRewards />
+                </AdminLayout>
+              }
+            />
+            <Route
+              path="/admin/leaderboards"
+              element={
+                <AdminLayout>
+                  <AdminLeaderboards />
+                </AdminLayout>
+              }
+            />
+            <Route
+              path="/admin/analytics"
+              element={
+                <AdminLayout>
+                  <AdminAnalytics />
+                </AdminLayout>
+              }
+            />
+          </Route>
         </Routes>
         {/* </UmiProvider> */}
       </MyWalletWrapper>

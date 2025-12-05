@@ -24,7 +24,7 @@ interface Raffle {
 }
 
 export default function RaffleCarousel() {
-  const [raffles, setRaffles] = useState<Raffle[]>([]);
+  const [raffles, setRaffles] = useState<Raffle[] | null>(null);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -56,6 +56,8 @@ export default function RaffleCarousel() {
           }));
 
           setRaffles(mapped);
+        } else {
+          setRaffles([]);
         }
       } catch (error) {
         console.error("Failed to load featured raffles", error);
@@ -64,14 +66,10 @@ export default function RaffleCarousel() {
     fetchFeatured();
   }, []);
 
+  if (raffles === null) return null;
+
   //if no raffles loaded yet
-  if (raffles.length === 0) {
-    return (
-      <Card className="glass-card p-10 text-center border-primary/30">
-        Loading featured raffles...
-      </Card>
-    );
-  }
+  if (raffles.length === 0) return null;
 
   const data = raffles[index];
 
