@@ -26,7 +26,6 @@ import { useRef } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 
-
 // Constants for Token Program IDs
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
@@ -667,7 +666,7 @@ const CreateRaffle = () => {
     <div className="container mx-auto px-4 py-2 max-w-4xl">
       <div className="mb-6">
         {/* Fetch Drafts Button */}
-        {/* <div className="flex justify-end mb-4">
+        <div className="flex justify-end mb-4">
           <Button
             onClick={fetchDrafts}
             disabled={draftLoading || !user.isAuthenticated}
@@ -675,7 +674,7 @@ const CreateRaffle = () => {
             className="gap-2">
             {draftLoading ? "Loading..." : "Fetch Saved Drafts"}
           </Button>
-        </div> */}
+        </div>
 
         {/* Saved Draft Display */}
         {savedDraft && (
@@ -688,17 +687,13 @@ const CreateRaffle = () => {
             <div className="mt-3 flex gap-3">
               <button
                 onClick={() => loadDraft(savedDraft)}
-                className="px-4 py-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm transition-colors rounded-md cursor-pointer"
-              >
+                className="px-4 py-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm transition-colors rounded-md cursor-pointer">
                 Resume Draft
               </button>
 
               <button
                 onClick={deleteDraft}
-                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer"
-              >
-                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer"
-              >
+                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer">
                 Delete Draft
               </button>
             </div>
@@ -822,7 +817,7 @@ const CreateRaffle = () => {
                         No NFTs found in your wallet.
                       </p>
                     ) : (
-                      <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
+                      <div className="grid grid-cols-2 gap-4">
                         {nftCandidates.map((nft) => {
                           const isSelected = selectedNFTs.some(
                             (item) => item.id === nft.id
@@ -837,7 +832,7 @@ const CreateRaffle = () => {
                               }
                               disabled={isSelected}
                               className={`
-                group relative overflow-hidden rounded-lg border-2 transition-all
+                group relative overflow-hidden rounded-lg border-2 transition-all w-full h-40 flex
                 ${
                   isSelected
                     ? "border-green-500 opacity-50 cursor-not-allowed"
@@ -848,11 +843,11 @@ const CreateRaffle = () => {
                               <img
                                 src={nft.image}
                                 alt={nft.name}
-                                className="w-full h-40 object-cover rounded-lg"
+                                className="w-full h-full object-cover"
                               />
 
                               {/* Footer Overlay */}
-                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background-90 to-transparent p-2">
+                              <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-background via-background-90 to-transparent p-2">
                                 <p className="font-semibold text-sm truncate">
                                   {nft.name}
                                 </p>
@@ -910,13 +905,13 @@ const CreateRaffle = () => {
                             className="w-24 h-24 rounded-lg object-cover"
                           />
                           <div>
-                            <p className="font-semibold break-words break-all">
+                            <p className="font-semibold wrap-break-word break-all">
                               {nft.name}
                             </p>
-                            <p className="text-sm text-muted-foreground break-words break-all">
+                            <p className="text-sm text-muted-foreground wrap-break-word break-all">
                               {nft.collection}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1 break-words break-all">
+                            <p className="text-xs text-muted-foreground mt-1 wrap-break-word break-all">
                               Mint: {nft.mint}
                             </p>
                           </div>
@@ -976,7 +971,7 @@ const CreateRaffle = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
+                      <div className="grid grid-cols-2 gap-4">
                         {tokenCandidates.map((token) => {
                           const isSelected = selectedTokens.some(
                             (t) => t.mint === token.mint
@@ -986,10 +981,12 @@ const CreateRaffle = () => {
                             <button
                               key={token.mint}
                               type="button"
-                              onClick={() => !isSelected && handleSelectToken(token)}
+                              onClick={() =>
+                                !isSelected && handleSelectToken(token)
+                              }
                               disabled={isSelected}
                               className={`
-                                      group relative overflow-hidden rounded-lg border-2 transition-all flex items-center
+                                      group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2
                                       ${
                                         isSelected
                                           ? "border-green-500 opacity-50 cursor-not-allowed"
