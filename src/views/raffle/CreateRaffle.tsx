@@ -63,7 +63,6 @@ const CreateRaffle = () => {
   const [imageUploading, setImageUploading] = useState(false);
 
   const [savedDraft, setSavedDraft] = useState<any>(null);
-  const [draftLoading, setDraftLoading] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -641,7 +640,6 @@ const CreateRaffle = () => {
     }
 
     try {
-      setDraftLoading(true);
       const res = await server.get("/raffle/draft");
 
       if (res.data.success && res.data.data) {
@@ -661,8 +659,6 @@ const CreateRaffle = () => {
     } catch (err: any) {
       console.error("Failed to fetch drafts", err);
       setSavedDraft(null);
-    } finally {
-      setDraftLoading(false);
     }
   };
 
