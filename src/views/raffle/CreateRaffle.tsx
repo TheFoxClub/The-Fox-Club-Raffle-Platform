@@ -697,6 +697,8 @@ const CreateRaffle = () => {
                 onClick={deleteDraft}
                 className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer"
               >
+                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer"
+              >
                 Delete Draft
               </button>
             </div>
@@ -779,12 +781,14 @@ const CreateRaffle = () => {
                 {/* Select Button (Always Visible) */}
                 <Dialog
                   open={isNFTDialogOpen}
-                  onOpenChange={setIsNFTDialogOpen}>
+                  onOpenChange={setIsNFTDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full h-32 border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-background-50 mt-2">
+                      className="w-full h-32 border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-background-50 mt-2"
+                    >
                       <div className="flex flex-col items-center gap-2">
                         <Wallet className="h-8 w-8" />
                         <span className="font-semibold">
@@ -798,7 +802,7 @@ const CreateRaffle = () => {
                   </DialogTrigger>
 
                   {/* Modal */}
-                  <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
+                  <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Select NFT from Your Wallet</DialogTitle>
                     </DialogHeader>
@@ -839,7 +843,8 @@ const CreateRaffle = () => {
                     ? "border-green-500 opacity-50 cursor-not-allowed"
                     : "border-border hover:border-primary hover:scale-105"
                 }
-              `}>
+              `}
+                            >
                               <img
                                 src={nft.image}
                                 alt={nft.name}
@@ -873,7 +878,8 @@ const CreateRaffle = () => {
                     <div className="flex justify-end mt-4">
                       <Button
                         className="gradient-primary"
-                        onClick={() => setIsNFTDialogOpen(false)}>
+                        onClick={() => setIsNFTDialogOpen(false)}
+                      >
                         Done
                       </Button>
                     </div>
@@ -886,12 +892,14 @@ const CreateRaffle = () => {
                     {selectedNFTs.map((nft) => (
                       <div
                         key={nft.id}
-                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50">
+                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
+                      >
                         {/* Remove Single NFT */}
                         <button
                           type="button"
                           onClick={() => removeNFT(nft.id)}
-                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors">
+                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                        >
                           <X className="h-4 w-4" />
                         </button>
 
@@ -925,12 +933,14 @@ const CreateRaffle = () => {
                 </label>
                 <Dialog
                   open={isTokenDialogOpen}
-                  onOpenChange={setIsTokenDialogOpen}>
+                  onOpenChange={setIsTokenDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full h-32 border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-background/50 mt-2">
+                      className="w-full h-32 border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-background/50 mt-2"
+                    >
                       <div className="flex flex-col items-center gap-2">
                         <Wallet className="h-8 w-8" />
                         <span className="font-semibold">
@@ -944,7 +954,7 @@ const CreateRaffle = () => {
                   </DialogTrigger>
 
                   {/* Modal */}
-                  <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
+                  <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Select Token from Your Wallet</DialogTitle>
                     </DialogHeader>
@@ -985,8 +995,16 @@ const CreateRaffle = () => {
                                           ? "border-green-500 opacity-50 cursor-not-allowed"
                                           : "border-border hover:border-primary hover:scale-105"
                                       }
-                                    `}>
-                              <div className="flex flex-col p-4 gap-1">
+                                    `}
+                            >
+                              {/* Left icon / badge */}
+                              {/* <div className="shrink-0 w-10 h-10 rounded-md bg-background-60 flex items-center justify-center text-xs font-semibold text-muted-foreground">
+                                {token.name?.charAt(0) ??
+                                  token.mint?.slice(0, 1)}
+                              </div> */}
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-sm truncate">
                                   {token.name}
                                 </p>
@@ -1013,7 +1031,8 @@ const CreateRaffle = () => {
                     <div className="flex justify-end mt-4">
                       <Button
                         className="gradient-primary"
-                        onClick={() => setIsTokenDialogOpen(false)}>
+                        onClick={() => setIsTokenDialogOpen(false)}
+                      >
                         Done
                       </Button>
                     </div>
@@ -1025,11 +1044,13 @@ const CreateRaffle = () => {
                     {selectedTokens.map((t) => (
                       <div
                         key={t.mint}
-                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50">
+                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
+                      >
                         <button
                           type="button"
                           onClick={() => removeToken(t.mint)}
-                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors">
+                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                        >
                           <X className="h-4 w-4" />
                         </button>
                         <div className="flex flex-col gap-2 break-all">
@@ -1111,14 +1132,16 @@ const CreateRaffle = () => {
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="absolute top-2 right-2 bg-red-500 text-white text-xs p-2 rounded-full hover:bg-red-600 transition-colors">
+                  className="absolute top-2 right-2 bg-red-500 text-white text-xs p-2 rounded-full hover:bg-red-600 transition-colors"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed cursor-pointer rounded-xl p-6 flex flex-col items-center justify-center gap-3 border-input transition hover:border-primary/50 hover:bg-background-50">
+                className="border-2 border-dashed cursor-pointer rounded-xl p-6 flex flex-col items-center justify-center gap-3 border-input transition hover:border-primary/50 hover:bg-background-50"
+              >
                 <Upload className="w-8 h-8 text-muted-foreground" />
                 <p className="text-sm font-medium">Click to upload an image</p>
                 <p className="text-xs text-muted-foreground">
@@ -1281,7 +1304,8 @@ const CreateRaffle = () => {
             variant="outline"
             className="w-full cursor-pointer"
             onClick={handleSaveDraft}
-            disabled={loading}>
+            disabled={loading}
+          >
             {loading ? "Processing..." : "Save as Draft"}
           </Button>
 
@@ -1289,7 +1313,8 @@ const CreateRaffle = () => {
             onClick={() => submitRaffle("UPCOMING")}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
-            disabled={loading}>
+            disabled={loading}
+          >
             <PlusCircle className="h-4 w-4" />
             {loading ? "Creating..." : "Create Raffle"}
           </Button>
