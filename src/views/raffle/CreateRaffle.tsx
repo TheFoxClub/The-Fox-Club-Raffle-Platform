@@ -834,7 +834,7 @@ const CreateRaffle = () => {
                               }
                               disabled={isSelected}
                               className={`
-                group relative overflow-hidden rounded-lg border-2 transition-all
+                group relative overflow-hidden rounded-lg border-2 transition-all w-full h-40 flex
                 ${
                   isSelected
                     ? "border-green-500 opacity-50 cursor-not-allowed"
@@ -844,11 +844,11 @@ const CreateRaffle = () => {
                               <img
                                 src={nft.image}
                                 alt={nft.name}
-                                className="w-full h-40 object-cover rounded-lg"
+                                className="w-full h-full object-cover"
                               />
 
                               {/* Footer Overlay */}
-                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background-90 to-transparent p-2">
+                              <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-background via-background-90 to-transparent p-2">
                                 <p className="font-semibold text-sm truncate">
                                   {nft.name}
                                 </p>
@@ -903,13 +903,13 @@ const CreateRaffle = () => {
                             className="w-24 h-24 rounded-lg object-cover"
                           />
                           <div>
-                            <p className="font-semibold break-words break-all">
+                            <p className="font-semibold wrap-break-word break-all">
                               {nft.name}
                             </p>
-                            <p className="text-sm text-muted-foreground break-words break-all">
+                            <p className="text-sm text-muted-foreground wrap-break-word break-all">
                               {nft.collection}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1 break-words break-all">
+                            <p className="text-xs text-muted-foreground mt-1 wrap-break-word break-all">
                               Mint: {nft.mint}
                             </p>
                           </div>
@@ -982,7 +982,7 @@ const CreateRaffle = () => {
                               }
                               disabled={isSelected}
                               className={`
-                                      group relative overflow-hidden rounded-lg border-2 transition-all flex items-center
+                                      group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2
                                       ${
                                         isSelected
                                           ? "border-green-500 opacity-50 cursor-not-allowed"
@@ -990,7 +990,7 @@ const CreateRaffle = () => {
                                       }
                                     `}>
                               {/* Left icon / badge */}
-                              <div className="flex-shrink-0 w-10 h-10 rounded-md bg-background-60 flex items-center justify-center text-xs font-semibold text-muted-foreground">
+                              <div className="shrink-0 w-10 h-10 rounded-md bg-background-60 flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                 {token.name?.charAt(0) ??
                                   token.mint?.slice(0, 1)}
                               </div>
