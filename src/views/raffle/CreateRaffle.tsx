@@ -666,7 +666,7 @@ const CreateRaffle = () => {
     <div className="container mx-auto px-4 py-2 max-w-4xl">
       <div className="mb-6">
         {/* Fetch Drafts Button */}
-        <div className="flex justify-end mb-4">
+        {/* <div className="flex justify-end mb-4">
           <Button
             onClick={fetchDrafts}
             disabled={draftLoading || !user.isAuthenticated}
@@ -674,7 +674,7 @@ const CreateRaffle = () => {
             className="gap-2">
             {draftLoading ? "Loading..." : "Fetch Saved Drafts"}
           </Button>
-        </div>
+        </div> */}
 
         {/* Saved Draft Display */}
         {savedDraft && (
@@ -687,13 +687,15 @@ const CreateRaffle = () => {
             <div className="mt-3 flex gap-3">
               <button
                 onClick={() => loadDraft(savedDraft)}
-                className="px-4 py-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm transition-colors rounded-md cursor-pointer">
+                className="px-4 py-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm transition-colors rounded-md cursor-pointer"
+              >
                 Resume Draft
               </button>
 
               <button
                 onClick={deleteDraft}
-                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer">
+                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer"
+              >
                 Delete Draft
               </button>
             </div>
