@@ -100,6 +100,12 @@ const CreateRaffle = () => {
   ];
 
   useEffect(() => {
+    if (user.isAuthenticated) {
+      fetchDrafts();
+    }
+  }, [user.isAuthenticated]);
+
+  useEffect(() => {
     const totalPrizes = selectedNFTs.length + selectedTokens.length;
 
     // only auto-set if user hasn't typed anything
@@ -475,11 +481,26 @@ const CreateRaffle = () => {
         additionalJson: { created: "user", category: "raffle" },
       };
 
-      const res = await server.post("/raffle/create", payload);
+      const draftId = savedDraft?.id || savedDraft?.raffle?.id;
+      let res;
+
+      if (status === "DRAFT" && draftId) {
+        //UPDATE EXISTING DRAFT
+        console.log("Updating existing draft:", draftId);
+        res = await server.put(`/raffle/draft/${draftId}`, payload);
+      } else {
+        //CREATE A NEW DRAFT
+        console.log("Creating new raffle/draft");
+        res = await server.post("/raffle/create", payload);
+      }
 
       if (res.data.success) {
         toast.success(status === "DRAFT" ? "Draft saved!" : "Raffle created!");
-        if (status === "UPCOMING") {
+
+        if (status === "DRAFT") {
+          // Re-fetch to get the latest draft with its ID
+          await fetchDrafts();
+        } else {
           const createdId = res.data.data.raffle.id;
           navigate(`/raffle/${createdId}`);
         }
@@ -509,8 +530,6 @@ const CreateRaffle = () => {
       setStartDate(draft.startDate || "");
       setEndDate(draft.endDate || "");
       setSelectedTokenType(draft.tokenType || null);
-      setSelectedNFTs(draft.selectedNFTs || []);
-      setSelectedTokens(draft.selectedTokens || []);
     } catch (err) {
       console.error("Failed to load draft", err);
     }
@@ -554,13 +573,71 @@ const CreateRaffle = () => {
     setSelectedTokens(loadedTokens);
   };
 
-  const deleteDraft = () => {
-    setSavedDraft(null);
+  const deleteDraft = async () => {
+    console.log("🗑️ Attempting to delete draft:", savedDraft);
+
+    const raffleData = savedDraft?.raffle || savedDraft;
+    const draftId = raffleData?.id;
+    const status = raffleData?.status;
+
+    if (!draftId) {
+      console.log("No draft ID found:", savedDraft);
+      toast.error("No draft to delete");
+      return;
+    }
+
+    try {
+      let res;
+
+      if (status === "DRAFT") {
+        console.log("Calling DELETE /raffle/draft/" + draftId);
+        // res = await server.delete(`/raffle/draft/${draftId}`);
+        res = await server.delete(`/raffle/draft/${draftId}`);
+      } else {
+        console.log("Calling DELETE /raffle/" + draftId);
+        res = await server.delete(`/raffle/${draftId}`);
+      }
+
+      console.log("Delete response:", res.data);
+
+      if (res.data.success) {
+        // Clear the saved draft state
+        setSavedDraft(null);
+
+        setTitle("");
+        setDescription("");
+        setTicketPrice("");
+        setTotalTickets("");
+        setNumberOfWinners(1);
+        setStartDate("");
+        setEndDate("");
+        setSelectedTokenType(null);
+        setSelectedNFTs([]);
+        setSelectedTokens([]);
+        setRaffleImage(null);
+        setRaffleImagePreview(null);
+        setErrors({});
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+
+        toast.success("Draft deleted successfully!");
+      } else {
+        toast.error(res.data.message || "Failed to delete draft");
+      }
+    } catch (err: any) {
+      console.error("Failed to delete draft", err);
+
+      const errorMsg =
+        err.response?.data?.message || err.message || "Failed to delete draft";
+      toast.error(errorMsg);
+    }
   };
 
   const fetchDrafts = async () => {
     if (!user.isAuthenticated) {
-      toast.error("Please sign in to fetch drafts!");
+      setSavedDraft(null);
       return;
     }
 
@@ -569,16 +646,22 @@ const CreateRaffle = () => {
       const res = await server.get("/raffle/draft");
 
       if (res.data.success && res.data.data) {
-        setSavedDraft(res.data.data);
-        toast.success("Draft loaded successfully!");
+        const draftData = res.data.data.raffle || res.data.data;
+
+        if (draftData && draftData.id) {
+          console.log("Valid draft found:", draftData);
+          setSavedDraft(draftData);
+        } else {
+          console.log("No valid draft ID found");
+          setSavedDraft(null);
+        }
       } else {
+        console.log("No draft data in response");
         setSavedDraft(null);
-        toast.info("No saved drafts found.");
       }
     } catch (err: any) {
       console.error("Failed to fetch drafts", err);
       setSavedDraft(null);
-      toast.error(err.response?.data?.message || "Failed to fetch drafts");
     } finally {
       setDraftLoading(false);
     }
@@ -588,7 +671,7 @@ const CreateRaffle = () => {
     <div className="container mx-auto px-4 py-2 max-w-4xl">
       <div className="mb-6">
         {/* Fetch Drafts Button */}
-        <div className="flex justify-end mb-4">
+        {/* <div className="flex justify-end mb-4">
           <Button
             onClick={fetchDrafts}
             disabled={draftLoading || !user.isAuthenticated}
@@ -596,7 +679,7 @@ const CreateRaffle = () => {
             className="gap-2">
             {draftLoading ? "Loading..." : "Fetch Saved Drafts"}
           </Button>
-        </div>
+        </div> */}
 
         {/* Saved Draft Display */}
         {savedDraft && (
@@ -609,13 +692,15 @@ const CreateRaffle = () => {
             <div className="mt-3 flex gap-3">
               <button
                 onClick={() => loadDraft(savedDraft)}
-                className="px-4 py-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm transition-colors rounded-md">
+                className="px-4 py-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm transition-colors rounded-md cursor-pointer"
+              >
                 Resume Draft
               </button>
 
               <button
                 onClick={deleteDraft}
-                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md">
+                className="px-4 py-2 border border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-md cursor-pointer"
+              >
                 Delete Draft
               </button>
             </div>
@@ -1198,7 +1283,7 @@ const CreateRaffle = () => {
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full cursor-pointer"
             onClick={handleSaveDraft}
             disabled={loading}>
             {loading ? "Processing..." : "Save as Draft"}

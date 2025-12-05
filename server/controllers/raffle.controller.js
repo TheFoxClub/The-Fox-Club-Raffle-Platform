@@ -869,17 +869,19 @@ class RaffleController {
       const userData = await User.findOne({ where: { id: userId } });
 
       const raffle = await Raffle.findOne({
-        where: { userId },
+        where: { userId, status: RAFFLE_STATUS.DRAFT },
         include: [{ model: RaffleDetail }, { model: RaffleReward }],
       });
 
-      raffle.tokenType = mapEnumValue(TOKEN_TYPE, raffle.tokenType);
-      raffle.status = mapEnumValue(RAFFLE_STATUS, raffle.status);
+      if (raffle) {
+        raffle.tokenType = mapEnumValue(TOKEN_TYPE, raffle.tokenType);
+        raffle.status = mapEnumValue(RAFFLE_STATUS, raffle.status);
 
-      raffle.raffle_rewards = raffle.raffle_rewards.map((reward) => ({
-        ...reward,
-        rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
-      }));
+        raffle.raffle_rewards = raffle.raffle_rewards.map((reward) => ({
+          ...reward,
+          rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+        }));
+      }
 
       return respond(res, httpStatus.OK, "Raffle retrieved successfully", {
         raffle,
