@@ -98,7 +98,9 @@ const Profile = () => {
             <div className="flex-1 space-y-4">
               <div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold break-all">{pubkey}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold break-all">
+                    {pubkey}
+                  </h1>
                   <div className="mt-2 sm:mt-0 self-start sm:self-center bg-green-900/30 backdrop-blur-sm text-green-400 px-3 hover:bg-primary hover:text-white py-1 rounded-full flex items-center gap-2 text-sm">
                     <CheckCircle size={12} /> Verified
                   </div>
@@ -121,7 +123,9 @@ const Profile = () => {
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm mb-2">
                 <span className="text-muted-foreground">XP Progress</span>
-                <span className="font-semibold mt-1 sm:mt-0">12450 / 15000 XP</span>
+                <span className="font-semibold mt-1 sm:mt-0">
+                  12450 / 15000 XP
+                </span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
@@ -132,7 +136,9 @@ const Profile = () => {
             </div>
 
             <Link to="/profile/EditProfile">
-              <Button variant="outline">Edit Profile</Button>
+              <Button variant="outline" className="cursor-pointer">
+                Edit Profile
+              </Button>
             </Link>
           </div>
         </Card>

@@ -47,7 +47,7 @@ export const Header = () => {
           <Link to="/">
             <Button
               variant={isActive("/") ? "default" : "ghost"}
-              className="gap-2 cursor-pointer"
+              className="gap-2"
             >
               <Trophy className="h-4 w-4" /> Raffles
             </Button>
@@ -55,7 +55,7 @@ export const Header = () => {
           <Link to="/leaderboard">
             <Button
               variant={isActive("/leaderboard") ? "default" : "ghost"}
-              className="gap-2 cursor-pointer"
+              className="gap-2 hover:bg-accent"
             >
               <Trophy className="h-4 w-4" /> Leaderboard
             </Button>
@@ -63,7 +63,7 @@ export const Header = () => {
           <Link to="/profile">
             <Button
               variant={isActive("/profile") ? "default" : "ghost"}
-              className="gap-2 cursor-pointer"
+              className="gap-2"
             >
               <User className="h-4 w-4" /> Profile
             </Button>
