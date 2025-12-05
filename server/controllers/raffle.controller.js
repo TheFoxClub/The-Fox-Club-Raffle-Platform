@@ -341,89 +341,24 @@ class RaffleController {
     }
   }
 
-  // static async createRaffle(req, res) {
-  //   try {
-  //     const userId = req.payload?.id;
-
-  //     const {
-  //       title,
-  //       description,
-  //       imageUrl,
-  //       totalTickets,
-  //       ticketPrice,
-  //       tokenType,
-  //       numberOfWinners,
-  //       startDate,
-  //       endDate,
-  //       // RaffleDetail fields
-  //       requiresNftVerification,
-  //       verifiedCollectionRequired,
-  //       additionalJson,
-  //     } = req.body;
-
-  //     if (!title || !totalTickets || !ticketPrice || !startDate || !endDate) {
-  //       return respond(
-  //         res,
-  //         httpStatus.BAD_REQUEST,
-  //         "Missing required fields: title, totalTickets, ticketPrice, startDate, endDate"
-  //       );
-  //     }
-
-  //     if (new Date(startDate) >= new Date(endDate)) {
-  //       return respond(
-  //         res,
-  //         httpStatus.BAD_REQUEST,
-  //         "Start date must be before end date"
-  //       );
-  //     }
-
-  //     const raffle = await Raffle.create({
-  //       userId,
-  //       title,
-  //       description,
-  //       imageUrl,
-  //       totalTickets,
-  //       ticketPrice,
-  //       ticketsSold: 0,
-  //       tokenType: TOKEN_TYPE[tokenType] || TOKEN_TYPE.SOLANA,
-  //       numberOfWinners: numberOfWinners || 1,
-  //       startDate,
-  //       endDate,
-  //     });
-
-  //     await RaffleDetail.create({
-  //       raffleId: raffle.id,
-  //       isFeatured: false,
-  //       requiresNftVerification: requiresNftVerification || false,
-  //       verifiedCollectionRequired: verifiedCollectionRequired || null,
-  //       additionalJson: additionalJson || null,
-  //     });
-
-  //     const createdRaffle = await Raffle.findOne({
-  //       where: { id: raffle.id },
-  //       include: [
-  //         {
-  //           model: RaffleDetail,
-  //         },
-  //       ],
-  //     });
-
-  //     return respond(res, httpStatus.OK, "Raffle created successfully", {
-  //       raffle: createdRaffle,
-  //     });
-  //   } catch (err) {
-  //     logger.error(err);
-  //     return respond(
-  //       res,
-  //       httpStatus.INTERNAL_SERVER_ERROR,
-  //       parseSequelizeErrors(err)
-  //     );
-  //   }
-  // }
-
   static async createRaffle(req, res) {
     try {
       const userId = req.payload?.id;
+
+      const existingDraft = await Raffle.findOne({
+        where: {
+          userId,
+          status: RAFFLE_STATUS.DRAFT,
+        },
+      });
+
+      if (existingDraft) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "You already have a draft raffle. Please edit or delete the existing draft before creating a new one."
+        );
+      }
 
       const {
         title,
