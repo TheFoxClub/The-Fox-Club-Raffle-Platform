@@ -18,11 +18,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-import {
-  userStats,
-  hostedRaffles,
-  purchasedTickets,
-} from "../../dummydata/profileData";
+import { userStats, purchasedTickets } from "../../dummydata/profileData";
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import { useDispatch, useSelector } from "react-redux";
@@ -30,10 +26,28 @@ import type { RootState, AppDispatch } from "../../redux/store";
 import { setUser, setLoading } from "../../redux/userSlice";
 import { Link } from "react-router-dom";
 
+type HostedRaffle = {
+  id: number;
+  title: string;
+  status: number;
+  ticketsSold: number;
+  totalTickets: number;
+  revenue: number;
+  endDate: string;
+};
+
 const Profile = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, pubkey, user_info } = useSelector(
     (state: RootState) => state.user
+  );
+
+  const [statsArray] = useState(userStats);
+  const [user] = statsArray;
+
+  const { totalSpent, rafflesWon, ticketsPurchased, reputation } = user || {};
+  const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
+    []
   );
 
   //fetch user info from backend
@@ -57,6 +71,48 @@ const Profile = () => {
     fetchUser();
   }, [dispatch]);
 
+  useEffect(() => {
+    const fetchUserAndRaffles = async () => {
+      try {
+        const resUser = await server.get("/user/info");
+        const userData = resUser.data.data.user;
+
+        dispatch(
+          setUser({
+            ...userData,
+            isAuthenticated: true,
+            isLoading: false,
+          })
+        );
+
+        if (userData.id) {
+          const resRaffles = await server.get(`/raffle/user/${userData.id}`);
+          const raffles = resRaffles.data.data.raffles || [];
+
+          const formatted = raffles.map(
+            (r: any): HostedRaffle => ({
+              id: r.id,
+              title: r.title,
+              status: r.status,
+              ticketsSold: r.ticketsSold ?? 0,
+              totalTickets: r.totalTickets ?? 0,
+              revenue: r.revenue ?? 0,
+              endDate: r.endDate.split("T")[0],
+            })
+          );
+
+          setHostedRafflesData(formatted);
+          console.log("Hosted raffles fetched:", formatted);
+        }
+      } catch (error) {
+        dispatch(setLoading(false));
+        console.error("Error fetching user info or hosted raffles:", error);
+      }
+    };
+
+    fetchUserAndRaffles();
+  }, [dispatch]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-300">
@@ -64,10 +120,6 @@ const Profile = () => {
       </div>
     );
   }
-  const [statsArray] = useState(userStats);
-  const [user] = statsArray;
-
-  const { totalSpent, rafflesWon, ticketsPurchased, reputation } = user || {};
 
   // // Handle loading/empty state gracefully
   // if (!user || Object.keys(user).length === 0) {
@@ -98,7 +150,7 @@ const Profile = () => {
             <div className="flex-1 space-y-4">
               <div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold break-all">
+                  <h1 className="text-lg sm:text-lg font-bold break-all">
                     {pubkey}
                   </h1>
                   <div className="mt-2 sm:mt-0 self-start sm:self-center bg-green-900/30 backdrop-blur-sm text-green-400 px-3 hover:bg-primary hover:text-white py-1 rounded-full flex items-center gap-2 text-sm">
@@ -233,7 +285,13 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="hostedRaffles" className="space-y-6">
-            {hostedRaffles.map((raffle) => (
+            {hostedRafflesData.length === 0 && (
+              <p className="text-center text-muted-foreground">
+                No raffles hosted yet.
+              </p>
+            )}
+
+            {hostedRafflesData.map((raffle) => (
               <Card
                 key={raffle.id}
                 className="bg-card/50 backdrop-blur-xl border border-border/50 p-6"
@@ -242,15 +300,16 @@ const Profile = () => {
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
                       <h3 className="text-lg font-bold">{raffle.title}</h3>
-                      {raffle.status === "active" ? (
+                      {raffle.status === 2 && (
                         <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
                           Active
                         </div>
-                      ) : raffle.status === "completed" ? (
+                      )}
+                      {raffle.status === 3 && (
                         <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
                           Completed
                         </div>
-                      ) : null}
+                      )}
                     </div>
 
                     <div className="flex items-center text-sm text-muted-foreground gap-4">
@@ -263,7 +322,7 @@ const Profile = () => {
 
                       <div className="flex items-center gap-1">
                         <Coins className="h-4 w-4 text-accent" />
-                        <span>{raffle.revenue} SOL revenue</span>
+                        <span>{raffle.revenue ?? 0} SOL revenue</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
@@ -274,7 +333,9 @@ const Profile = () => {
 
                   <div className="flex gap-2">
                     <Button variant="outline">Manage</Button>
-                    <Button variant="outline">View</Button>
+                    <Link to={`/raffle/${raffle.id}`}>
+                      <Button variant="outline">View</Button>
+                    </Link>
                   </div>
                 </div>
               </Card>

@@ -60,14 +60,18 @@ export const Header = () => {
               <Trophy className="h-4 w-4" /> Leaderboard
             </Button>
           </Link>
-          <Link to="/profile">
-            <Button
-              variant={isActive("/profile") ? "default" : "ghost"}
-              className="gap-2"
-            >
-              <User className="h-4 w-4" /> Profile
-            </Button>
-          </Link>
+
+          {user.isAuthenticated && (
+            <Link to="/profile">
+              <Button
+                variant={isActive("/profile") ? "default" : "ghost"}
+                className="gap-2"
+              >
+                <User className="h-4 w-4" /> Profile
+              </Button>
+            </Link>
+          )}
+
           {user.isAdmin && (
             <Link to="/admin">
               <Button
@@ -141,18 +145,22 @@ export const Header = () => {
               className="w-full gap-2 cursor-pointer"
               size="sm"
             >
-              <Trophy className="h-4 w-4" /> Leaders
+              <Trophy className="h-4 w-4" /> Leaderboard
             </Button>
           </Link>
-          <Link to="/profile" className="flex-1">
-            <Button
-              variant={isActive("/profile") ? "default" : "ghost"}
-              className="w-full gap-2 cursor-pointer"
-              size="sm"
-            >
-              <User className="h-4 w-4" /> Profile
-            </Button>
-          </Link>
+
+          {user.isAuthenticated && (
+            <Link to="/profile" className="flex-1">
+              <Button
+                variant={isActive("/profile") ? "default" : "ghost"}
+                className="w-full gap-2 cursor-pointer"
+                size="sm"
+              >
+                <User className="h-4 w-4" /> Profile
+              </Button>
+            </Link>
+          )}
+
           {user.isAdmin && (
             <Link to="/admin" className="flex-1">
               <Button

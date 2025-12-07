@@ -96,7 +96,7 @@ const RaffleDetail = () => {
             winners: data.numberOfWinners,
             endTime: formatCountdown(data.endDate),
             created: formatDateOnly(data.createdAt),
-            host: data.userName || "Admin",
+            host: res.data.data.userData.pubkey,
             hostReputation: data.userReputation || 100,
             isVerified: data.raffle_detail.requiresNftVerification,
             isFeatured: data.raffle_detail.isFeatured,
