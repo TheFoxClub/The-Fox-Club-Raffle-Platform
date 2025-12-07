@@ -6,6 +6,9 @@ const auth = require("../config/auth");
 // Get User Info
 router.get("/info", auth.bearer, UserController.getUserInfo);
 
+// Get Any User Info by ID
+router.get("/info/:id", UserController.getAnyUserInfo);
+
 // Create or Update User Info
 router.put("/info", auth.bearer, UserController.createOrUpdateUserInfo);
 

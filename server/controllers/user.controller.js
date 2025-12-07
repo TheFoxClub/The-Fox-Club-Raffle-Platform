@@ -1,4 +1,4 @@
-const { User, UserInfo } = require("../models");
+const { User, UserInfo, Raffle } = require("../models");
 const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
@@ -32,6 +32,61 @@ class UserController {
 
       if (user) {
         return respond(res, httpStatus.OK, "Successful!", { user });
+      } else {
+        return respond(res, httpStatus.NOT_FOUND, "User not found");
+      }
+    } catch (err) {
+      logger.error(err);
+      return respond(res, httpStatus.OK, parseSequelizeErrors(err));
+    }
+  }
+
+  static async getAnyUserInfo(req, res) {
+    try {
+      const userId = req.params.id;
+
+      const user = await User.findOne({
+        where: {
+          id: userId,
+        },
+        include: [
+          {
+            model: UserInfo,
+            attributes: [
+              "id",
+              "email",
+              "description",
+              "username",
+              "photoUrl",
+              // "twitter",
+              // "discord",
+            ],
+            required: false,
+          },
+          {
+            model: Raffle,
+            attributes: [
+              "id",
+              "title",
+              "description",
+              "imageUrl",
+              "ticketPrice",
+              "ticketsSold",
+              "tokenType",
+              "numberOfWinners",
+              "startDate",
+              "endDate",
+              "status",
+              "endedAt",
+            ],
+          },
+        ],
+      });
+
+      if (user) {
+        return respond(res, httpStatus.OK, "User Info Fetched Successfully", {
+          user,
+        });
       } else {
         return respond(res, httpStatus.NOT_FOUND, "User not found");
       }
