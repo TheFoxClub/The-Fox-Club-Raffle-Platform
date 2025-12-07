@@ -8,8 +8,11 @@ const {
   COLLECTION_ADDRESS,
   SOLANA_RPC_POOL_DAS_API,
 } = require("../config/credentials");
+const redisClient = require("../util/redisClient");
 
 const umi = createUmi(SOLANA_RPC_POOL_DAS_API).use(dasApi());
+
+const CACHE_TTL = process.env.REDIS_TTL || 300;
 
 class HolderController {
   static async getUserNftsFromCollection(req, res) {
@@ -19,6 +22,29 @@ class HolderController {
       if (!pubkey) {
         return respond(res, httpStatus.BAD_REQUEST, "Missing wallet address");
       }
+
+      const cacheKey = `nfts:collection:${pubkey}:${
+        COLLECTION_ADDRESS || "all"
+      }`;
+
+      const cachedData = await redisClient.get(cacheKey);
+
+      if (cachedData) {
+        logger.info(`Cache hit for key: ${cacheKey}`);
+        return respond(
+          res,
+          httpStatus.OK,
+          "NFTs fetched successfully (cached)!",
+          {
+            total: cachedData.total,
+            nfts: cachedData.nfts,
+            cached: true,
+            timestamp: cachedData.timestamp,
+          }
+        );
+      }
+
+      logger.info(`Cache miss for key: ${cacheKey}, fetching from blockchain`);
 
       const searchParams = {
         owner: publicKey(pubkey),
@@ -40,9 +66,18 @@ class HolderController {
         ownership: item.ownership,
       }));
 
-      return respond(res, httpStatus.OK, "NFTs fetched successfully!", {
+      const responseData = {
         total: result.total,
         nfts,
+        timestamp: new Date().toISOString(),
+      };
+
+      await redisClient.set(cacheKey, responseData, CACHE_TTL);
+      logger.info(`Cached data for key: ${cacheKey} with TTL ${CACHE_TTL}s`);
+
+      return respond(res, httpStatus.OK, "NFTs fetched successfully!", {
+        ...responseData,
+        cached: false,
       });
     } catch (err) {
       logger.error(err);
@@ -65,6 +100,27 @@ class HolderController {
         return respond(res, httpStatus.BAD_REQUEST, "Missing wallet address");
       }
 
+      const cacheKey = `nfts:all:${pubkey}`;
+
+      const cachedData = await redisClient.get(cacheKey);
+
+      if (cachedData) {
+        logger.info(`Cache hit for key: ${cacheKey}`);
+        return respond(
+          res,
+          httpStatus.OK,
+          "NFTs fetched successfully (cached)!",
+          {
+            total: cachedData.total,
+            nfts: cachedData.nfts,
+            cached: true,
+            timestamp: cachedData.timestamp,
+          }
+        );
+      }
+
+      logger.info(`Cache miss for key: ${cacheKey}, fetching from blockchain`);
+
       const searchParams = {
         owner: publicKey(pubkey),
       };
@@ -80,9 +136,18 @@ class HolderController {
         ownership: item.ownership,
       }));
 
-      return respond(res, httpStatus.OK, "NFTs fetched successfully!", {
+      const responseData = {
         total: result.total,
         nfts,
+        timestamp: new Date().toISOString(),
+      };
+
+      await redisClient.set(cacheKey, responseData, CACHE_TTL);
+      logger.info(`Cached data for key: ${cacheKey} with TTL ${CACHE_TTL}s`);
+
+      return respond(res, httpStatus.OK, "NFTs fetched successfully!", {
+        ...responseData,
+        cached: false,
       });
     } catch (err) {
       logger.error(err);
@@ -90,6 +155,58 @@ class HolderController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         "Failed to fetch NFTs.",
+        {
+          error: err.message,
+        }
+      );
+    }
+  }
+
+  static async clearUserNftsCache(req, res) {
+    try {
+      const { pubkey } = req.params;
+
+      if (!pubkey) {
+        return respond(res, httpStatus.BAD_REQUEST, "Missing wallet address");
+      }
+
+      const collectionKey = `nfts:collection:${pubkey}:${
+        COLLECTION_ADDRESS || "all"
+      }`;
+      const allKey = `nfts:all:${pubkey}`;
+
+      await redisClient.del(collectionKey);
+      await redisClient.del(allKey);
+
+      logger.info(`Cache cleared for user: ${pubkey}`);
+
+      return respond(res, httpStatus.OK, "Cache cleared successfully!");
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to clear cache.",
+        {
+          error: err.message,
+        }
+      );
+    }
+  }
+
+  static async getCacheStats(req, res) {
+    try {
+      return respond(res, httpStatus.OK, "Cache stats", {
+        enabled: true,
+        ttl: CACHE_TTL,
+        clientStatus: redisClient.client?.status || "unknown",
+      });
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to get cache stats.",
         {
           error: err.message,
         }
