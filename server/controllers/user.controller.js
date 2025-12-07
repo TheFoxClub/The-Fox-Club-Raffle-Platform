@@ -103,6 +103,7 @@ class UserController {
           });
 
           return respond(res, httpStatus.OK, "User Info Fetched Successfully", {
+            user,
             formattedRaffles,
           });
         }
