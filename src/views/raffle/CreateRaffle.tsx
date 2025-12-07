@@ -799,7 +799,7 @@ const CreateRaffle = () => {
                   </DialogTrigger>
 
                   {/* Modal */}
-                  <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
+                  <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Select NFT from Your Wallet</DialogTitle>
                     </DialogHeader>
@@ -951,7 +951,7 @@ const CreateRaffle = () => {
                   </DialogTrigger>
 
                   {/* Modal */}
-                  <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
+                  <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Select Token from Your Wallet</DialogTitle>
                     </DialogHeader>
@@ -997,10 +997,10 @@ const CreateRaffle = () => {
                                     `}
                             >
                               {/* Left icon / badge */}
-                              <div className="shrink-0 w-10 h-10 rounded-md bg-background-60 flex items-center justify-center text-xs font-semibold text-muted-foreground">
+                              {/* <div className="shrink-0 w-10 h-10 rounded-md bg-background-60 flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                 {token.name?.charAt(0) ??
                                   token.mint?.slice(0, 1)}
-                              </div>
+                              </div> */}
 
                               {/* Content */}
                               <div className="flex-1 min-w-0">
