@@ -18,7 +18,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-import { userStats, purchasedTickets } from "../../dummydata/profileData";
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import { useDispatch, useSelector } from "react-redux";
@@ -42,10 +41,29 @@ const Profile = () => {
     (state: RootState) => state.user
   );
 
-  const [statsArray] = useState(userStats);
-  const [user] = statsArray;
+  type ExtendedUser = {
+    id?: number;
+    username?: string;
+    email?: string;
+    description?: string;
+    photoUrl?: string;
+    totalSpent?: number;
+    rafflesWon?: number;
+    ticketsPurchased?: number;
+    reputation?: number;
+    xp?: number; // current XP
+    xpGoal?: number;
+  };
 
-  const { totalSpent, rafflesWon, ticketsPurchased, reputation } = user || {};
+  const {
+    totalSpent = 0,
+    rafflesWon = 0,
+    ticketsPurchased = 0,
+    reputation = 0,
+    xp = 0,
+    xpGoal = 15000,
+  } = user_info as ExtendedUser;
+
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
     []
   );
@@ -96,7 +114,7 @@ const Profile = () => {
               status: r.status,
               ticketsSold: r.ticketsSold ?? 0,
               totalTickets: r.totalTickets ?? 0,
-              revenue: r.revenue ?? 0,
+              revenue: (r.ticketsSold ?? 0) * (r.ticketPrice ?? 0),
               endDate: r.endDate.split("T")[0],
             })
           );
@@ -132,7 +150,7 @@ const Profile = () => {
 
   return (
     <div className="container mx-auto px-4 py-2">
-      <div className="space-y-8">
+      <div className="space-y-6">
         <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 md:p-8">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex items-center justify-center bg-gradient-primary h-24 w-24 rounded-full gradient-primary glow-primary">
@@ -176,13 +194,13 @@ const Profile = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm mb-2">
                 <span className="text-muted-foreground">XP Progress</span>
                 <span className="font-semibold mt-1 sm:mt-0">
-                  12450 / 15000 XP
+                  {xp} / {xpGoal} XP
                 </span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full gradient-primary"
-                  style={{ width: `${(12450 / 15000) * 100}%` }}
+                  style={{ width: `${(xp / xpGoal) * 100}%` }}
                 />
               </div>
             </div>
@@ -239,7 +257,13 @@ const Profile = () => {
           </TabsList>
 
           <TabsContent value="purchasedTickets" className="space-y-4">
-            {purchasedTickets.map((ticket) => (
+            <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
+              <p className="text-center text-muted-foreground">
+                You haven't bought any tickets yet. Explore raffles and join one
+                to get started!
+              </p>
+            </Card>
+            {/* {purchasedTickets.map((ticket) => (
               <Card
                 key={ticket.id}
                 className="bg-card/50 backdrop-blur-xl p-6 border border-border/50"
@@ -281,7 +305,7 @@ const Profile = () => {
                   <Button variant="outline">View Raffle</Button>
                 </div>
               </Card>
-            ))}
+            ))} */}
           </TabsContent>
 
           <TabsContent value="hostedRaffles" className="space-y-6">
@@ -343,7 +367,13 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="won" className="space-y-4">
-            <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6">
+            <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
+              <p className="mx-10 text-center text-muted-foreground">
+                No wins yet! Keep participating and try your luck.
+              </p>
+            </Card>
+
+            {/* <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6">
               <div className="flex items-center gap-4">
                 <Trophy className="h-12 w-12 text-accent" />
                 <div>
@@ -353,7 +383,7 @@ const Profile = () => {
                   </p>
                 </div>
               </div>
-            </Card>
+            </Card> */}
           </TabsContent>
         </Tabs>
       </div>
