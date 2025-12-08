@@ -15,7 +15,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-import { topHosts, topBuyers } from "../../dummydata/topHostsBuyers";
+//import { topHosts, topBuyers } from "../../dummydata/topHostsBuyers";
 import { useState } from "react";
 
 const Leaderboard = () => {
@@ -46,6 +46,10 @@ const Leaderboard = () => {
   ];
 
   const [selectedTime, setSelectedTime] = useState("monthly");
+
+  // Fallback since API is not ready
+  const topHosts: any[] = [];
+  const topBuyers: any[] = [];
 
   return (
     <div className="container mx-auto px-4 py-2">
@@ -99,47 +103,53 @@ const Leaderboard = () => {
                 <p className="font-bold text-2xl">Top Hosts by Revenue</p>
               </div>
 
-              <div className="space-y-3">
-                {topHosts.map((host) => (
-                  <Card
-                    key={host.rank}
-                    className={`${getRankCardClass(host.rank)} p-4 bg-card`}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className="flex items-center justify-center w-12">
-                          {getRankIcon(host.rank, host.badge)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-bold text-lg truncate">
-                              {host.wallet}
-                            </p>
-                            {host.reputation >= 97 && (
-                              <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
-                                {host.reputation}% rep
-                              </div>
-                            )}
+              {topHosts.length === 0 ? (
+                <p className="text-center text-muted-foreground py-10">
+                  Leaderboard data not available yet — coming soon.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {topHosts.map((host) => (
+                    <Card
+                      key={host.rank}
+                      className={`${getRankCardClass(host.rank)} p-4 bg-card`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className="flex items-center justify-center w-12">
+                            {getRankIcon(host.rank, host.badge)}
                           </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-bold text-lg truncate">
+                                {host.wallet}
+                              </p>
+                              {host.reputation >= 97 && (
+                                <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
+                                  {host.reputation}% rep
+                                </div>
+                              )}
+                            </div>
 
+                            <p className="text-sm text-muted-foreground">
+                              {host.raffles} raffles hosted
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-2 justify-end mb-1">
+                            <Coins className="h-5 w-5 text-accent" />
+                            <p className="font-bold text-xl">{host.revenue}</p>
+                          </div>
                           <p className="text-sm text-muted-foreground">
-                            {host.raffles} raffles hosted
+                            SOL earned
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-2 justify-end mb-1">
-                          <Coins className="h-5 w-5 text-accent" />
-                          <p className="font-bold text-xl">{host.revenue}</p>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          SOL earned
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
 
@@ -150,44 +160,50 @@ const Leaderboard = () => {
                 <p className="font-bold text-2xl">Top Buyers by Spending</p>
               </div>
 
-              <div className="space-y-3">
-                {topBuyers.map((buyer) => (
-                  <Card
-                    key={buyer.rank}
-                    className={`${getRankCardClass(buyer.rank)} bg-card p-4`}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className="flex items-center justify-center w-12">
-                          {getRankIcon(buyer.rank, buyer.badge)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-lg mb-1 truncate">
-                            {buyer.wallet}
-                          </p>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <span>{buyer.tickets} tickets</span>
-                            <span>.</span>
-                            <span className="flex items-center gap-1">
-                              <Trophy className="h-3 w-3 text-accent" />
-                              {buyer.wins} wins
-                            </span>
+              {topBuyers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-10">
+                  Buyer leaderboard coming soon — stay tuned!
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {topBuyers.map((buyer) => (
+                    <Card
+                      key={buyer.rank}
+                      className={`${getRankCardClass(buyer.rank)} bg-card p-4`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className="flex items-center justify-center w-12">
+                            {getRankIcon(buyer.rank, buyer.badge)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-lg mb-1 truncate">
+                              {buyer.wallet}
+                            </p>
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                              <span>{buyer.tickets} tickets</span>
+                              <span>.</span>
+                              <span className="flex items-center gap-1">
+                                <Trophy className="h-3 w-3 text-accent" />
+                                {buyer.wins} wins
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-2 justify-end mb-1">
-                          <Coins className="h-5 w-5 text-accent" />
-                          <p className="font-bold text-xl">{buyer.spent}</p>
+                        <div className="text-right">
+                          <div className="flex items-center gap-2 justify-end mb-1">
+                            <Coins className="h-5 w-5 text-accent" />
+                            <p className="font-bold text-xl">{buyer.spent}</p>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            SOL spent
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          SOL spent
-                        </p>
                       </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
         </Tabs>
