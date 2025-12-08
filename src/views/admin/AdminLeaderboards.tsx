@@ -40,9 +40,9 @@ export default function AdminLeaderboards() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-84 md:w-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row gap-4 items-center mb-4 justify-between">
         <div>
           <h2 className="text-2xl font-bold">Leaderboards</h2>
           <p className="text-muted-foreground">View and manage top performing users</p>

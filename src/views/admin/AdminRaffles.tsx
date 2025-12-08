@@ -31,9 +31,9 @@ export default function AdminRaffles() {
 const [, setSelectedRaffle] = useState<typeof mockRaffles[0] | null>(null);
 
   return (
-    <div className="space-y-6">
+    <div className="w-84 md:w-full">
       {/* Search and Filters */}
-      <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50">
+      <div className="glass-card p-4 sm:p-6 rounded-xl mb-4 border border-border/50">
         <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
