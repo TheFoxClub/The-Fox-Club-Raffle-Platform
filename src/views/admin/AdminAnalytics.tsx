@@ -128,7 +128,7 @@ export default function AdminAnalytics() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-center mt-30">No volume data available yet.</p>
+            <p className="text-center mt-10">No volume data available yet.</p>
           )}
         </div>
 
@@ -162,7 +162,7 @@ export default function AdminAnalytics() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p>No token data available yet.</p>
+            <p className="text-center mt-10">No token data available yet</p>
           )}
         </div>
       </div>
