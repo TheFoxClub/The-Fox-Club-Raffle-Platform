@@ -62,7 +62,7 @@ const Profile = () => {
     reputation = 0,
     xp = 0,
     xpGoal = 15000,
-  } = user_info as ExtendedUser;
+  } = (user_info ?? {}) as ExtendedUser;
 
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
     []
