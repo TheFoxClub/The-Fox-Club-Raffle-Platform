@@ -38,9 +38,9 @@ const topWallets = [
 
 export default function AdminAnalytics() {
   return (
-    <div className="space-y-6">
+    <div className="w-84 md:w-full">
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-4 gap-4 sm:gap-6">
         <StatCard
           title="Total Users"
           value="8,942"
@@ -72,83 +72,118 @@ export default function AdminAnalytics() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 sm:gap-6">
         {/* Volume Over Time */}
-        <div className="glass-card p-6 rounded-xl border border-border/50">
-          <h3 className="text-lg font-bold mb-6">Volume Over Time</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={volumeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 6% 20%)" />
-              <XAxis dataKey="date" stroke="hsl(240 5% 65%)" />
-              <YAxis stroke="hsl(240 5% 65%)" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(240 10% 7%)",
-                  border: "1px solid hsl(240 6% 20%)",
-                  borderRadius: "8px",
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="volume"
-                stroke="hsl(10 85% 58%)"
-                strokeWidth={3}
-                dot={{ fill: "hsl(10 85% 58%)", r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50 overflow-hidden">
+          <h3 className="text-base sm:text-lg font-bold mb-4 sm:mb-6">
+            Volume Over Time
+          </h3>
+          <div className="w-full h-64 sm:h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={volumeData}
+                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 6% 20%)" />
+                <XAxis
+                  dataKey="date"
+                  stroke="hsl(240 5% 65%)"
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  stroke="hsl(240 5% 65%)"
+                  tick={{ fontSize: 11 }}
+                  width={40}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(240 10% 7%)",
+                    border: "1px solid hsl(240 6% 20%)",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="volume"
+                  stroke="hsl(10 85% 58%)"
+                  strokeWidth={2}
+                  dot={{ fill: "hsl(10 85% 58%)", r: 3 }}
+                  isAnimationActive={true}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Volume by Token Type */}
-        <div className="glass-card p-6 rounded-xl border border-border/50">
-          <h3 className="text-lg font-bold mb-6">Volume by Token Type</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={tokenData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, value }) => `${name}: ${value}%`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {tokenData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(240 10% 7%)",
-                  border: "1px solid hsl(240 6% 20%)",
-                  borderRadius: "8px",
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50 overflow-hidden">
+          <h3 className="text-base sm:text-lg font-bold mb-4 sm:mb-6">
+            Volume by Token Type
+          </h3>
+          <div className="w-full h-64 sm:h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={{ top: 5, right: 30, left: 30, bottom: 5 }}>
+                <Pie
+                  data={tokenData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, value }) => `${name}: ${value}%`}
+                  outerRadius={60}
+                  innerRadius={0}
+                  fill="#8884d8"
+                  dataKey="value">
+                  {tokenData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(240 10% 7%)",
+                    border: "1px solid hsl(240 6% 20%)",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
       {/* Top Wallets Table */}
-      <div className="glass-card p-6 rounded-xl border border-border/50">
-        <h3 className="text-lg font-bold mb-6">Top Wallets by Spending</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-border/50">
-              <tr className="text-left text-sm text-muted-foreground">
-                <th className="p-4 font-medium">Rank</th>
-                <th className="p-4 font-medium">Wallet</th>
-                <th className="p-4 font-medium">Total Spending</th>
-                <th className="p-4 font-medium">Raffles Entered</th>
+      <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50">
+        <h3 className="text-base sm:text-lg font-bold mb-4 sm:mb-6">
+          Top Wallets by Spending
+        </h3>
+
+        {/* Force horizontal scroll on mobile */}
+        <div className="relative overflow-x-auto w-full">
+          {/* Set a min width so table doesn't squish on mobile */}
+          <table className="min-w-[600px] w-full text-sm text-left text-muted-foreground">
+            <thead className="text-xs sm:text-sm text-muted-foreground bg-muted/20 border-b border-border/50">
+              <tr>
+                <th className="px-3 sm:px-6 py-3 font-medium">Rank</th>
+                <th className="px-3 sm:px-6 py-3 font-medium whitespace-nowrap">
+                  Wallet
+                </th>
+                <th className="px-3 sm:px-6 py-3 font-medium whitespace-nowrap">
+                  Total Spending
+                </th>
+                <th className="px-3 sm:px-6 py-3 font-medium whitespace-nowrap">
+                  Raffles Entered
+                </th>
               </tr>
             </thead>
+
             <tbody>
               {topWallets.map((wallet, index) => (
-                <tr key={wallet.wallet} className="border-b border-border/30 hover:bg-muted/20">
-                  <td className="p-4">
+                <tr
+                  key={wallet.wallet}
+                  className="bg-card/50 border-b border-border/30 hover:bg-muted/20 transition-colors">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <div
-                      className={`h-8 w-8 rounded-full flex items-center justify-center font-bold ${
+                      className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm ${
                         index === 0
                           ? "bg-gradient-primary text-white"
                           : index === 1
@@ -156,14 +191,22 @@ export default function AdminAnalytics() {
                           : index === 2
                           ? "bg-accent/20 text-accent"
                           : "bg-muted text-muted-foreground"
-                      }`}
-                    >
+                      }`}>
                       {index + 1}
                     </div>
                   </td>
-                  <td className="p-4 font-medium">{wallet.wallet}</td>
-                  <td className="p-4 text-primary font-bold">{wallet.spending}</td>
-                  <td className="p-4 text-muted-foreground">{wallet.raffles}</td>
+
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium text-xs sm:text-sm whitespace-nowrap">
+                    {wallet.wallet}
+                  </td>
+
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-primary font-bold text-xs sm:text-sm whitespace-nowrap">
+                    {wallet.spending}
+                  </td>
+
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-muted-foreground text-xs sm:text-sm whitespace-nowrap">
+                    {wallet.raffles}
+                  </td>
                 </tr>
               ))}
             </tbody>
