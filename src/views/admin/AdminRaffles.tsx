@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Search, Filter, Edit, Ban, Star } from "lucide-react";
-import Button  from "../../components/ui/Button";
+import { useState, useEffect } from "react";
+import { Search, Filter, Edit, Ban, Star, Copy } from "lucide-react";
+import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import {
   Select,
@@ -17,18 +17,186 @@ import {
   DialogTrigger,
 } from "../../components/ui/Dialog";
 import { Switch } from "../../components/ui/Switch";
+import server from "../../config/server";
+import { toast } from "react-toastify";
+// const mockRaffles = [
+//   { id: 1, name: "Legendary Fox #001", creator: "7XYZ...abc1", token: "SOL", price: "0.5", sold: 489, total: 500, status: "Live", featured: true },
+//   { id: 2, name: "Golden Den Pass", creator: "8ABC...def2", token: "USDC", price: "10", sold: 378, total: 400, status: "Live", featured: false },
+//   { id: 3, name: "Fox Club VIP", creator: "9DEF...ghi3", token: "SOL", price: "1.0", sold: 312, total: 312, status: "Ended", featured: false },
+//   { id: 4, name: "Silver Fox Token", creator: "7XYZ...abc1", token: "BONK", price: "1000000", sold: 156, total: 200, status: "Live", featured: false },
+// ];
+interface RaffleDetail {
+  id: number;
+  raffleId: number;
+  isFeatured: boolean;
+  featuredPosition?: string | null;
+  featuredUntil?: string | null;
+}
 
-const mockRaffles = [
-  { id: 1, name: "Legendary Fox #001", creator: "7XYZ...abc1", token: "SOL", price: "0.5", sold: 489, total: 500, status: "Live", featured: true },
-  { id: 2, name: "Golden Den Pass", creator: "8ABC...def2", token: "USDC", price: "10", sold: 378, total: 400, status: "Live", featured: false },
-  { id: 3, name: "Fox Club VIP", creator: "9DEF...ghi3", token: "SOL", price: "1.0", sold: 312, total: 312, status: "Ended", featured: false },
-  { id: 4, name: "Silver Fox Token", creator: "7XYZ...abc1", token: "BONK", price: "1000000", sold: 156, total: 200, status: "Live", featured: false },
-];
+interface Raffle {
+  id: number;
+  name: string;
+  creator: string;
+  token: string;
+  price: number | string;
+  sold: number;
+  total: number;
+  status: string;
+  featured: boolean;
+  raffle_detail?: RaffleDetail;
+  endDate?: string;
+}
+
+const tokenMap: Record<number, string> = {
+  0: "SOL",
+  3: "USDC",
+};
+
+const statusMap: Record<number, string> = {
+  2: "Live",
+  1: "Upcoming",
+  3: "Ended",
+};
+
+const mapRaffle = (r: any): Raffle => ({
+  id: r.id,
+  name: r.title,
+  creator: r.user?.pubkey || "Unknown",
+  token: tokenMap[r.tokenType] ?? "Unknown",
+  price: r.ticketPrice,
+  sold: r.ticketsSold,
+  total: r.totalTickets,
+  status: statusMap[r.status] ?? "Unknown",
+  featured: r.raffle_detail?.isFeatured ?? false,
+  raffle_detail: r.raffle_detail,
+  endDate: r.endDate,
+});
+
+const shortPubkey = (key: string) => {
+  if (!key) return "Unknown";
+  return key.slice(0, 4) + "..." + key.slice(-4);
+};
 
 export default function AdminRaffles() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-const [, setSelectedRaffle] = useState<typeof mockRaffles[0] | null>(null);
+  const [selectedRaffle, setSelectedRaffle] = useState<Raffle | null>(null);
+  const [raffles, setRaffles] = useState<Raffle[]>([]);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [status, setStatus] = useState("live");
+
+  // Initialize dialog state when a raffle is selected
+  useEffect(() => {
+    if (selectedRaffle) {
+      setIsFeatured(selectedRaffle.featured);
+      setStatus(selectedRaffle.status);
+    }
+  }, [selectedRaffle]);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied!", {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } catch (err) {
+      toast.error("Failed to copy wallet address", {
+        position: "top-right",
+      });
+    }
+  };
+  useEffect(() => {
+    const fetchRaffles = async () => {
+      try {
+        const res = await server.get("/admin/raffles");
+        const mapped = res.data.data.raffles.map(mapRaffle);
+        setRaffles(mapped);
+      } catch (err) {
+        console.error("Error fetching raffles", err);
+      }
+    };
+    fetchRaffles();
+  }, []);
+
+  const handleSaveChanges = async () => {
+    if (!selectedRaffle) return;
+
+    try {
+      // Update raffle status
+      await server.put(`/admin/raffles/${selectedRaffle.id}`, {
+        status: status || selectedRaffle.status,
+      });
+
+      // Update featured
+      const currentPosition =
+        isFeatured && selectedRaffle.raffle_detail?.featuredPosition
+          ? selectedRaffle.raffle_detail.featuredPosition
+          : null;
+
+      // Use endDate as featuredUntil if featured, else null
+      const featuredUntil = isFeatured ? selectedRaffle.endDate : null;
+
+      await server.put(`/admin/featured/${selectedRaffle.id}`, {
+        isFeatured: isFeatured,
+        featuredPosition: currentPosition,
+        featuredUntil: featuredUntil,
+      });
+
+      // Update frontend
+      setRaffles((prev) =>
+        prev.map((r) =>
+          r.id === selectedRaffle.id
+            ? { ...r, featured: isFeatured, status: status || r.status }
+            : r
+        )
+      );
+
+      toast.success("Raffle updated successfully!");
+      setSelectedRaffle(null); // close dialog
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update raffle");
+    }
+  };
+
+  const handleToggleSuspend = async (
+    raffleId: number,
+    currentlySuspended: boolean
+  ) => {
+    try {
+      // send toggle state
+      const res = await server.put(`/admin/suspend/${raffleId}`, {
+        suspend: !currentlySuspended, // toggle
+      });
+
+      const updatedRaffle = res.data.data.raffle;
+
+      // Update table status dynamically
+      setRaffles((prev) =>
+        prev.map((r) =>
+          r.id === raffleId
+            ? {
+                ...r,
+                status: updatedRaffle.raffle_detail?.additionalJson?.suspended
+                  ? "Suspended"
+                  : "Live", // or previous status
+              }
+            : r
+        )
+      );
+
+      // Show toast from backend message
+      toast.success(res.data.message);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update raffle");
+    }
+  };
 
   return (
     <div className="w-84 md:w-full">
@@ -60,116 +228,150 @@ const [, setSelectedRaffle] = useState<typeof mockRaffles[0] | null>(null);
       </div>
 
       {/* Raffles Table */}
-      <div className="relative overflow-x-auto glass-card rounded-xl border border-border/50">
-        <table className="w-full text-sm text-left text-muted-foreground">
-          <thead className="text-sm text-muted-foreground bg-muted/20 border-b border-border/50">
-            <tr>
-              <th scope="col" className="px-6 py-3 font-medium">
-                Raffle Name
-              </th>
-              <th scope="col" className="px-6 py-3 font-medium">
-                Creator
-              </th>
-              <th scope="col" className="px-6 py-3 font-medium">
-                Token
-              </th>
-              <th scope="col" className="px-6 py-3 font-medium">
-                Price
-              </th>
-              <th scope="col" className="px-6 py-3 font-medium">
-                Tickets
-              </th>
-              <th scope="col" className="px-6 py-3 font-medium">
-                Status
-              </th>
-              <th scope="col" className="px-6 py-3 font-medium">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {mockRaffles.map((raffle) => (
-              <tr key={raffle.id} className="bg-card/50 border-b border-border/30 hover:bg-muted/20 transition-colors">
-                <th scope="row" className="px-6 py-4 font-medium whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    {raffle.featured && <Star className="h-4 w-4 fill-accent text-accent" />}
-                    <span>{raffle.name}</span>
-                  </div>
-                </th>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {raffle.creator}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
-                    {raffle.token}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {raffle.price}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {raffle.sold}/{raffle.total}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      raffle.status === "Live"
-                        ? "bg-green-500/20 text-green-500"
-                        : raffle.status === "Ended"
-                        ? "bg-muted text-muted-foreground"
-                        : "bg-destructive/20 text-destructive"
-                    }`}
-                  >
-                    {raffle.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedRaffle(raffle)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="w-[90vw] sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Edit Raffle</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Featured on Homepage</span>
-                            <Switch defaultChecked={raffle.featured} />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Status</span>
-                            <Select defaultValue={raffle.status.toLowerCase()}>
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="live">Live</SelectItem>
-                                <SelectItem value="suspended">Suspend</SelectItem>
-                                <SelectItem value="ended">End</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button className="w-full gradient-primary">Save Changes</Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    <Button variant="ghost" size="icon" className="text-destructive">
-                      <Ban className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </td>
+      <div className="glass-card rounded-xl border border-border/50 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="border-b border-border/50">
+              <tr className="text-left text-sm text-muted-foreground">
+                <th className="p-4 font-medium">Raffle Name</th>
+                <th className="p-4 font-medium">Creator</th>
+                <th className="p-4 font-medium">Token</th>
+                <th className="p-4 font-medium">Price</th>
+                <th className="p-4 font-medium">Tickets</th>
+                <th className="p-4 font-medium">Status</th>
+                <th className="p-4 font-medium">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {raffles.map((raffle) => (
+                <tr
+                  key={raffle.id}
+                  className="border-b border-border/30 hover:bg-muted/20 transition-colors"
+                >
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      {raffle.featured && (
+                        <Star className="h-4 w-4 fill-accent text-accent" />
+                      )}
+                      <span className="font-medium">{raffle.name}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-muted-foreground">
+                    <button
+                      className="flex items-center gap-1 hover:text-primary transition"
+                      onClick={() => copyToClipboard(raffle.creator)}
+                    >
+                      {shortPubkey(raffle.creator)}
+                      <Copy className="h-3 w-3 opacity-50 ml-1" />
+                    </button>
+                  </td>
+                  <td className="p-4">
+                    <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                      {raffle.token}
+                    </span>
+                  </td>
+                  <td className="p-4">{raffle.price}</td>
+                  <td className="p-4">
+                    <span className="text-sm">
+                      {raffle.sold}/{raffle.total}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        raffle.status === "Suspended"
+                          ? "bg-orange-500/20 text-orange-500"
+                          : raffle.status === "Live"
+                          ? "bg-green-500/20 text-green-500"
+                          : raffle.status === "Ended"
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-destructive/20 text-destructive"
+                      }`}
+                    >
+                      {raffle.status}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSelectedRaffle(raffle)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Edit Raffle</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                Featured on Homepage
+                              </span>
+                              <Switch
+                                checked={isFeatured}
+                                onCheckedChange={setIsFeatured}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                Status
+                              </span>
+                              <Select value={status} onValueChange={setStatus}>
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Live">Live</SelectItem>
+                                  <SelectItem value="Suspended">
+                                    Suspend
+                                  </SelectItem>
+                                  <SelectItem value="Ended">End</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button
+                              className="w-full gradient-primary"
+                              onClick={handleSaveChanges}
+                            >
+                              Save Changes
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={
+                          raffle.status === "Suspended"
+                            ? "text-orange-500"
+                            : "text-destructive"
+                        }
+                        onClick={() =>
+                          handleToggleSuspend(
+                            raffle.id,
+                            raffle.status === "Suspended"
+                          )
+                        }
+                        title={
+                          raffle.status === "Suspended"
+                            ? "Unsuspend"
+                            : "Suspend"
+                        }
+                      >
+                        <Ban className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

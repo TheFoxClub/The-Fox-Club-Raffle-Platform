@@ -14,16 +14,9 @@ import {
 
 const mockTokens = [
   { id: 1, name: "Solana", symbol: "SOL", decimals: 9, fee: 2.5, active: true },
-  {
-    id: 2,
-    name: "USD Coin",
-    symbol: "USDC",
-    decimals: 6,
-    fee: 2.5,
-    active: true,
-  },
-  { id: 3, name: "Bonk", symbol: "BONK", decimals: 5, fee: 3.0, active: true },
-  { id: 4, name: "Orca", symbol: "ORCA", decimals: 6, fee: 3.0, active: false },
+  // { id: 2, name: "USD Coin", symbol: "USDC", decimals: 6, fee: 2.5, active: true },
+  // { id: 3, name: "Bonk", symbol: "BONK", decimals: 5, fee: 3.0, active: true },
+  // { id: 4, name: "Orca", symbol: "ORCA", decimals: 6, fee: 3.0, active: false },
 ];
 
 export default function AdminTokens() {
@@ -80,10 +73,10 @@ export default function AdminTokens() {
                 <Label>Active</Label>
                 <Switch defaultChecked />
               </div>
-
               <Button
                 className="w-full gradient-primary"
-                onClick={() => setOpen(false)}>
+                onClick={() => setOpen(false)}
+              >
                 Add Token
               </Button>
             </div>
@@ -110,19 +103,21 @@ export default function AdminTokens() {
               {mockTokens.map((token) => (
                 <tr
                   key={token.id}
-                  className="border-b border-border/30 hover:bg-muted/20 transition-colors">
-                  <td className="p-4 font-medium whitespace-nowrap">
-                    {token.name}
-                  </td>
-
-                  <td className="p-4 whitespace-nowrap">
+                  className="border-b border-border/30 hover:bg-muted/20 transition-colors"
+                >
+                  <td className="p-4 font-medium">{token.name}</td>
+                  <td className="p-4">
                     <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
                       {token.symbol}
                     </span>
                   </td>
-
-                  <td className="p-4 text-muted-foreground whitespace-nowrap">
+                  <td className="p-4 text-muted-foreground">
                     {token.decimals}
+                  </td>
+                  <td className="p-4">
+                    <span className="text-accent font-medium">
+                      {token.fee}%
+                    </span>
                   </td>
 
                   <td className="p-4 whitespace-nowrap">
@@ -143,7 +138,8 @@ export default function AdminTokens() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-destructive">
+                        className="text-destructive"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

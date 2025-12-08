@@ -16,6 +16,8 @@ export const Header = () => {
   const { publicKey, connected } = useWallet();
   const user = useSelector((state: RootState) => state.user);
 
+  // console.log("Header user:", user);
+
   const isActive = (path: string) => location.pathname === path;
 
   const shortenAddress = (address: string, start = 4, end = 4) =>
@@ -41,7 +43,6 @@ export const Header = () => {
             <p className="text-xs text-muted-foreground">Raffle Platform</p>
           </div>
         </Link>
-
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-2">
           <Link to="/">
@@ -60,7 +61,6 @@ export const Header = () => {
               <Trophy className="h-4 w-4" /> Leaderboard
             </Button>
           </Link>
-
           {user.isAuthenticated && (
             <Link to="/profile">
               <Button
@@ -71,7 +71,6 @@ export const Header = () => {
               </Button>
             </Link>
           )}
-
           {user.isAdmin && (
             <Link to="/admin">
               <Button
@@ -85,7 +84,6 @@ export const Header = () => {
             </Link>
           )}
         </div>
-
         {/* Wallet & Create Button */}
         <div className="flex items-center gap-2  relative">
           {connected && (
@@ -98,10 +96,8 @@ export const Header = () => {
               </Button>
             </Link>
           )}
-
           <div className="flex items-center gap-2">
             {user.isAuthenticated ? null : connected ? <SolanaSignIn /> : null}
-
             <MyConnectWalletButton>
               {connected ? (
                 <Button
@@ -127,7 +123,6 @@ export const Header = () => {
             )}
           </div>
         </div>
-
         {/* Mobile Menu */}
         <div className="flex md:hidden items-center gap-2 mt-4 w-full">
           <Link to="/" className="flex-1">

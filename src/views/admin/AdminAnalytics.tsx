@@ -82,7 +82,8 @@ export default function AdminAnalytics() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={volumeData}
-                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 6% 20%)" />
                 <XAxis
                   dataKey="date"
@@ -132,7 +133,8 @@ export default function AdminAnalytics() {
                   outerRadius={60}
                   innerRadius={0}
                   fill="#8884d8"
-                  dataKey="value">
+                  dataKey="value"
+                >
                   {tokenData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -180,7 +182,8 @@ export default function AdminAnalytics() {
               {topWallets.map((wallet, index) => (
                 <tr
                   key={wallet.wallet}
-                  className="bg-card/50 border-b border-border/30 hover:bg-muted/20 transition-colors">
+                  className="bg-card/50 border-b border-border/30 hover:bg-muted/20 transition-colors"
+                >
                   <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <div
                       className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm ${
@@ -191,7 +194,8 @@ export default function AdminAnalytics() {
                           : index === 2
                           ? "bg-accent/20 text-accent"
                           : "bg-muted text-muted-foreground"
-                      }`}>
+                      }`}
+                    >
                       {index + 1}
                     </div>
                   </td>
