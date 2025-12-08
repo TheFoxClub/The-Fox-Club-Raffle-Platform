@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
@@ -18,6 +18,10 @@ import {
 // import type { RaffleType } from "../../dummydata/mockRaffleDetail";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Connection, Transaction } from "@solana/web3.js";
+import { storeSignature } from "./api";
+import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 
 export interface RaffleType {
   id: number;
@@ -62,6 +66,7 @@ function formatCountdown(endDate: string) {
 }
 
 const RaffleDetail = () => {
+  const { publicKey, signTransaction, connected } = useWallet();
   const { id } = useParams<{ id: string }>();
 
   const [raffle, setRaffle] = useState<RaffleType | null>(null);
@@ -74,48 +79,144 @@ const RaffleDetail = () => {
     3: "USDC",
   };
 
-  useEffect(() => {
-    // simulate fetching raffle data
-    const fetchRaffle = async () => {
-      if (!id) return;
-      try {
-        setLoading(true);
-        const res = await server.get(`/raffle/${id}`);
-        if (res.data.success) {
-          const data = res.data.data.raffle;
+  const handleBuyTickets = useCallback(async () => {
+    if (!raffle) {
+      toast.error("Raffle data not loaded");
+      return;
+    }
 
-          const mappedRaffle: RaffleType = {
-            id: data.id,
-            title: data.title,
-            description: data.description,
-            image: data.imageUrl,
-            price: Number(data.ticketPrice),
-            tokenType: TOKEN_MAP[data.tokenType] || "UNKNOWN",
-            total: data.totalTickets,
-            sold: data.ticketsSold,
-            winners: data.numberOfWinners,
-            endTime: formatCountdown(data.endDate),
-            created: formatDateOnly(data.createdAt),
-            host: res.data.data.userData.pubkey,
-            hostReputation: data.userReputation || 100,
-            isVerified: data.raffle_detail.requiresNftVerification,
-            isFeatured: data.raffle_detail.isFeatured,
-            prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
-          };
+    if (!connected || !publicKey || !signTransaction) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
 
-          setRaffle(mappedRaffle);
-        } else {
-          toast.error(res.data.message || "Failed to fetch raffle");
-        }
-      } catch (error: any) {
-        console.error(error);
-        toast.error(error.response?.data?.message || "Failed to fetch raffle");
-      } finally {
-        setLoading(false);
+    if (ticketCount <= 0) {
+      toast.error("Please select at least 1 ticket");
+      return;
+    }
+
+    const now = new Date();
+    const endDate = new Date(raffle.endTime);
+    if (now > endDate) {
+      toast.error("This raffle has ended");
+      return;
+    }
+
+    if (raffle.sold + ticketCount > raffle.total) {
+      toast.error("Not enough tickets available");
+      return;
+    }
+
+    toast.info("Processing transaction. Please wait...");
+
+    try {
+      const transactionResponse = await server.post("/ticket/buy", {
+        senderPubkey: publicKey.toBase58(),
+        type: "solana",
+        raffleId: raffle.id,
+        ticketCount: ticketCount,
+      });
+
+      if (!transactionResponse.data.success) {
+        throw new Error(
+          transactionResponse.data.message || "Failed to create transaction"
+        );
       }
-    };
-    fetchRaffle();
+
+      const { transaction } = transactionResponse.data.data;
+
+      const solanaTransaction = Transaction.from(
+        Buffer.from(transaction, "base64")
+      );
+
+      const signedTransaction = await signTransaction(solanaTransaction);
+
+      const connection = new Connection(SOLANA_RPC_HOST);
+
+      const signature = await connection.sendRawTransaction(
+        signedTransaction.serialize()
+      );
+
+      const confirmResponse = await storeSignature(
+        publicKey.toBase58(),
+        signature,
+        "load",
+        transactionResponse.data.data.lamports,
+        "sol",
+        ticketCount,
+        raffle.id
+      );
+
+      if (confirmResponse.success) {
+        toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
+
+        await fetchRaffle();
+      } else {
+        throw new Error(
+          confirmResponse.data.message || "Failed to confirm purchase"
+        );
+      }
+    } catch (error: any) {
+      console.error("Transaction error:", error);
+
+      if (error.message.includes("rejected")) {
+        toast.error("Transaction was rejected by wallet");
+      } else if (error.message.includes("insufficient")) {
+        toast.error("Insufficient balance");
+      } else if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error(error.message || "Transaction failed");
+      }
+    } finally {
+      // setProcessing(false);
+    }
+  }, [raffle, ticketCount, publicKey, signTransaction, connected]);
+
+  const fetchRaffle = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const res = await server.get(`/raffle/${id}`);
+      if (res.data.success) {
+        const data = res.data.data.raffle;
+
+        const mappedRaffle: RaffleType = {
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          image: data.imageUrl,
+          price: Number(data.ticketPrice),
+          tokenType: TOKEN_MAP[data.tokenType] || "UNKNOWN",
+          // tokenTypeNumber: data.tokenType,
+          total: data.totalTickets,
+          sold: data.ticketsSold,
+          winners: data.numberOfWinners,
+          endTime: formatCountdown(data.endDate),
+          created: formatDateOnly(data.createdAt),
+          host: res.data.data.userData.pubkey,
+          hostReputation: data.userReputation || 100,
+          isVerified: data.raffle_detail?.requiresNftVerification || false,
+          isFeatured: data.raffle_detail?.isFeatured || false,
+          prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
+          // tokenMint: data.tokenMint,
+        };
+
+        setRaffle(mappedRaffle);
+      } else {
+        toast.error(res.data.message || "Failed to fetch raffle");
+      }
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Failed to fetch raffle");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchRaffle();
+  }, [fetchRaffle]);
 
   if (loading)
     return (
@@ -313,7 +414,11 @@ const RaffleDetail = () => {
             </div>
 
             {/* Buy Button */}
-            <Button className="w-full mt-4 gradient-primary glow-primary h-12 text-lg">
+            <Button
+              className="w-full mt-4 gradient-primary glow-primary h-12 text-lg"
+              onClick={handleBuyTickets}
+              disabled={!connected || ticketsLeft === 0}
+            >
               <Ticket className="h-5 w-5 mr-2" />
               Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
             </Button>

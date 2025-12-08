@@ -7,6 +7,6 @@ router.post("/login", AuthController.login);
 
 router.get("/authenticate", auth.bearer, AuthController.authenticate);
 
-router.post("/logout", auth.bearer, AuthController.logout);
+router.post("/logout", AuthController.logout);
 
 module.exports = router;

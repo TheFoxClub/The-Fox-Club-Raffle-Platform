@@ -21,6 +21,10 @@ module.exports = (sequelize, DataTypes) => {
         sourceKey: "id",
         foreignKey: "raffleId",
       });
+      this.hasMany(models.RaffleTicket, {
+        sourceKey: "id",
+        foreignKey: "raffleId",
+      });
     }
   }
   raffle.init(

@@ -12,6 +12,10 @@ module.exports = (sequelize, DataTypes) => {
         sourceKey: "id",
         foreignKey: "userId",
       });
+      this.hasMany(models.RaffleTicket, {
+        sourceKey: "id",
+        foreignKey: "userId",
+      });
     }
   }
   user.init(
