@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import server from "../../config/server";
+import { useNavigate } from "react-router-dom";
 // import { featuredRaffles } from "../../dummydata/featuredRaffles";
 
 interface Raffle {
@@ -24,6 +25,8 @@ interface Raffle {
 }
 
 export default function RaffleCarousel() {
+  const navigate = useNavigate();
+
   const [raffles, setRaffles] = useState<Raffle[] | null>(null);
   const [index, setIndex] = useState(0);
 
@@ -135,7 +138,10 @@ export default function RaffleCarousel() {
 
             {/* Button + Arrows */}
             <div className="flex items-center gap-3">
-              <Button className="gradient-primary glow-primary text-white rounded-xl text-sm flex-1">
+              <Button
+                className="gradient-primary glow-primary text-white rounded-xl text-sm flex-1"
+                onClick={() => navigate(`/raffle/${data.id}`)}
+              >
                 Enter Raffle
               </Button>
 

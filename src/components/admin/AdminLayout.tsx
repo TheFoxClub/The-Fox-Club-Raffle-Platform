@@ -13,7 +13,8 @@ import {
   Menu,
   Bell,
   ChevronLeft,
-  Home
+  Home,
+  X
 } from "lucide-react";
 import Button from "../ui/Button";
 import { useSelector } from "react-redux";
@@ -56,14 +57,22 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
+      {/* Backdrop Overlay - Mobile Only */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Mobile and Desktop */}
       <aside
         className={`${
-          sidebarOpen ? "w-64" : "w-20"
-        } glass-card border-r border-border/50 transition-all duration-300 flex flex-col fixed h-full z-50`}
+          sidebarOpen ? "w-64" : "w-0"
+        } bg-black border-r border-border/50 transition-all duration-300 flex flex-col fixed h-screen z-50 overflow-hidden md:static md:z-0 md:w-64 md:h-screen`}
       >
         {/* Logo */}
-        <div className="p-4 border-b border-border/50 flex items-center justify-between">
+        <div className="p-4 border-b border-border/50 flex items-center justify-between shrink-0">
           {sidebarOpen && (
             <Link to="/admin" className="flex items-center gap-2">
               <span className="text-xl font-bold text-orange-500">🦊</span>
@@ -73,10 +82,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="ml-auto"
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden"
           >
-            {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            <X className="h-5 w-5" />
           </Button>
         </div>
 
@@ -93,17 +102,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               }`}
             >
               <item.icon className="h-5 w-5 shrink-0" />
-              {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
+              <span className="text-sm font-medium">{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
         {/* Back to Site & Logout */}
-        <div className="p-4 border-t border-border/50 space-y-2">
+        <div className="p-4 border-t border-border/50 space-y-2 shrink-0">
           <Link to="/">
             <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all w-full">
               <Home className="h-5 w-5" />
-              {sidebarOpen && <span className="text-sm font-medium">Back to Site</span>}
+              <span className="text-sm font-medium">Back to Site</span>
             </button>
           </Link>
           <button
@@ -111,27 +120,38 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-destructive hover:bg-destructive/10 transition-all w-full"
           >
             <LogOut className="h-5 w-5" />
-            {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
+            <span className="text-sm font-medium">Logout</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarOpen ? "ml-64" : "ml-20"} transition-all duration-300`}>
+      <div className={`flex-1 ${sidebarOpen ? "md:ml-0" : "md:ml-0"} ml-0 transition-all duration-300`}>
         {/* Top Bar */}
-        <header className="glass-card border-b border-border/50 sticky top-0 z-40">
-          <div className="flex items-center justify-between px-6 py-4">
-            <h1 className="text-xl font-bold">
-              {menuItems.find((item) => isActive(item.path))?.label || "Dashboard"}
-            </h1>
+        <header className="bg-black border-b border-border/50 sticky top-0 z-40">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              {/* Mobile Hamburger Menu */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="md:hidden shrink-0"
+              >
+                {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
+              <h1 className="text-lg sm:text-xl font-bold truncate">
+                {menuItems.find((item) => isActive(item.path))?.label || "Dashboard"}
+              </h1>
+            </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
               </Button>
 
-              <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-3">
                 <div className="text-right">
                   <p className="text-sm font-medium">
                     {user.isAdmin ? "Admin" : "User"}
@@ -140,7 +160,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     {user.pubkey ? shortenAddress(user.pubkey) : "Not connected"}
                   </p>
                 </div>
-                <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold">
+                <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm">
+                  {user.isAdmin ? "A" : "U"}
+                </div>
+              </div>
+
+              <div className="sm:hidden flex items-center justify-center">
+                <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-xs">
                   {user.isAdmin ? "A" : "U"}
                 </div>
               </div>

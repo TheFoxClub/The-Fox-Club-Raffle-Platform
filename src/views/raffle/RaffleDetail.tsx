@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
 import Button from "../../components/ui/Button";
+import HostProfilePopover from "../../components/ui/HostProfilePopover";
+
 import {
   Clock,
   Users,
@@ -36,6 +38,7 @@ export interface RaffleType {
   endTime: string;
   created: string;
   host: string;
+  hostId: number;
   hostReputation: number;
   isVerified: boolean;
   isFeatured: boolean;
@@ -195,6 +198,7 @@ const RaffleDetail = () => {
           endTime: formatCountdown(data.endDate),
           created: formatDateOnly(data.createdAt),
           host: res.data.data.userData.pubkey,
+          hostId: res.data.data.userData.id,
           hostReputation: data.userReputation || 100,
           isVerified: data.raffle_detail?.requiresNftVerification || false,
           isFeatured: data.raffle_detail?.isFeatured || false,
@@ -304,19 +308,21 @@ const RaffleDetail = () => {
           {/* Host Section */}
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
             <h2 className="text-lg font-bold mb-4">Hosted By</h2>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-primarmrounded-full flex items-center justify-center">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0 flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center">
                   <User className="h-6 w-6 text-white" />
                 </div>
-                <div>
-                  <p className="font-semibold">{raffle.host}</p>
+                <div className="flex flex-col truncate">
+                  <p className="font-semibold break-words">{raffle.host}</p>
                   <p className="text-sm text-muted-foreground">
                     {raffle.hostReputation}% positive rating
                   </p>
                 </div>
               </div>
-              <Button variant="outline">View Profile</Button>
+              <div className="relative z-10">
+                <HostProfilePopover hostId={raffle.hostId} />
+              </div>
             </div>
           </Card>
         </div>

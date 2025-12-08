@@ -144,7 +144,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
           className={cn(
             "relative h-screen w-[--sidebar-width] bg-transparent transition-[width] duration-200 ease-linear",
             state === "collapsed" && collapsible === "offcanvas" && "w-0",
-            state === "collapsed" && collapsible === "icon" && "w-[--sidebar-width-icon]"
+            state === "collapsed" && collapsible === "icon" && "w-0"
           )}
         />
         <div
@@ -152,7 +152,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
             "fixed inset-y-0 z-10 hidden h-screen w-[--sidebar-width] transition-[left,right,width] duration-200 ease-linear md:flex",
             side === "left" ? "left-0" : "right-0",
             state === "collapsed" && collapsible === "offcanvas" && (side === "left" ? "-left-[--sidebar-width]" : "-right-[--sidebar-width]"),
-            state === "collapsed" && collapsible === "icon" && "w-[--sidebar-width-icon]",
+            state === "collapsed" && collapsible === "icon" && (side === "left" ? "-left-[--sidebar-width]" : "-right-[--sidebar-width]"),
             variant === "sidebar" && "border-r border-zinc-800",
             className
           )}
