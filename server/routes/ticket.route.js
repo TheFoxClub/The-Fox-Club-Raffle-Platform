@@ -6,4 +6,6 @@ const auth = require("../config/auth");
 router.post("/buy", auth.bearer, TicketController.buyTicket);
 router.post("/store-signature", auth.bearer, TicketController.storeSignature);
 
+router.get("/user-tickets", auth.bearer, TicketController.getUserTickets);
+
 module.exports = router;

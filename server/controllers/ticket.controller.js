@@ -3,6 +3,7 @@ const {
   User,
   Raffle,
   RaffleTicket,
+  RaffleReward,
 } = require("../models");
 const {
   PublicKey,
@@ -21,6 +22,9 @@ const {
   SPL_TOKEN_SEND_TX_STATUS,
   SPL_TOKEN_ADDRESS,
   SPL_TOKEN_SEND_TRANSACTION_TYPE,
+  TOKEN_TYPE,
+  mapEnumValue,
+  RAFFLE_STATUS,
 } = require("../config/data");
 
 const { addCommissionToTransaction } = require("../services/commissions");
@@ -235,6 +239,114 @@ class TicketController {
     } catch (error) {
       logger.error(error);
       return respond(res, httpStatus.BAD_REQUEST, parseSequelizeErrors(error));
+    }
+  }
+
+  static async getUserTickets(req, res) {
+    try {
+      const userId = req.payload.id;
+
+      const tickets = await RaffleTicket.findAll({
+        where: { userId },
+        include: [
+          {
+            model: Raffle,
+            include: [
+              {
+                model: RaffleReward,
+                required: false,
+              },
+            ],
+          },
+        ],
+        order: [
+          [{ model: Raffle }, "endDate", "DESC"],
+          ["ticketNumber", "ASC"],
+        ],
+      });
+
+      const groupedTickets = {};
+
+      tickets.forEach((ticket) => {
+        const raffleId = ticket.raffleId;
+
+        if (!groupedTickets[raffleId]) {
+          groupedTickets[raffleId] = {
+            raffle: ticket.raffle,
+            tickets: [],
+            totalTickets: 0,
+            totalSpent: 0,
+            status: "UPCOMING",
+            ticketNumbers: [],
+          };
+        }
+
+        groupedTickets[raffleId].tickets.push(ticket);
+        groupedTickets[raffleId].totalTickets++;
+        groupedTickets[raffleId].totalSpent += parseFloat(
+          ticket.raffle.ticketPrice
+        );
+        groupedTickets[raffleId].ticketNumbers.push(ticket.ticketNumber);
+
+        if (ticket.isWinner) {
+          groupedTickets[raffleId].hasWinningTicket = true;
+        }
+      });
+
+      const raffleGroups = Object.values(groupedTickets).map((group) => {
+        const raffle = group.raffle;
+
+        const tokenType = mapEnumValue(TOKEN_TYPE, raffle.tokenType);
+
+        return {
+          raffleId: raffle.id,
+          title: raffle.title,
+          description: raffle.description || "",
+          imageUrl: raffle.imageUrl,
+          status: mapEnumValue(RAFFLE_STATUS, raffle.status),
+          ticketCount: group.totalTickets,
+          totalSpent: group.totalSpent.toFixed(2),
+          tokenType: tokenType,
+          endDate: raffle.endDate,
+          ticketsSold: raffle.ticketsSold,
+          totalTickets: raffle.totalTickets,
+          ticketNumbers: group.ticketNumbers.sort((a, b) => a - b),
+          isWinner: group.hasWinningTicket || false,
+        };
+      });
+
+      const formattedResponse = raffleGroups.map((group) => ({
+        id: group.raffleId,
+        title: group.title,
+        description: group.description,
+        image: group.imageUrl,
+        prizeValue: group.prizeValue,
+        status: group.status,
+        tickets: group.ticketCount,
+        spent: group.totalSpent,
+        tokenType: group.tokenType,
+        endsAt: group.endDate,
+        ticketNumbers: group.ticketNumbers,
+        progress: {
+          sold: group.ticketsSold,
+          total: group.totalTickets,
+          percentage: Math.round(
+            (group.ticketsSold / group.totalTickets) * 100
+          ),
+        },
+      }));
+
+      return respond(res, httpStatus.OK, "User Tickets Fetched Successfully", {
+        tickets: formattedResponse,
+      });
+    } catch (error) {
+      logger.error("Error fetching user tickets:", error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to fetch user tickets",
+        { error: error.message }
+      );
     }
   }
 }
