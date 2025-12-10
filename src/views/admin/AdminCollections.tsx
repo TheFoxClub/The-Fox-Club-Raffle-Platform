@@ -204,10 +204,6 @@ export default function AdminCollections() {
                   value={newCollectionName}
                   onChange={(e) => setNewCollectionName(e.target.value)}
                 />
-                <Switch
-                  checked={verifyCollection}
-                  onCheckedChange={setVerifyCollection}
-                />
               </div>
               {/* <div className="space-y-2">
                 <Label>Mint Address</Label>
