@@ -224,7 +224,7 @@ export default function AdminCollections() {
           {collections.map((collection) => (
             <div
               key={collection.id}
-              className="glass-card p-6 rounded-xl border border-border/50 hover:border-primary/50 transition-all hover:glow-primary"
+              className="glass-card p-6 rounded-xl border border-border/50 hover:border-primary/50 transition-all hover:glow-primary flex flex-col justify-between"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="h-16 w-16 rounded-lg bg-gradient-primary/20 flex items-center justify-center">
@@ -237,9 +237,10 @@ export default function AdminCollections() {
                 )}
               </div>
 
-              <h3 className="font-semibold text-base break-all mb-2">
+              <h3 className="font-semibold text-base mb-2 line-clamp-2 overflow-hidden text-ellipsis break-all">
                 {collection.name}
               </h3>
+
               {/* <p className="text-xs text-muted-foreground mb-3">
                 {collection.mint}
               </p>
