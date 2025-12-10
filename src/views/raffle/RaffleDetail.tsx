@@ -43,6 +43,7 @@ export interface RaffleType {
   isVerified: boolean;
   isFeatured: boolean;
   prizeValue: string;
+  endDate?: string;
 }
 
 function formatDateOnly(dateStr: string) {
@@ -50,22 +51,37 @@ function formatDateOnly(dateStr: string) {
   return d.toISOString().split("T")[0];
 }
 
-function formatCountdown(endDate: string) {
-  const end = new Date(endDate).getTime();
+function formatCountdown(endDateStr: string) {
+  const end = new Date(endDateStr).getTime();
   const now = Date.now();
   let diff = end - now;
 
   if (diff <= 0) return "Ended";
 
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  diff %= 1000 * 60 * 60 * 24;
+  const secondsInYear = 1000 * 60 * 60 * 24 * 365;
+  const secondsInDay = 1000 * 60 * 60 * 24;
+  const secondsInHour = 1000 * 60 * 60;
+  const secondsInMinute = 1000 * 60;
 
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  diff %= 1000 * 60 * 60;
+  const years = Math.floor(diff / secondsInYear);
+  diff %= secondsInYear;
 
-  const minutes = Math.floor(diff / (1000 * 60));
+  const days = Math.floor(diff / secondsInDay);
+  diff %= secondsInDay;
 
-  return `${days}d ${hours}h ${minutes}m`;
+  const hours = Math.floor(diff / secondsInHour);
+  diff %= secondsInHour;
+
+  const minutes = Math.floor(diff / secondsInMinute);
+  diff %= secondsInMinute;
+
+  const seconds = Math.floor(diff / 1000);
+
+  if (years > 0) return `${years}y ${days}d ${hours}h`;
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
 const RaffleDetail = () => {
@@ -75,6 +91,7 @@ const RaffleDetail = () => {
   const [raffle, setRaffle] = useState<RaffleType | null>(null);
   const [loading, setLoading] = useState(true);
   const [ticketCount, setTicketCount] = useState(1);
+  const [countdown, setCountdown] = useState<string>("");
   const TOKEN_MAP: Record<number, string> = {
     0: "SOL",
     1: "USDT",
@@ -99,8 +116,8 @@ const RaffleDetail = () => {
     }
 
     const now = new Date();
-    const endDate = new Date(raffle.endTime);
-    if (now > endDate) {
+    const endDate = raffle.endDate ? new Date(raffle.endDate) : null;
+    if (endDate && now > endDate) {
       toast.error("This raffle has ended");
       return;
     }
@@ -199,7 +216,6 @@ const RaffleDetail = () => {
           total: data.totalTickets,
           sold: data.ticketsSold,
           winners: data.numberOfWinners,
-          endTime: formatCountdown(data.endDate),
           created: formatDateOnly(data.createdAt),
           host: res.data.data.userData.pubkey,
           hostId: res.data.data.userData.id,
@@ -208,6 +224,8 @@ const RaffleDetail = () => {
           isFeatured: data.raffle_detail?.isFeatured || false,
           prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
           // tokenMint: data.tokenMint,
+          endDate: data.endDate,
+          endTime: "",
         };
 
         setRaffle(mappedRaffle);
@@ -221,6 +239,20 @@ const RaffleDetail = () => {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!raffle?.endDate) return;
+
+    const updateCountdown = () => {
+      const timeStr = formatCountdown(raffle.endDate!);
+      setCountdown(timeStr);
+    };
+
+    updateCountdown(); // initialize immediately
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [raffle?.endDate]);
 
   useEffect(() => {
     fetchRaffle();
@@ -376,7 +408,7 @@ const RaffleDetail = () => {
                 <span className="text-muted-foreground">Ends In</span>
               </div>
               <span className="text-muted-foreground text-xl font-bold">
-                {raffle.endTime}
+                {countdown}
               </span>
             </div>
 
