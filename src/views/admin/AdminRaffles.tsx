@@ -129,33 +129,26 @@ export default function AdminRaffles() {
     try {
       // Update raffle status
       await server.put(`/admin/raffles/${selectedRaffle.id}`, {
-        status: status || selectedRaffle.status,
+        status: status,
       });
 
       // Update featured
-      const currentPosition =
-        isFeatured && selectedRaffle.raffle_detail?.featuredPosition
-          ? selectedRaffle.raffle_detail.featuredPosition
-          : null;
-
-      // Use endDate as featuredUntil if featured, else null
       const featuredUntil = isFeatured ? selectedRaffle.endDate : null;
-
       await server.put(`/admin/featured/${selectedRaffle.id}`, {
         isFeatured: isFeatured,
-        featuredPosition: currentPosition,
+        featuredPosition:
+          selectedRaffle.raffle_detail?.featuredPosition || null,
         featuredUntil: featuredUntil,
       });
 
-      // Update frontend
+      // Update frontend table
       setRaffles((prev) =>
         prev.map((r) =>
           r.id === selectedRaffle.id
-            ? { ...r, featured: isFeatured, status: status || r.status }
+            ? { ...r, featured: isFeatured, status: status }
             : r
         )
       );
-
       toast.success("Raffle updated successfully!");
       setSelectedRaffle(null); // close dialog
     } catch (err) {
@@ -197,6 +190,36 @@ export default function AdminRaffles() {
       toast.error("Failed to update raffle");
     }
   };
+
+  // Helper to highlight search term matches
+  const highlightText = (text: string, highlight: string) => {
+    if (!highlight) return text;
+    const regex = new RegExp(`(${highlight})`, "gi");
+    const parts = text.split(regex);
+    return parts.map((part, index) =>
+      regex.test(part) ? (
+        <span key={index} className="bg-yellow-200 text-black">
+          {part}
+        </span>
+      ) : (
+        part
+      )
+    );
+  };
+
+  // Filtered raffles based on search term and status filter
+  const filteredRaffles = raffles
+    .filter((raffle) => {
+      const term = searchTerm.toLowerCase();
+      return (
+        raffle.name.toLowerCase().includes(term) ||
+        raffle.creator.toLowerCase().includes(term)
+      );
+    })
+    .filter((raffle) => {
+      if (statusFilter === "all") return true;
+      return raffle.status.toLowerCase() === statusFilter.toLowerCase();
+    });
 
   return (
     <div className="w-84 md:w-full">
@@ -243,7 +266,7 @@ export default function AdminRaffles() {
               </tr>
             </thead>
             <tbody>
-              {raffles.map((raffle) => (
+              {filteredRaffles.map((raffle) => (
                 <tr
                   key={raffle.id}
                   className="border-b border-border/30 hover:bg-muted/20 transition-colors"
@@ -253,7 +276,9 @@ export default function AdminRaffles() {
                       {raffle.featured && (
                         <Star className="h-4 w-4 fill-accent text-accent" />
                       )}
-                      <span className="font-medium">{raffle.name}</span>
+                      <span className="font-medium">
+                        {highlightText(raffle.name, searchTerm)}
+                      </span>
                     </div>
                   </td>
                   <td className="p-4 text-muted-foreground">

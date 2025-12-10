@@ -35,25 +35,25 @@ type HostedRaffle = {
   endDate: string;
 };
 
+type ExtendedUser = {
+  id?: number;
+  username?: string;
+  email?: string;
+  description?: string;
+  photoUrl?: string;
+  totalSpent?: number;
+  rafflesWon?: number;
+  ticketsPurchased?: number;
+  reputation?: number;
+  xp?: number; // current XP
+  xpGoal?: number;
+};
+
 const Profile = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, pubkey, user_info } = useSelector(
     (state: RootState) => state.user
   );
-
-  type ExtendedUser = {
-    id?: number;
-    username?: string;
-    email?: string;
-    description?: string;
-    photoUrl?: string;
-    totalSpent?: number;
-    rafflesWon?: number;
-    ticketsPurchased?: number;
-    reputation?: number;
-    xp?: number; // current XP
-    xpGoal?: number;
-  };
 
   const {
     totalSpent = 0,
@@ -67,30 +67,11 @@ const Profile = () => {
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
     []
   );
+  const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
 
   //fetch user info from backend
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await server.get("/user/info");
-        const userData = res.data.data.user;
-        dispatch(
-          setUser({
-            ...userData,
-            isAuthenticated: true,
-            isLoading: false,
-          })
-        );
-      } catch (error) {
-        dispatch(setLoading(false));
-        console.error("Error fetching user info:", error);
-      }
-    };
-    fetchUser();
-  }, [dispatch]);
-
-  useEffect(() => {
-    const fetchUserAndRaffles = async () => {
+    const fetchData = async () => {
       try {
         const resUser = await server.get("/user/info");
         const userData = resUser.data.data.user;
@@ -107,28 +88,47 @@ const Profile = () => {
           const resRaffles = await server.get(`/raffle/user/${userData.id}`);
           const raffles = resRaffles.data.data.raffles || [];
 
-          const formatted = raffles.map(
-            (r: any): HostedRaffle => ({
-              id: r.id,
-              title: r.title,
-              status: r.status,
-              ticketsSold: r.ticketsSold ?? 0,
-              totalTickets: r.totalTickets ?? 0,
-              revenue: (r.ticketsSold ?? 0) * (r.ticketPrice ?? 0),
-              endDate: r.endDate.split("T")[0],
-            })
+          setHostedRafflesData(
+            raffles.map(
+              (r: any): HostedRaffle => ({
+                id: r.id,
+                title: r.title,
+                status: r.status,
+                ticketsSold: r.ticketsSold ?? 0,
+                totalTickets: r.totalTickets ?? 0,
+                revenue: (r.ticketsSold ?? 0) * (r.ticketPrice ?? 0),
+                endDate: r.endDate.split("T")[0],
+              })
+            )
           );
-
-          setHostedRafflesData(formatted);
-          console.log("Hosted raffles fetched:", formatted);
         }
+        const resTickets = await server.get("/ticket/user-tickets");
+        const tickets = resTickets.data?.data?.tickets ?? [];
+
+        setPurchasedTickets(
+          tickets.map((t: any) => ({
+            id: t.id,
+            raffleId: t.raffle_id,
+            raffleTitle: t.Raffle?.title ?? "Unknown Raffle",
+            tickets: t.quantity,
+            spent: t.spent_amount,
+            ticketNumbers: t.ticketNumbers ?? [],
+            status:
+              t.Raffle?.status === 2
+                ? "active"
+                : t.Raffle?.status === 3
+                ? "won"
+                : "upcoming",
+            endDate: t.Raffle?.endDate?.split("T")[0] ?? "N/A",
+          }))
+        );
       } catch (error) {
         dispatch(setLoading(false));
         console.error("Error fetching user info or hosted raffles:", error);
       }
     };
 
-    fetchUserAndRaffles();
+    fetchData();
   }, [dispatch]);
 
   if (isLoading) {
@@ -257,13 +257,15 @@ const Profile = () => {
           </TabsList>
 
           <TabsContent value="purchasedTickets" className="space-y-4">
-            <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
-              <p className="text-center text-muted-foreground">
-                You haven't bought any tickets yet. Explore raffles and join one
-                to get started!
-              </p>
-            </Card>
-            {/* {purchasedTickets.map((ticket) => (
+            {purchasedTickets.length === 0 && (
+              <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
+                <p className="text-center text-muted-foreground">
+                  You haven't bought any tickets yet. Explore raffles and join
+                  one to get started!
+                </p>
+              </Card>
+            )}
+            {purchasedTickets.map((ticket) => (
               <Card
                 key={ticket.id}
                 className="bg-card/50 backdrop-blur-xl p-6 border border-border/50"
@@ -300,12 +302,33 @@ const Profile = () => {
                         <span>Ends {ticket.endDate}</span>
                       </div>
                     </div>
+                    {/* Ticket numbers inline */}
+                    {ticket.ticketNumbers?.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+                        <span className="text-muted-foreground">
+                          {ticket.ticketNumbers.length === 1
+                            ? "Ticket Number:"
+                            : "Ticket Numbers:"}
+                        </span>
+
+                        {ticket.ticketNumbers.map((num: number) => (
+                          <span
+                            key={num}
+                            className="px-2 py-0.5 rounded-md bg-secondary/20 text-secondary border border-secondary/30"
+                          >
+                            #{num}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <Button variant="outline">View Raffle</Button>
+                  <Link to={`/raffle/${ticket.raffleId}`}>
+                    <Button variant="outline">View Raffle</Button>
+                  </Link>
                 </div>
               </Card>
-            ))} */}
+            ))}
           </TabsContent>
 
           <TabsContent value="hostedRaffles" className="space-y-6">
@@ -325,13 +348,18 @@ const Profile = () => {
                     <div className="flex items-center gap-3">
                       <h3 className="text-lg font-bold">{raffle.title}</h3>
                       {raffle.status === 2 && (
-                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
+                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-500 text-white w-fit">
                           Active
                         </div>
                       )}
                       {raffle.status === 3 && (
-                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
+                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
                           Completed
+                        </div>
+                      )}
+                      {raffle.status === 1 && (
+                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
+                          Upcoming
                         </div>
                       )}
                     </div>
@@ -340,7 +368,7 @@ const Profile = () => {
                       <div className="flex items-center gap-1">
                         <Ticket className="h-4 w-4" />
                         <span>
-                          {raffle.ticketsSold} / {raffle.totalTickets}sold
+                          {raffle.ticketsSold} / {raffle.totalTickets} sold
                         </span>
                       </div>
 
