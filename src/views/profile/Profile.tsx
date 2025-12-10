@@ -291,17 +291,18 @@ const Profile = () => {
                     <div className="flex items-center text-sm text-muted-foreground gap-4">
                       <div className="flex items-center gap-1">
                         <Ticket className="h-4 w-4" />
-                        <span>{ticket.tickets} tickets</span>
+                        <span>{ticket.ticketNumbers.length} tickets</span>
                       </div>
 
                       <div className="flex items-center gap-1">
                         <Coins className="h-4 w-4" />
                         <span>{ticket.spent} SOL spent</span>
                       </div>
-                      <div className="flex items-center gap-1">
+                      {/* Needs fixing */}
+                      {/* <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
                         <span>Ends {ticket.endDate}</span>
-                      </div>
+                      </div> */}
                     </div>
                     {/* Ticket numbers inline */}
                     {ticket.ticketNumbers?.length > 0 && (
