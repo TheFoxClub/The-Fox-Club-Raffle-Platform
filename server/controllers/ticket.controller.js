@@ -25,9 +25,11 @@ const {
   TOKEN_TYPE,
   mapEnumValue,
   RAFFLE_STATUS,
+  COMMISSION_RATES,
 } = require("../config/data");
 
 const { addCommissionToTransaction } = require("../services/commissions");
+const NFTService = require("../services/nft.service");
 
 const dotenv = require("dotenv");
 dotenv.config();
@@ -63,8 +65,20 @@ class TicketController {
         return respond(res, httpStatus.BAD_REQUEST, "Raffle not found");
       }
 
+      const nftHolderInfo = await NFTService.checkNFTCollectionHolder(
+        senderPubkey
+      );
+      const isNFTHolder = nftHolderInfo.isHolder;
+
+      const commissionRate = isNFTHolder
+        ? COMMISSION_RATES.HOLDER
+        : COMMISSION_RATES.NON_HOLDER;
+
       const ticketPrice = raffleData.ticketPrice;
       const totalSolAmount = ticketPrice * ticketCount;
+
+      const commissionAmount = totalSolAmount * commissionRate;
+      const creatorAmount = totalSolAmount * (1 - commissionRate);
 
       const senderPublicKey = new PublicKey(senderPubkey);
       const receiverPubkey = BET_RECEIVER_WALLET;
@@ -85,15 +99,8 @@ class TicketController {
           );
           break;
         default:
-          return res.json({
-            message: "Invalid reward type",
-          });
+          return respond(res, httpStatus.BAD_REQUEST, "Invalid reward type");
       }
-
-      transaction = await addCommissionToTransaction({
-        transaction: transaction,
-        senderPubkey: senderPubkey,
-      });
 
       const latestBlockhash = await umi.rpc.getLatestBlockhash();
 
@@ -110,6 +117,10 @@ class TicketController {
         blockhash: latestBlockhash,
         totalSolAmount: totalSolAmount,
         lamports: totalSolAmount * LAMPORTS_PER_SOL,
+        commissionRate: commissionRate,
+        commissionAmount: commissionAmount,
+        creatorAmount: creatorAmount,
+        isNFTHolder: isNFTHolder,
         raffleId,
         ticketCount,
       };
@@ -131,6 +142,10 @@ class TicketController {
         entryToken,
         ticketCount,
         raffleId,
+        commissionRate,
+        creatorAmount,
+        commissionAmount,
+        isNFTHolder = false,
       } = req.body;
 
       const signatureToStore = signature;
@@ -156,8 +171,12 @@ class TicketController {
         txId: signatureToStore,
         tokenAddress: entryToken === "sol" ? SPL_TOKEN_ADDRESS.SOLANA : "",
         decimals: 9,
-        uiAmount: lamports,
+        uiAmount: Math.round(Number(lamports)),
         status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+        commissionRate,
+        creatorAmount,
+        commissionAmount,
+        isNFTHolder,
       };
 
       const splTokenSendTxDb = await SplTokenSendTransaction.create(
@@ -170,6 +189,18 @@ class TicketController {
             by: ticketCount,
             where: { id: raffleId },
           });
+
+          await Raffle.increment(
+            {
+              totalCommission: commissionAmount,
+              claimableAmount: creatorAmount,
+              totalRevenue: lamports / LAMPORTS_PER_SOL,
+              platformRevenue: commissionAmount,
+            },
+            {
+              where: { id: raffleId },
+            }
+          );
 
           const user = await User.findOne({ where: { pubkey: pubkey } });
 
@@ -194,6 +225,8 @@ class TicketController {
                 ticketNumber: nextTicketNumber + i,
                 transactionSignature: signatureToStore,
                 isWinner: false,
+                commissionRate,
+                creatorAmount,
               });
             }
 
@@ -216,6 +249,14 @@ class TicketController {
                 ticketsSold: updatedRaffle.ticketsSold,
                 ticketsLeft:
                   updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+                totalCommission: updatedRaffle.totalCommission || 0,
+                claimableAmount: updatedRaffle.claimableAmount || 0,
+              },
+              commissionInfo: {
+                rate: commissionRate,
+                amount: commissionAmount,
+                creatorAmount: creatorAmount,
+                isNFTHolder: isNFTHolder,
               },
             };
 
@@ -228,12 +269,24 @@ class TicketController {
           }
         } catch (ticketError) {
           logger.error("Error creating tickets:", ticketError);
+          return respond(
+            res,
+            httpStatus.OK,
+            "Transaction stored but ticket creation failed",
+            {
+              message: "Transaction stored successfully",
+              signature: signatureToStore,
+              error: "Ticket creation failed",
+            }
+          );
         }
       }
 
       const resData = {
         message: "Transaction stored successfully",
         signature: signatureToStore,
+        commissionRate: commissionRate,
+        isNFTHolder: isNFTHolder,
       };
       return respond(res, httpStatus.OK, "Success", resData);
     } catch (error) {

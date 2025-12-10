@@ -144,7 +144,11 @@ const RaffleDetail = () => {
         publicKey.toBase58(),
         signature,
         "load",
-        transactionResponse.data.data.lamports,
+        transactionResponse?.data?.data?.lamports,
+        transactionResponse?.data?.data?.commissionRate,
+        transactionResponse?.data?.data?.commissionAmount,
+        transactionResponse?.data?.data?.creatorAmount,
+        transactionResponse?.data?.data?.isNFTHolder,
         "sol",
         ticketCount,
         raffle.id

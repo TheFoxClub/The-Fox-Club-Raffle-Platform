@@ -22,6 +22,10 @@ module.exports = (sequelize, DataTypes) => {
       uiAmount: DataTypes.STRING,
       status: DataTypes.INTEGER,
       additionalJson: DataTypes.JSON,
+      commissionRate: DataTypes.DECIMAL(10, 4),
+      commissionAmount: DataTypes.DECIMAL(10, 9),
+      creatorAmount: DataTypes.DECIMAL(10, 9),
+      isNFTHolder: DataTypes.BOOLEAN,
     },
     {
       sequelize,

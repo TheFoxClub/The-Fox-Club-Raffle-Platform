@@ -55,6 +55,11 @@ const RAFFLE_FEATURED_POSITION = {
   FIFTH: 5,
 };
 
+const COMMISSION_RATES = {
+  HOLDER: 0.025, // 2.5% for NFT holders
+  NON_HOLDER: 0.05, // 5% for non-holders
+};
+
 function mapEnumValue(enumObj, value) {
   return Object.keys(enumObj).find((key) => enumObj[key] === value) || value;
 }
@@ -69,5 +74,6 @@ module.exports = {
   RAFFLE_REWARD_TYPES,
   SPL_TOKEN_ADDRESS,
   SPL_TOKEN_SEND_TX_STATUS,
+  COMMISSION_RATES,
   mapEnumValue,
 };

@@ -25,6 +25,8 @@ module.exports = (sequelize, DataTypes) => {
       ticketNumber: DataTypes.INTEGER,
       splTokenSendTxId: DataTypes.STRING,
       isWinner: DataTypes.BOOLEAN,
+      commissionRate: DataTypes.DECIMAL(10, 4),
+      creatorAmount: DataTypes.DECIMAL(10, 9),
     },
     {
       sequelize,

@@ -42,6 +42,11 @@ module.exports = (sequelize, DataTypes) => {
       startDate: DataTypes.DATE,
       endDate: DataTypes.DATE,
       endedAt: DataTypes.DATE,
+      totalCommission: DataTypes.DECIMAL(10, 9),
+      claimableAmount: DataTypes.DECIMAL(10, 9),
+      claimedAmount: DataTypes.DECIMAL(10, 9),
+      platformRevenue: DataTypes.DECIMAL(10, 9),
+      totalRevenue: DataTypes.DECIMAL(10, 9),
     },
     {
       sequelize,
