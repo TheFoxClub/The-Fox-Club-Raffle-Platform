@@ -44,7 +44,7 @@ export default function RaffleCarousel() {
             title: r.title,
             description: r.description,
             price: r.ticketPrice,
-            sold: Number(r.ticketSold ?? 0),
+            sold: Number(r.ticketsSold ?? 0),
             total: Number(r.totalTickets),
             image: r.imageUrl,
             tokenType:
