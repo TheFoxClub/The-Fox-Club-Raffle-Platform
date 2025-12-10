@@ -6,7 +6,6 @@ import {
   Edit,
   Upload,
   FileSpreadsheet,
-  Verified,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -65,6 +64,9 @@ export default function AdminCollections() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [verifyCollection, setVerifyCollection] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // FETCH VERIFIED COLLECTIONS
   // MOVE fetchCollections OUTSIDE useEffect
@@ -95,6 +97,38 @@ export default function AdminCollections() {
     fetchCollections();
   }, []);
 
+  const handleAddCollection = async () => {
+    if (!newCollectionName.trim()) {
+      toast.error("Collection name is required");
+      return;
+    }
+    try {
+      setSaving(true);
+
+      const res = await server.post("/admin/verified-collection", {
+        addresses: [newCollectionName],
+        verified: verifyCollection,
+        blockchainNetwork: "solana",
+      });
+
+      if (res.data.success) {
+        toast.success("Collection added successfully!");
+
+        fetchCollections();
+        setOpen(false);
+
+        setNewCollectionName("");
+        setVerifyCollection(true);
+      } else {
+        toast.error(res.data.message || "Failed to add collection");
+      }
+    } catch (error: any) {
+      console.error("Error adding collection:", error);
+      toast.error(error.response?.data?.message || "Error adding collection");
+    } finally {
+      setSaving(false);
+    }
+  };
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -165,7 +199,15 @@ export default function AdminCollections() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Collection Name</Label>
-                <Input placeholder="Fox Club Genesis" />
+                <Input
+                  placeholder="Fox Club Genesis"
+                  value={newCollectionName}
+                  onChange={(e) => setNewCollectionName(e.target.value)}
+                />
+                <Switch
+                  checked={verifyCollection}
+                  onCheckedChange={setVerifyCollection}
+                />
               </div>
               {/* <div className="space-y-2">
                 <Label>Mint Address</Label>
@@ -177,9 +219,10 @@ export default function AdminCollections() {
               </div>
               <Button
                 className="w-full gradient-primary"
-                onClick={() => setOpen(false)}
+                onClick={handleAddCollection}
+                disabled={saving}
               >
-                Add Collection
+                {saving ? "Adding..." : "Add Collection"}
               </Button>
             </div>
           </DialogContent>

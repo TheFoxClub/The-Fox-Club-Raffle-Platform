@@ -117,7 +117,8 @@ const Profile = () => {
               t.Raffle?.status === 2
                 ? "active"
                 : t.Raffle?.status === 3
-                ? "won"
+                ? //? "won"
+                  "Ended"
                 : "upcoming",
             endDate: t.Raffle?.endDate?.split("T")[0] ?? "N/A",
           }))
@@ -280,9 +281,9 @@ const Profile = () => {
                         <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
                           Active
                         </div>
-                      ) : ticket.status === "won" ? (
+                      ) : ticket.status === "ended" ? (
                         <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
-                          Won
+                          Ended
                         </div>
                       ) : null}
                     </div>
