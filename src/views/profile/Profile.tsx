@@ -57,13 +57,14 @@ const Profile = () => {
   );
 
   const {
-    totalSpent = 0,
     rafflesWon = 0,
-    ticketsPurchased = 0,
     reputation = 0,
     xp = 0,
     xpGoal = 15000,
   } = (user_info ?? {}) as ExtendedUser;
+
+  const [ticketsBought, setTicketsBought] = useState(0);
+  const [totalSolSpent, setTotalSolSpent] = useState(0);
 
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
     []
@@ -93,6 +94,9 @@ const Profile = () => {
       try {
         const resUser = await server.get("/user/info");
         const userData = resUser.data.data.user;
+
+        setTicketsBought(resUser.data.data.ticketsBought || 0);
+        setTotalSolSpent(resUser.data.data.totalSolSpent || 0);
 
         dispatch(
           setUser({
@@ -239,7 +243,7 @@ const Profile = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 text-center p-6 space-y-2">
             <Coins className="h-8 w-8 mx-auto text-accent" />
-            <p className="text-2xl font-bold">{totalSpent} SOL</p>
+            <p className="text-2xl font-bold">{totalSolSpent} SOL</p>
             <p className="text-sm text-muted-foreground">Total Spent</p>
           </Card>
 
@@ -251,7 +255,7 @@ const Profile = () => {
 
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 text-center p-6 space-y-2">
             <Ticket className="h-8 w-8 mx-auto text-secondary" />
-            <p className="text-2xl font-bold">{ticketsPurchased}</p>
+            <p className="text-2xl font-bold">{ticketsBought}</p>
             <p className="text-sm text-muted-foreground">Tickets Bought</p>
           </Card>
 
