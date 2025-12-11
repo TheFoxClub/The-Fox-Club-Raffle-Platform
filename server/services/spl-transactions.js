@@ -25,8 +25,6 @@ const getSplTokenSendTransactions = async () => {
     order: [["createdAt", "DESC"]],
   });
 
-  console.log("rows: ", rows);
-
   return rows.map((row) => {
     return { txId: row.txId, txType: row.type };
   });
