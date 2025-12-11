@@ -276,7 +276,9 @@ const Profile = () => {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-bold">{ticket.title}</h3>
+                      <h3 className="text-lg font-bold">
+                        {ticket.raffleTitle}
+                      </h3>
                       {ticket.status === "active" ? (
                         <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
                           Active
@@ -375,7 +377,9 @@ const Profile = () => {
 
                       <div className="flex items-center gap-1">
                         <Coins className="h-4 w-4 text-accent" />
-                        <span>{raffle.revenue ?? 0} SOL revenue</span>
+                        <span>
+                          {(raffle.revenue ?? 0).toFixed(4)} SOL revenue
+                        </span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
