@@ -108,10 +108,10 @@ const Profile = () => {
         setPurchasedTickets(
           tickets.map((t: any) => ({
             id: t.id,
-            raffleId: t.raffle_id,
-            raffleTitle: t.Raffle?.title ?? "Unknown Raffle",
-            tickets: t.quantity,
-            spent: t.spent_amount,
+            raffleId: t.id,
+            raffleTitle: t.title ?? "Unknown Raffle",
+            tickets: t.tickets,
+            spent: t.spent,
             ticketNumbers: t.ticketNumbers ?? [],
             status:
               t.Raffle?.status === 2
@@ -120,7 +120,9 @@ const Profile = () => {
                 ? //? "won"
                   "Ended"
                 : "upcoming",
-            endDate: t.Raffle?.endDate?.split("T")[0] ?? "N/A",
+            endDate: t.endsAt ? t.endsAt.split("T")[0] : "N/A",
+            totalTickets: t.progress?.total ?? 0,
+            ticketsSold: t.progress?.sold ?? 0,
           }))
         );
       } catch (error) {
@@ -274,9 +276,7 @@ const Profile = () => {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-bold">
-                        {ticket.raffleTitle}
-                      </h3>
+                      <h3 className="text-lg font-bold">{ticket.title}</h3>
                       {ticket.status === "active" ? (
                         <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
                           Active
