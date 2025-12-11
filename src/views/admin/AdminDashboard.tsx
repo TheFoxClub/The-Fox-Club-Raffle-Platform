@@ -3,6 +3,7 @@ import { StatCard } from "../../components/admin/StatCard";
 import Button from "../../components/ui/Button";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import server from "../../config/server";
 
 // const topRaffles = [
 //   {
@@ -28,33 +29,46 @@ import { useState, useEffect } from "react";
 //   },
 // ];
 
-// const topCreators = [
-//   { wallet: "7XYZ...abc1", revenue: "1,245 SOL", rank: 1 },
-//   { wallet: "8ABC...def2", revenue: "987 SOL", rank: 2 },
-//   { wallet: "9DEF...ghi3", revenue: "756 SOL", rank: 3 },
-// ];
-
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
-  // fallback data
-  const stats = {
-    totalVolume: 0,
-    liveRaffles: 0,
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
     totalTicketsSold: 0,
-    platformFees: 0,
-  };
+    totalPlatformRevenue: 0,
+    liveRaffleCount: 0,
+  });
 
   const topRaffles: any[] = [];
-  const topCreators: any[] = [];
+  const [topCreators, setTopCreators] = useState<any[]>([]);
+
+  const shortWallet = (address: string) => {
+    if (!address) return "";
+    return address.slice(0, 6) + "..." + address.slice(-6);
+  };
 
   useEffect(() => {
-    // simulate async fetch or API call delay
-    const timer = setTimeout(() => {
-      setLoading(false); // after 500ms, just stop loading
-    }, 500);
+    async function fetchData() {
+      try {
+        // Fetch top creators
+        const creatorsRes = await server.get("/admin/top-creators");
+        const creatorsData = creatorsRes.data.data;
+        setTopCreators(creatorsData);
 
-    return () => clearTimeout(timer);
+        // Fetch top raffles
+        // - setTopRaffles(await rafflesRes.json());
+        // - setStats(...)
+
+        // Fetch dashboard stats
+        const statsRes = await server.get("/admin/dashboard-stats");
+        setStats(statsRes.data.data);
+      } catch (error) {
+        console.error("Error fetching top creators:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
   if (loading) return <p>Loading dashboard...</p>;
@@ -64,14 +78,14 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatCard
           title="Total Volume"
-          value={`${stats.totalVolume} SOL`}
+          value={`${stats.totalRevenue} SOL`}
           change={0}
           trend="up"
           icon={<Wallet className="h-6 w-6" />}
         />
         <StatCard
           title="Live Raffles"
-          value={stats.liveRaffles}
+          value={stats.liveRaffleCount}
           change={0}
           trend="up"
           icon={<Ticket className="h-6 w-6" />}
@@ -85,7 +99,7 @@ export default function AdminDashboard() {
         />
         <StatCard
           title="Platform Fees Earned"
-          value={`${stats.platformFees} SOL`}
+          value={`${stats.totalPlatformRevenue} SOL`}
           change={0}
           trend="up"
           icon={<Coins className="h-6 w-6" />}
@@ -194,31 +208,29 @@ export default function AdminDashboard() {
               Top Creators
             </h2>
             <div className="space-y-4">
-              {/* {topCreators.map((creator) => (
-                <div key={creator.wallet} className="flex items-center gap-3">
-                  <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center font-bold ${
-                      creator.rank === 1
-                        ? "bg-gradient-primary text-white"
-                        : creator.rank === 2
-                        ? "bg-secondary/20 text-secondary"
-                        : "bg-accent/20 text-accent"
-                    }`}
-                  >
-                    {creator.rank}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{creator.wallet}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {creator.revenue}
-                    </p>
-                  </div>
-                </div>
-              ))} */}
-
               {topCreators.length > 0 ? (
                 topCreators.map((creator) => (
-                  <div key={creator.wallet}>{creator.wallet}</div>
+                  <div key={creator.wallet} className="flex items-center gap-3">
+                    <div
+                      className={`h-10 w-10 rounded-full flex items-center justify-center font-bold ${
+                        creator.rank === 1
+                          ? "bg-gradient-primary text-white"
+                          : creator.rank === 2
+                          ? "bg-secondary/20 text-secondary"
+                          : "bg-accent/20 text-accent"
+                      }`}
+                    >
+                      {creator.rank}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">
+                        {shortWallet(creator.walletAddress)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {creator.totalRevenue} SOL
+                      </p>
+                    </div>
+                  </div>
                 ))
               ) : (
                 <p className="text-muted-foreground">
