@@ -4,6 +4,7 @@ const {
   User,
   UserInfo,
   VerifiedCollection,
+  Sequelize,
 } = require("../models");
 const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
@@ -278,6 +279,93 @@ class AdminController {
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(err)
       );
+    }
+  }
+
+  static async getTopRaffleCreators(req, res) {
+    try {
+      const creators = await Raffle.findAll({
+        attributes: [
+          "userId",
+          [Sequelize.fn("SUM", Sequelize.col("totalRevenue")), "totalRevenue"],
+        ],
+        include: [
+          {
+            model: User,
+            attributes: ["pubkey"],
+            include: [
+              {
+                model: UserInfo,
+                attributes: ["username", "photoUrl"],
+              },
+            ],
+          },
+        ],
+        group: ["userId", "user.id", "user->user_info.id"],
+        order: [[Sequelize.literal("totalRevenue"), "DESC"]],
+        limit: 3,
+        raw: false,
+      });
+
+      const ranked = creators.map((row, index) => ({
+        rank: index + 1,
+        userId: row.userId,
+        walletAddress: row.user?.pubkey,
+        username: row.user?.user_info?.username ?? null,
+        photoUrl: row.user?.user_info?.photoUrl ?? null,
+        totalRevenue: Number(row.dataValues.totalRevenue),
+      }));
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Top raffle creators fetched!",
+        ranked
+      );
+    } catch (error) {
+      console.error(error);
+      return respond(res, httpStatus.INTERNAL_SERVER_ERROR, "Server error", {
+        error: error.message,
+      });
+    }
+  }
+
+  static async getDashboardStats(req, res) {
+    try {
+      const stats = await Raffle.findOne({
+        attributes: [
+          [Sequelize.fn("SUM", Sequelize.col("totalRevenue")), "totalRevenue"],
+          [
+            Sequelize.fn("SUM", Sequelize.col("ticketsSold")),
+            "totalTicketsSold",
+          ],
+          [
+            Sequelize.fn("SUM", Sequelize.col("platformRevenue")),
+            "totalPlatformRevenue",
+          ],
+        ],
+        raw: true,
+      });
+
+      const liveRaffleCount = await Raffle.count({
+        where: {
+          status: RAFFLE_STATUS.LIVE,
+        },
+      });
+
+      const response = {
+        totalRevenue: Number(stats.totalRevenue || 0),
+        totalTicketsSold: Number(stats.totalTicketsSold || 0),
+        totalPlatformRevenue: Number(stats.totalPlatformRevenue || 0),
+        liveRaffleCount,
+      };
+
+      return respond(res, httpStatus.OK, "Dashboard stats fetched!", response);
+    } catch (error) {
+      console.error(error);
+      return respond(res, httpStatus.INTERNAL_SERVER_ERROR, "Server error", {
+        error: error.message,
+      });
     }
   }
 }

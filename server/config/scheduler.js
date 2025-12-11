@@ -4,6 +4,9 @@ const {
   checkSplTokenSendTransactions,
 } = require("../helpers/solana/read-transactions");
 const logger = require("../util/logger");
+const {
+  checkRaffleAndFeaturedStatus,
+} = require("../services/raffles/cron-job");
 
 const SECONDS_1 = "0/1 * * * * *";
 const SECONDS_20 = "*/20 * * * * *";
@@ -20,4 +23,9 @@ const EVERY_SIX_HOUR = "0 */6 * * *";
 schedule.scheduleJob(SECONDS_20, async () => {
   logger.info("Started Spl Token Send Transactions:");
   await checkSplTokenSendTransactions();
+});
+
+schedule.scheduleJob(SECONDS_20, async () => {
+  logger.info("Started Raffle & Featured Status Check:");
+  await checkRaffleAndFeaturedStatus();
 });

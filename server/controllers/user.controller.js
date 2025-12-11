@@ -1,9 +1,21 @@
-const { User, UserInfo, Raffle } = require("../models");
+const {
+  User,
+  UserInfo,
+  Raffle,
+  RaffleTicket,
+  SplTokenSendTransaction,
+} = require("../models");
 const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
-const { mapEnumValue, TOKEN_TYPE, RAFFLE_STATUS } = require("../config/data");
+const {
+  mapEnumValue,
+  TOKEN_TYPE,
+  RAFFLE_STATUS,
+  SPL_TOKEN_SEND_TRANSACTION_TYPE,
+  SPL_TOKEN_SEND_TX_STATUS,
+} = require("../config/data");
 
 class UserController {
   static async getUserInfo(req, res) {
@@ -17,22 +29,43 @@ class UserController {
         include: [
           {
             model: UserInfo,
-            attributes: [
-              "id",
-              "email",
-              "description",
-              "username",
-              "photoUrl",
-              // "twitter",
-              // "discord",
-            ],
+            attributes: ["id", "email", "description", "username", "photoUrl"],
             required: false,
+          },
+          {
+            model: RaffleTicket,
+            attributes: ["id", "ticketNumber", "raffleId"],
           },
         ],
       });
 
+      const solSpentData = await SplTokenSendTransaction.findAll({
+        where: {
+          senderPubkey: user.pubkey,
+          type: SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA,
+          status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+        },
+      });
+
+      let totalSolSpent = 0;
+
+      solSpentData.forEach((tx) => {
+        const commission = parseFloat(tx.commissionAmount || "0");
+        const creator = parseFloat(tx.creatorAmount || "0");
+
+        totalSolSpent += commission + creator;
+      });
+
+      totalSolSpent = Number(totalSolSpent.toFixed(9));
+
       if (user) {
-        return respond(res, httpStatus.OK, "Successful!", { user });
+        const totalTickets = user.raffle_tickets?.length || 0;
+
+        return respond(res, httpStatus.OK, "Successful!", {
+          user,
+          ticketsBought: totalTickets,
+          totalSolSpent,
+        });
       } else {
         return respond(res, httpStatus.NOT_FOUND, "User not found");
       }
