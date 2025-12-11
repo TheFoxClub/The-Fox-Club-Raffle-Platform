@@ -21,6 +21,10 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
+  const TOKEN_DISPLAY_NAMES: Record<string, string> = {
+    SOLANA: "SOL",
+  };
+
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (
@@ -78,7 +82,7 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
       {showPopover && hostData && (
         <div
           ref={popoverRef}
-          className="absolute bottom-full right-0 mb-2 w-84 bg-black/80 backdrop-blur-xl p-6
+          className="absolute bottom-full right-0 mb-2 w-90 bg-black/90 backdrop-blur-xl p-6
            border border-border rounded-xl shadow-lg z-50 transition-opacity duration-200 ease-out"
         >
           {loading ? (
@@ -165,21 +169,23 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                                 )}
                               </div>
                               <div className="flex items-center text-muted-foreground gap-2">
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-col items-center gap-1">
                                   <Ticket className="h-4 w-4" />
                                   <span>
                                     {r.ticketsSold} / {r.totalTickets} sold
                                   </span>
                                 </div>
 
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-col items-center gap-1">
                                   <Coins className="h-4 w-4 text-accent" />
                                   <span>
                                     {(Number(r.totalRevenue) || 0).toFixed(4)}{" "}
-                                    SOL revenue
+                                    {TOKEN_DISPLAY_NAMES[r.tokenType] ||
+                                      r.tokenType}{" "}
+                                    revenue
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-col items-center gap-1">
                                   <Calendar className="h-4 w-4" />
                                   <span>{r.endDate.split("T")[0]}</span>
                                 </div>

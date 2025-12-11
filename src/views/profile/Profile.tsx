@@ -32,6 +32,7 @@ type HostedRaffle = {
   ticketsSold: number;
   totalTickets: number;
   revenue: number;
+  token: string;
   endDate: string;
 };
 
@@ -69,6 +70,23 @@ const Profile = () => {
   );
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
 
+  const formatEndDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+
+    const today = new Date();
+    const ticketDate = new Date(dateString);
+
+    const formattedDate = ticketDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
+    return ticketDate >= today
+      ? `Ends ${formattedDate}`
+      : `Ended ${formattedDate}`;
+  };
+
   //fetch user info from backend
   useEffect(() => {
     const fetchData = async () => {
@@ -94,6 +112,7 @@ const Profile = () => {
                 id: r.id,
                 title: r.title,
                 status: r.status,
+                token: r.token ?? "SOL",
                 ticketsSold: r.ticketsSold ?? 0,
                 totalTickets: r.totalTickets ?? 0,
                 revenue: (r.ticketsSold ?? 0) * (r.ticketPrice ?? 0),
@@ -112,6 +131,7 @@ const Profile = () => {
             raffleTitle: t.title ?? "Unknown Raffle",
             tickets: t.tickets,
             spent: t.spent,
+            token: t.token ?? "SOL",
             ticketNumbers: t.ticketNumbers ?? [],
             status:
               t.Raffle?.status === 2
@@ -298,11 +318,13 @@ const Profile = () => {
 
                       <div className="flex items-center gap-1">
                         <Coins className="h-4 w-4" />
-                        <span>{ticket.spent} SOL spent</span>
+                        <span>
+                          {ticket.spent} {ticket.token} spent
+                        </span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        <span>Ends {ticket.endDate}</span>
+                        <span>{formatEndDate(ticket.endDate)}</span>
                       </div>
                     </div>
                     {/* Ticket numbers inline */}
@@ -378,7 +400,8 @@ const Profile = () => {
                       <div className="flex items-center gap-1">
                         <Coins className="h-4 w-4 text-accent" />
                         <span>
-                          {(raffle.revenue ?? 0).toFixed(4)} SOL revenue
+                          {(raffle.revenue ?? 0).toFixed(4)} {raffle.token}{" "}
+                          revenue
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
