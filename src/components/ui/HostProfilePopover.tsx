@@ -168,13 +168,16 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                                 <div className="flex items-center gap-1">
                                   <Ticket className="h-4 w-4" />
                                   <span>
-                                    {r.ticketsSold} / {r.totalTickets}sold
+                                    {r.ticketsSold} / {r.totalTickets} sold
                                   </span>
                                 </div>
 
                                 <div className="flex items-center gap-1">
                                   <Coins className="h-4 w-4 text-accent" />
-                                  <span>{r.revenue ?? 0} SOL revenue</span>
+                                  <span>
+                                    {(Number(r.totalRevenue) || 0).toFixed(4)}{" "}
+                                    SOL revenue
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <Calendar className="h-4 w-4" />

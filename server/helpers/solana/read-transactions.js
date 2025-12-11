@@ -1,8 +1,14 @@
 const { getConnectionDas } = require("../../config/solana");
-const { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } = require("@solana/spl-token");
+const {
+  TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
+} = require("@solana/spl-token");
 const logger = require("../../util/logger");
 const { SPL_TOKEN_SEND_TRANSACTION_TYPE } = require("../../config/data");
-const { getSplTokenSendTransactions, updateDbAndConfirmTransactions } = require("../../services/spl-transactions");
+const {
+  getSplTokenSendTransactions,
+  updateDbAndConfirmTransactions,
+} = require("../../services/spl-transactions");
 
 const connection = getConnectionDas();
 
@@ -33,7 +39,9 @@ const readTransactions = async (txs) => {
     });
 
     const filteredTxIds = data.map(
-      (dataEntry) => dataEntry?.transaction.signatures[0] && dataEntry.transaction.signatures[0],
+      (dataEntry) =>
+        dataEntry?.transaction.signatures[0] &&
+        dataEntry.transaction.signatures[0]
     );
 
     failedTransactions = txIds.filter((txId) => !filteredTxIds.includes(txId));
@@ -73,7 +81,14 @@ const readTransactions = async (txs) => {
       const preTokenBalances = transaction?.meta?.preTokenBalances || [];
       const postTokenBalances = transaction?.meta?.postTokenBalances || [];
 
-      let object = { sender: "", receiver: "", amount: "", amounts: [], mint: "", txType: "" };
+      let object = {
+        sender: "",
+        receiver: "",
+        amount: "",
+        amounts: [],
+        mint: "",
+        txType: "",
+      };
 
       const resetObject = () => {
         object.sender = "";
@@ -107,29 +122,37 @@ const readTransactions = async (txs) => {
             if (postTokenBalance.programId !== tokenProgramId) continue;
 
             const afterAmount =
-              (postTokenBalance.uiTokenAmount.uiAmount || 0) * Math.pow(10, postTokenBalance.uiTokenAmount.decimals);
+              (postTokenBalance.uiTokenAmount.uiAmount || 0) *
+              Math.pow(10, postTokenBalance.uiTokenAmount.decimals);
 
-            const preTokenBalance = preTokenBalances.find((p) => p.owner === postTokenBalance.owner);
+            const preTokenBalance = preTokenBalances.find(
+              (p) => p.owner === postTokenBalance.owner
+            );
 
             let prevAmount = 0;
 
             if (preTokenBalance) {
               prevAmount =
-                (preTokenBalance.uiTokenAmount.uiAmount || 0) * Math.pow(10, preTokenBalance.uiTokenAmount.decimals);
+                (preTokenBalance.uiTokenAmount.uiAmount || 0) *
+                Math.pow(10, preTokenBalance.uiTokenAmount.decimals);
             }
 
-            const filterInstruction = transaction?.transaction?.message?.instructions.find(
-              (instruction) =>
-                instruction?.program === "spl-token" && instruction?.parsed?.type === "transferCheckedWithFee",
-            );
+            const filterInstruction =
+              transaction?.transaction?.message?.instructions.find(
+                (instruction) =>
+                  instruction?.program === "spl-token" &&
+                  instruction?.parsed?.type === "transferCheckedWithFee"
+              );
 
             if (prevAmount > afterAmount) {
               object.sender = postTokenBalance.owner;
             } else if (prevAmount < afterAmount) {
               object.receiver = postTokenBalance.owner;
               if (filterInstruction) {
-                const { feeAmount, tokenAmount } = filterInstruction.parsed?.info;
-                object.amount = Number(tokenAmount.amount) - Number(feeAmount.amount);
+                const { feeAmount, tokenAmount } =
+                  filterInstruction.parsed?.info;
+                object.amount =
+                  Number(tokenAmount.amount) - Number(feeAmount.amount);
               } else {
                 object.amount = afterAmount - prevAmount;
               }
@@ -182,7 +205,9 @@ const getAmounts = (preBalances, postBalances) => {
     throw new Error("Length of preBalances and postBalances must be equal");
   }
 
-  const amounts = preBalances.slice(1).map((preBalance, idx) => Math.abs(preBalance - postBalances[idx + 1]));
+  const amounts = preBalances
+    .slice(1)
+    .map((preBalance, idx) => Math.abs(preBalance - postBalances[idx + 1]));
 
   return amounts.filter((amount) => amount !== 0);
 };

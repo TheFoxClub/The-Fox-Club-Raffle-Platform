@@ -70,6 +70,8 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+require("./config/scheduler");
+
 let server;
 
 if (port) {

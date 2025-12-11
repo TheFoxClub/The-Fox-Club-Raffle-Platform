@@ -73,6 +73,8 @@ class UserController {
               "imageUrl",
               "ticketPrice",
               "ticketsSold",
+              "totalTickets",
+              "totalRevenue",
               "tokenType",
               "numberOfWinners",
               "startDate",
