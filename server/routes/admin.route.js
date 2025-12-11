@@ -39,4 +39,20 @@ router.get(
   AdminController.getAllVerifiedCollections
 );
 
+// Get Top Creators
+router.get(
+  "/top-creators",
+  auth.bearer,
+  isAdmin,
+  AdminController.getTopRaffleCreators
+);
+
+// Get Dashboard Stats
+router.get(
+  "/dashboard-stats",
+  auth.bearer,
+  isAdmin,
+  AdminController.getDashboardStats
+);
+
 module.exports = router;
