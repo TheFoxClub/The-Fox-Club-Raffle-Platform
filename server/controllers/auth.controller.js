@@ -46,33 +46,27 @@ const handleError = async (res, err) => {
 };
 
 class AuthController {
-  static async authenticate(req, res, next) {
-    if (req.payload.pubkey !== req.query.pubkey) {
-      return respond(res, httpStatus.UNAUTHORIZED, "Not Authorized!");
-    }
-
+  static async authenticate(req, res) {
     const user = await User.findOne({
       raw: true,
-      where: { id: req.payload.id, pubkey: req.payload.pubkey },
+      where: {
+        id: req.payload.id,
+        pubkey: req.payload.pubkey,
+      },
       attributes: ["id", "blockchainNetwork", "pubkey"],
     });
 
-    if (user) {
-      return respond(res, httpStatus.OK, "Successful", {
-        user: {
-          ...user,
-          isAuthenticated: true,
-          isAdmin: ADMIN_PUBKEY.includes(user.pubkey),
-          adminPubkey: user.pubkey ? user.pubkey : undefined,
-        },
-      });
-    } else {
-      return respond(
-        res,
-        httpStatus.INTERNAL_SERVER_ERROR,
-        "Not authenticated!"
-      );
+    if (!user) {
+      return respond(res, httpStatus.UNAUTHORIZED, "Not authenticated!");
     }
+
+    return respond(res, httpStatus.OK, "Successful", {
+      user: {
+        ...user,
+        isAuthenticated: true,
+        isAdmin: ADMIN_PUBKEY.includes(user.pubkey),
+      },
+    });
   }
 
   static async login(req, res, next) {

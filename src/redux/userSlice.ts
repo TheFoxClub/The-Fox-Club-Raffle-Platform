@@ -31,7 +31,12 @@ const user = createSlice({
   name: "user",
   initialState,
   reducers: {
-    setUser: (_, action: PayloadAction<User>) => action.payload,
+    setUser: (state, action: PayloadAction<Partial<User>>) => {
+      return {
+        ...state,
+        ...action.payload,
+      };
+    },
 
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
@@ -44,7 +49,7 @@ const user = createSlice({
       if (token) {
         state.token = token;
         state.isAuthenticated = true;
-        state.isLoading = false; // avoid default "loading" state
+        state.isLoading = true;
       } else {
         state.isAuthenticated = false;
         state.isLoading = false;

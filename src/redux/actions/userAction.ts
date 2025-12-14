@@ -30,22 +30,13 @@ export const loginUser = createAsyncThunk<
 
 export const authenticateUser = createAsyncThunk<
   ResponseDataType,
-  string,
+  void,
   { rejectValue: ResponseDataType }
->("auth/authenticate", async (pubkey, { rejectWithValue }) => {
+>("auth/authenticate", async (_, { rejectWithValue }) => {
   try {
-    return await server
-      .get("/auth/authenticate", { params: { pubkey } })
-      .then((res) => res.data);
+    return await server.get("/auth/authenticate").then((res) => res.data);
   } catch (error: any) {
-    if (error.response?.data?.message) {
-      return rejectWithValue(error.response.data);
-    }
-    return rejectWithValue({
-      data: null,
-      message: "Oops something went wrong",
-      success: false,
-    });
+    return rejectWithValue(error.response?.data);
   }
 });
 
