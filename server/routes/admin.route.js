@@ -55,4 +55,15 @@ router.get(
   AdminController.getDashboardStats
 );
 
+// Get Top Performing Raffles
+router.get(
+  "/top-raffles",
+  auth.bearer,
+  isAdmin,
+  AdminController.getTopPerformingRaffles
+);
+
+// Get top hosts and buyers
+router.get("/leaderboard", AdminController.getTopHostsAndBuyers);
+
 module.exports = router;

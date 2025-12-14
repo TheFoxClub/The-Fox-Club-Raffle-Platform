@@ -5,6 +5,7 @@ const {
   UserInfo,
   VerifiedCollection,
   Sequelize,
+  sequelize,
 } = require("../models");
 const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
@@ -16,7 +17,12 @@ const {
   RAFFLE_STATUS,
   RAFFLE_FEATURED_STATUS,
   RAFFLE_FEATURED_POSITION,
+  mapEnumValue,
 } = require("../config/data");
+const {
+  getTopHosts,
+  getTopBuyers,
+} = require("../services/leaderboard.service");
 
 class AdminController {
   static async getAllRaffles(req, res) {
@@ -366,6 +372,95 @@ class AdminController {
       return respond(res, httpStatus.INTERNAL_SERVER_ERROR, "Server error", {
         error: error.message,
       });
+    }
+  }
+
+  static async getTopPerformingRaffles(req, res) {
+    try {
+      const { limit = 3 } = req.query;
+
+      const queryResult = await sequelize.query(
+        `
+        SELECT 
+          r.id,
+          r.title,
+          r.ticketPrice,
+          r.status,
+          u.pubkey as creatorAddress,
+          COALESCE(
+            (
+              SELECT COUNT(*) * r.ticketPrice
+              FROM raffle_tickets rt
+              WHERE rt.raffleId = r.id
+              AND rt.splTokenSendTxId IS NOT NULL
+            ), 0
+          ) as revenue,
+          COALESCE(
+            (
+              SELECT COUNT(*)
+              FROM raffle_tickets rt
+              WHERE rt.raffleId = r.id
+              AND rt.splTokenSendTxId IS NOT NULL
+            ), 0
+          ) as totalTicketsSold
+        FROM raffles r
+        LEFT JOIN users u ON r.userId = u.id
+        ORDER BY revenue DESC
+        LIMIT ?
+      `,
+        {
+          replacements: [parseInt(limit, 10)],
+        }
+      );
+
+      const raffles = queryResult[0] || [];
+
+      const formattedRaffles = raffles.map((raffle, index) => ({
+        rank: index + 1,
+        raffleId: raffle.id,
+        raffleName: raffle.title,
+        creatorAddress: raffle.creatorAddress,
+        revenueInSOL: parseFloat(raffle.revenue || 0),
+        totalTicketsSold: parseInt(raffle.totalTicketsSold || 0, 10),
+        status: mapEnumValue(RAFFLE_STATUS, raffle.status),
+        ticketPrice: parseFloat(raffle.ticketPrice || 0),
+      }));
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Top performing raffles fetched!",
+        formattedRaffles
+      );
+    } catch (error) {
+      logger.error("Error getting top performing raffles:", error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to retrieve top performing raffles"
+      );
+    }
+  }
+
+  static async getTopHostsAndBuyers(req, res) {
+    try {
+      const { limit = 10 } = req.query;
+
+      const topHosts = await getTopHosts(limit);
+
+      const topBuyers = await getTopBuyers(limit);
+
+      return respond(res, httpStatus.OK, "Top hosts and buyers fetched!", {
+        topHosts,
+        topBuyers,
+      });
+    } catch (error) {
+      logger.error("Error getting top hosts and buyers:", error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to fetch top hosts and buyers"
+      );
     }
   }
 }
