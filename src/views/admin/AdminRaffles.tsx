@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Edit, Ban, Star, Copy } from "lucide-react";
+import { Search, Filter, Edit, Ban, Star, Copy, Unlock } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import {
@@ -14,7 +14,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "../../components/ui/Dialog";
 import { Switch } from "../../components/ui/Switch";
 import server from "../../config/server";
@@ -83,13 +82,27 @@ export default function AdminRaffles() {
   const [selectedRaffle, setSelectedRaffle] = useState<Raffle | null>(null);
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [isFeatured, setIsFeatured] = useState(false);
-  const [status, setStatus] = useState("live");
+  const [open, setOpen] = useState(false);
+  //const [status, setStatus] = useState("live");
+
+  useEffect(() => {
+    const fetchRaffles = async () => {
+      try {
+        const res = await server.get("/admin/raffles");
+        const mapped = res.data.data.raffles.map(mapRaffle);
+        setRaffles(mapped);
+      } catch (err) {
+        console.error("Error fetching raffles", err);
+      }
+    };
+    fetchRaffles();
+  }, []);
 
   // Initialize dialog state when a raffle is selected
   useEffect(() => {
     if (selectedRaffle) {
       setIsFeatured(selectedRaffle.featured);
-      setStatus(selectedRaffle.status);
+      // setStatus(selectedRaffle.status);
     }
   }, [selectedRaffle]);
 
@@ -110,27 +123,15 @@ export default function AdminRaffles() {
       });
     }
   };
-  useEffect(() => {
-    const fetchRaffles = async () => {
-      try {
-        const res = await server.get("/admin/raffles");
-        const mapped = res.data.data.raffles.map(mapRaffle);
-        setRaffles(mapped);
-      } catch (err) {
-        console.error("Error fetching raffles", err);
-      }
-    };
-    fetchRaffles();
-  }, []);
 
   const handleSaveChanges = async () => {
     if (!selectedRaffle) return;
 
     try {
       // Update raffle status
-      await server.put(`/admin/raffles/${selectedRaffle.id}`, {
-        status: status,
-      });
+      // await server.put(`/admin/raffles/${selectedRaffle.id}`, {
+      //   status: status,
+      // });
 
       // Update featured
       const featuredUntil = isFeatured ? selectedRaffle.endDate : null;
@@ -145,11 +146,13 @@ export default function AdminRaffles() {
       setRaffles((prev) =>
         prev.map((r) =>
           r.id === selectedRaffle.id
-            ? { ...r, featured: isFeatured, status: status }
+            ? // ? { ...r, featured: isFeatured, status: status }
+              { ...r, featured: isFeatured }
             : r
         )
       );
       toast.success("Raffle updated successfully!");
+      setOpen(false);
       setSelectedRaffle(null); // close dialog
     } catch (err) {
       console.error(err);
@@ -305,12 +308,12 @@ export default function AdminRaffles() {
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium ${
                         raffle.status === "Suspended"
-                          ? "bg-orange-500/20 text-orange-500"
+                          ? "bg-primary/20 text-primary"
                           : raffle.status === "Live"
                           ? "bg-green-500/20 text-green-500"
                           : raffle.status === "Ended"
                           ? "bg-muted text-muted-foreground"
-                          : "bg-destructive/20 text-destructive"
+                          : "bg-secondary/20 text-secondary"
                       }`}
                     >
                       {raffle.status}
@@ -318,12 +321,15 @@ export default function AdminRaffles() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <Dialog>
+                      {/* <Dialog open={open} onOpenChange={setOpen}>
                         <DialogTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setSelectedRaffle(raffle)}
+                            onClick={() => {
+                              setSelectedRaffle(raffle);
+                              setOpen(true);
+                            }}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -342,7 +348,7 @@ export default function AdminRaffles() {
                                 onCheckedChange={setIsFeatured}
                               />
                             </div>
-                            <div className="flex items-center justify-between">
+                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">
                                 Status
                               </span>
@@ -358,7 +364,7 @@ export default function AdminRaffles() {
                                   <SelectItem value="Ended">End</SelectItem>
                                 </SelectContent>
                               </Select>
-                            </div>
+                            </div> 
                             <Button
                               className="w-full gradient-primary"
                               onClick={handleSaveChanges}
@@ -367,13 +373,23 @@ export default function AdminRaffles() {
                             </Button>
                           </div>
                         </DialogContent>
-                      </Dialog>
+                      </Dialog> */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setSelectedRaffle(raffle);
+                          setOpen(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className={
                           raffle.status === "Suspended"
-                            ? "text-orange-500"
+                            ? "text-green-500 hover:text-green-600"
                             : "text-destructive"
                         }
                         onClick={() =>
@@ -388,7 +404,11 @@ export default function AdminRaffles() {
                             : "Suspend"
                         }
                       >
-                        <Ban className="h-4 w-4" />
+                        {raffle.status === "Suspended" ? (
+                          <Unlock className="h-4 w-4 " />
+                        ) : (
+                          <Ban className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   </td>
@@ -396,6 +416,34 @@ export default function AdminRaffles() {
               ))}
             </tbody>
           </table>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Raffle</DialogTitle>
+              </DialogHeader>
+
+              {selectedRaffle && (
+                <div className="space-y-4 py-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Featured on Homepage
+                    </span>
+                    <Switch
+                      checked={isFeatured}
+                      onCheckedChange={setIsFeatured}
+                    />
+                  </div>
+
+                  <Button
+                    className="w-full gradient-primary"
+                    onClick={handleSaveChanges}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

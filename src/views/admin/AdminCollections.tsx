@@ -205,10 +205,10 @@ export default function AdminCollections() {
                   onChange={(e) => setNewCollectionName(e.target.value)}
                 />
               </div>
-              {/* <div className="space-y-2">
+              <div className="space-y-2">
                 <Label>Mint Address</Label>
                 <Input placeholder="FoxC...xyz1" />
-              </div> */}
+              </div>
               <div className="flex items-center justify-between">
                 <Label>Verify Immediately</Label>
                 <Switch defaultChecked />

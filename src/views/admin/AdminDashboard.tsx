@@ -5,30 +5,6 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 
-// const topRaffles = [
-//   {
-//     name: "Legendary Fox #001",
-//     creator: "7XYZ...abc1",
-//     volume: "245.5 SOL",
-//     tickets: 489,
-//     status: "Live",
-//   },
-//   {
-//     name: "Golden Den Pass",
-//     creator: "8ABC...def2",
-//     volume: "189.2 SOL",
-//     tickets: 378,
-//     status: "Live",
-//   },
-//   {
-//     name: "Fox Club VIP",
-//     creator: "9DEF...ghi3",
-//     volume: "156.8 SOL",
-//     tickets: 312,
-//     status: "Ended",
-//   },
-// ];
-
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
@@ -39,7 +15,7 @@ export default function AdminDashboard() {
     liveRaffleCount: 0,
   });
 
-  const topRaffles: any[] = [];
+  const [topRaffles, setTopRaffles] = useState<any[]>([]);
   const [topCreators, setTopCreators] = useState<any[]>([]);
 
   const shortWallet = (address: string) => {
@@ -56,8 +32,9 @@ export default function AdminDashboard() {
         setTopCreators(creatorsData);
 
         // Fetch top raffles
-        // - setTopRaffles(await rafflesRes.json());
-        // - setStats(...)
+        const rafflesRes = await server.get("/admin/top-raffles");
+        const rafflesData = rafflesRes.data.data;
+        setTopRaffles(rafflesData);
 
         // Fetch dashboard stats
         const statsRes = await server.get("/admin/dashboard-stats");
@@ -123,40 +100,40 @@ export default function AdminDashboard() {
           </div>
 
           <div className="space-y-4">
-            {/* {topRaffles.map((raffle, index) => (
-              <div
-                key={index}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-card/50 border border-border/30 hover:border-primary/50 transition-all gap-3"
-              >
-                <div className="flex-1">
-                  <h3 className="font-semibold mb-1">{raffle.name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {raffle.creator}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-primary">{raffle.volume}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {raffle.tickets} tickets
-                  </p>
-                </div>
-                <div className="sm:ml-4">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                      raffle.status === "Live"
-                        ? "bg-green-500/20 text-green-500"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {raffle.status}
-                  </span>
-                </div>
-              </div>
-            ))} */}
-
             {topRaffles.length > 0 ? (
               topRaffles.map((raffle, index) => (
-                <div key={index}>{raffle.name}</div>
+                <div
+                  key={index}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-card/50 border border-border/30 hover:border-primary/50 transition-all gap-3"
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">{raffle.raffleName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {shortWallet(raffle.creatorAddress)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-primary">
+                      {raffle.revenueInSOL}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {raffle.totalTicketsSold} tickets
+                    </p>
+                  </div>
+                  <div className="sm:ml-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                        raffle.status === "LIVE"
+                          ? "bg-green-500/20 text-green-500"
+                          : raffle.status == "UPCOMING"
+                          ? "bg-secondary/20 text-secondary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {raffle.status}
+                    </span>
+                  </div>
+                </div>
               ))
             ) : (
               <p className="text-muted-foreground mt-20 text-center">

@@ -9,6 +9,7 @@ import {
 } from "../../components/ui/Tabs";
 import { useToast } from "../../hooks/use-toast";
 import { useEffect } from "react";
+import server from "../../config/server";
 
 // const topHosts = [
 //   { wallet: "7XYZ...abc1", revenue: "1,245 SOL", raffles: 45, xp: 12450, streak: 15 },
@@ -31,12 +32,57 @@ export default function AdminLeaderboards() {
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const topHosts: any[] = []; // fallback empty
-  const topBuyers: any[] = []; // fallback empty
+  const [topHosts, setTopHosts] = useState<any[]>([]);
+  const [topBuyers, setTopBuyers] = useState<any[]>([]);
+
+  const shortWallet = (wallet: string) =>
+    wallet.slice(0, 4) + "..." + wallet.slice(-4);
+
+  const formatAmount = (amount: number, tokenType: string) => {
+    if (amount === null || amount === undefined) return `0 ${tokenType}`;
+
+    const TOKEN_LABELS: Record<string, string> = {
+      SOLANA: "SOL",
+      USDC: "USDC",
+    };
+
+    return `${amount} ${TOKEN_LABELS[tokenType] ?? tokenType}`;
+  };
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
+    async function fetchData() {
+      try {
+        const res = await server.get("/admin/leaderboard");
+        const { topHosts, topBuyers } = res.data.data;
+
+        setTopHosts(
+          topHosts.map((host: any) => ({
+            walletAddress: host.walletAddress,
+            totalRevenue: host.totalRevenue,
+            tokenType: host.tokenType,
+            rafflesCount: host.rafflesCount,
+            xp: 0,
+            streak: 0,
+          }))
+        );
+
+        setTopBuyers(
+          topBuyers.map((buyer: any) => ({
+            walletAddress: buyer.walletAddress,
+            spending: buyer.totalSpent,
+            tokenType: buyer.tokenType,
+            tickets: buyer.ticketsBought,
+            xp: 0,
+            streak: 0,
+          }))
+        );
+      } catch (error) {
+        console.error("Error fetching top hosts:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
   if (loading) return <p>Loading leaderboards...</p>;
@@ -102,7 +148,7 @@ export default function AdminLeaderboards() {
                   {topHosts.length > 0 ? (
                     topHosts.map((host, index) => (
                       <tr
-                        key={host.wallet}
+                        key={host.walletAddress}
                         className="border-b border-border/30 hover:bg-muted/20"
                       >
                         <td className="p-4">
@@ -125,12 +171,14 @@ export default function AdminLeaderboards() {
                             )}
                           </div>
                         </td>
-                        <td className="p-4 font-medium">{host.wallet}</td>
+                        <td className="p-4 font-medium">
+                          {shortWallet(host.walletAddress)}
+                        </td>
                         <td className="p-4 text-primary font-bold">
-                          {host.revenue}
+                          {formatAmount(host.totalRevenue, host.tokenType)}
                         </td>
                         <td className="p-4 text-muted-foreground">
-                          {host.raffles}
+                          {host.rafflesCount}
                         </td>
                         <td className="p-4">
                           <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-sm font-medium">
@@ -178,7 +226,7 @@ export default function AdminLeaderboards() {
                   {topBuyers.length > 0 ? (
                     topBuyers.map((buyer, index) => (
                       <tr
-                        key={buyer.wallet}
+                        key={buyer.walletAddress}
                         className="border-b border-border/30 hover:bg-muted/20"
                       >
                         <td className="p-4">
@@ -201,9 +249,11 @@ export default function AdminLeaderboards() {
                             )}
                           </div>
                         </td>
-                        <td className="p-4 font-medium">{buyer.wallet}</td>
+                        <td className="p-4 font-medium">
+                          {shortWallet(buyer.walletAddress)}
+                        </td>
                         <td className="p-4 text-accent font-bold">
-                          {buyer.spending}
+                          {formatAmount(buyer.spending, buyer.tokenType)}
                         </td>
                         <td className="p-4 text-muted-foreground">
                           {buyer.tickets}

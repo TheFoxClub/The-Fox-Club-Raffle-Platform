@@ -5,18 +5,7 @@ import { Switch } from "../../components/ui/Switch";
 import { Label } from "../../components/ui/Label";
 import { useToast } from "../../hooks/use-toast";
 import { useState, useEffect } from "react";
-
-// const topHosts = [
-//   { wallet: "7XYZ...abc1", volume: "1,245 SOL", rank: 1 },
-//   { wallet: "8ABC...def2", volume: "987 SOL", rank: 2 },
-//   { wallet: "9DEF...ghi3", volume: "756 SOL", rank: 3 },
-// ];
-
-// const topBuyers = [
-//   { wallet: "4GHI...jkl4", spending: "2,345 SOL", rank: 1 },
-//   { wallet: "5JKL...mno5", spending: "1,876 SOL", rank: 2 },
-//   { wallet: "6MNO...pqr6", spending: "1,543 SOL", rank: 3 },
-// ];
+import server from "../../config/server";
 
 export default function AdminRewards() {
   const { toast } = useToast();
@@ -24,8 +13,22 @@ export default function AdminRewards() {
 
   const rewardPool = 0;
   const poolProgress = 0;
-  const topHosts: any[] = [];
-  const topBuyers: any[] = [];
+  const [topHosts, setTopHosts] = useState<any[]>([]);
+  const [topBuyers, setTopBuyers] = useState<any[]>([]);
+
+  const shortWallet = (wallet: string) =>
+    wallet.slice(0, 4) + "..." + wallet.slice(-4);
+
+  const formatAmount = (amount: number, tokenType: string) => {
+    if (amount === null || amount === undefined) return `0 ${tokenType}`;
+
+    const TOKEN_LABELS: Record<string, string> = {
+      SOLANA: "SOL",
+      USDC: "USDC",
+    };
+
+    return `${amount} ${TOKEN_LABELS[tokenType] ?? tokenType}`;
+  };
 
   const handleExport = (type: string) => {
     toast({
@@ -34,18 +37,29 @@ export default function AdminRewards() {
     });
   };
 
-  useEffect(() => {
-    // simulate async fetch
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
   const handleAirdrop = () => {
     toast({
       title: "🎁 Airdrop Triggered",
       description: "Rewards are being distributed to top users",
     });
   };
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await server.get("/admin/leaderboard");
+        const { topHosts, topBuyers } = res.data.data;
+
+        setTopHosts(topHosts);
+        setTopBuyers(topBuyers);
+      } catch (error) {
+        console.error("Error fetching top hosts:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
   if (loading) return <p>Loading rewards dashboard...</p>;
 
   return (
@@ -122,7 +136,7 @@ export default function AdminRewards() {
             {topHosts.length > 0 ? (
               topHosts.map((host) => (
                 <div
-                  key={host.wallet}
+                  key={host.walletAddress}
                   className="flex items-center gap-4 p-4 rounded-lg bg-card/50 border border-border/30"
                 >
                   <div
@@ -137,12 +151,16 @@ export default function AdminRewards() {
                     {host.rank}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium">{host.wallet}</p>
+                    <p className="font-medium">
+                      {shortWallet(host.walletAddress)}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       Total Volume
                     </p>
                   </div>
-                  <p className="font-bold text-primary">{host.volume}</p>
+                  <p className="font-bold text-primary">
+                    {formatAmount(host.totalRevenue, host.tokenType)}
+                  </p>
                 </div>
               ))
             ) : (
@@ -174,7 +192,7 @@ export default function AdminRewards() {
             {topBuyers.length > 0 ? (
               topBuyers.map((buyer) => (
                 <div
-                  key={buyer.wallet}
+                  key={buyer.walletAddress}
                   className="flex items-center gap-4 p-4 rounded-lg bg-card/50 border border-border/30"
                 >
                   <div
@@ -189,12 +207,16 @@ export default function AdminRewards() {
                     {buyer.rank}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium">{buyer.wallet}</p>
+                    <p className="font-medium">
+                      {shortWallet(buyer.walletAddress)}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       Total Spending
                     </p>
                   </div>
-                  <p className="font-bold text-accent">{buyer.spending}</p>
+                  <p className="font-bold text-accent">
+                    {formatAmount(buyer.totalSpent, buyer.tokenType)}
+                  </p>
                 </div>
               ))
             ) : (
