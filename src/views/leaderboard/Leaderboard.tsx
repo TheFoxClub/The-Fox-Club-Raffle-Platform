@@ -16,9 +16,72 @@ import {
   TabsTrigger,
 } from "../../components/ui/Tabs";
 //import { topHosts, topBuyers } from "../../dummydata/topHostsBuyers";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import server from "../../config/server";
 
 const Leaderboard = () => {
+  const [selectedTime, setSelectedTime] = useState("monthly");
+  const [topHosts, setTopHosts] = useState<any[]>([]);
+  const [topBuyers, setTopBuyers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const timeOptions = [
+    { value: "weekly", label: "Weekly" },
+    { value: "monthly", label: "Monthly" },
+    { value: "alltime", label: "All Time" },
+  ];
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setLoading(true);
+      try {
+        const res = await server.get("/admin/leaderboard");
+        const json = res.data;
+
+        if (json.success) {
+          const formatToken = (token: string) => {
+            if (token === "SOLANA") return "SOL";
+            if (token === "USDC") return "USDC"; // keep as is
+            return token; // fallback
+          };
+
+          const shortenWallet = (wallet: string) => {
+            if (!wallet) return "";
+            return wallet.slice(0, 4) + "..." + wallet.slice(-4);
+          };
+
+          const mappedHosts = json.data.topHosts.map((host: any) => ({
+            rank: host.rank,
+            wallet: shortenWallet(host.walletAddress),
+            revenue: host.totalRevenue,
+            raffles: host.rafflesCount,
+            tokenType: formatToken(host.tokenType),
+            badge: host.rank === 1 ? "crown" : undefined,
+            reputation: 0,
+          }));
+          const mappedBuyers = json.data.topBuyers.map((buyer: any) => ({
+            rank: buyer.rank,
+            wallet: shortenWallet(buyer.walletAddress),
+            spent: buyer.totalSpent,
+            tickets: buyer.ticketsBought,
+            wins: buyer.transactionsCount,
+            tokenType: formatToken(buyer.tokenType),
+            badge: buyer.rank === 1 ? "crown" : undefined,
+          }));
+
+          setTopHosts(mappedHosts);
+          setTopBuyers(mappedBuyers);
+        }
+      } catch (error) {
+        console.error("Failed to fetch leaderboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, []);
+
   const getRankIcon = (rank: number, badge?: string) => {
     if (badge === "crown") {
       return <Crown className="h-6 w-6 text-yellow-500" />;
@@ -38,18 +101,6 @@ const Leaderboard = () => {
     if (rank === 3) return " border-amber-600/50";
     return "";
   };
-
-  const timeOptions = [
-    { value: "weekly", label: "Weekly" },
-    { value: "monthly", label: "Monthly" },
-    { value: "alltime", label: "All Time" },
-  ];
-
-  const [selectedTime, setSelectedTime] = useState("monthly");
-
-  // Fallback since API is not ready
-  const topHosts: any[] = [];
-  const topBuyers: any[] = [];
 
   return (
     <div className="container mx-auto px-4 py-2">
@@ -103,7 +154,11 @@ const Leaderboard = () => {
                 <p className="font-bold text-2xl">Top Hosts by Revenue</p>
               </div>
 
-              {topHosts.length === 0 ? (
+              {loading ? (
+                <p className="text-center text-muted-foreground py-10">
+                  Loading leaderboard...
+                </p>
+              ) : topHosts.length === 0 ? (
                 <p className="text-center text-muted-foreground py-10">
                   Leaderboard data not available yet — coming soon.
                 </p>
@@ -142,7 +197,7 @@ const Leaderboard = () => {
                             <p className="font-bold text-xl">{host.revenue}</p>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            SOL earned
+                            {host.tokenType} earned
                           </p>
                         </div>
                       </div>
@@ -160,7 +215,11 @@ const Leaderboard = () => {
                 <p className="font-bold text-2xl">Top Buyers by Spending</p>
               </div>
 
-              {topBuyers.length === 0 ? (
+              {loading ? (
+                <p className="text-center text-muted-foreground py-10">
+                  Loading leaderboard...
+                </p>
+              ) : topBuyers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-10">
                   Buyer leaderboard coming soon — stay tuned!
                 </p>
@@ -196,7 +255,7 @@ const Leaderboard = () => {
                             <p className="font-bold text-xl">{buyer.spent}</p>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            SOL spent
+                            {buyer.tokenType} spent
                           </p>
                         </div>
                       </div>
