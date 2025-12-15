@@ -84,12 +84,37 @@ const getTopBuyers = async (limit = 10) => {
 
     const ticketCounts = await getTicketCountsByBuyers(walletAddresses);
 
+    const winsData = await sequelize.query(
+      `
+      SELECT 
+        st.senderPubkey AS walletAddress,
+        COUNT(rt.id) AS totalWins
+      FROM spl_token_send_transactions st
+      INNER JOIN raffle_tickets rt ON rt.splTokenSendTxId = st.id
+      WHERE st.senderPubkey IN (?)
+        AND rt.isWinner = 1
+        AND st.status = ?
+      GROUP BY st.senderPubkey
+      `,
+      {
+        replacements: [walletAddresses, SPL_TOKEN_SEND_TX_STATUS.SUCCESS],
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    // Convert wins data to a lookup object
+    const winsLookup = winsData.reduce((acc, item) => {
+      acc[item.walletAddress] = parseInt(item.totalWins || 0, 10);
+      return acc;
+    }, {});
+
     return buyers.map((buyer, index) => ({
       rank: index + 1,
       walletAddress: buyer.walletAddress,
       totalSpent: parseFloat(buyer.totalSpent || 0),
       ticketsBought: parseInt(ticketCounts[buyer.walletAddress] || 0, 10),
       transactionsCount: parseInt(buyer.transactionsCount || 0, 10),
+      totalWins: winsLookup[buyer.walletAddress] || 0,
       tokenType: mapEnumValue(TOKEN_TYPE, buyer.transactionType),
     }));
   } catch (error) {

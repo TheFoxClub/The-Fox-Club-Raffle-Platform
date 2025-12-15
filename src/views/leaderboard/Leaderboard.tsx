@@ -64,7 +64,7 @@ const Leaderboard = () => {
             wallet: shortenWallet(buyer.walletAddress),
             spent: buyer.totalSpent,
             tickets: buyer.ticketsBought,
-            wins: buyer.transactionsCount,
+            wins: buyer.totalWins,
             tokenType: formatToken(buyer.tokenType),
             badge: buyer.rank === 1 ? "crown" : undefined,
           }));
