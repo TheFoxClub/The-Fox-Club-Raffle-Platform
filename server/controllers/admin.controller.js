@@ -207,51 +207,6 @@ class AdminController {
     }
   }
 
-  static async createOrUpdateVerifiedCollection(req, res) {
-    try {
-      const { address, addresses } = req.body;
-      let records = [];
-
-      if (address) {
-        const [record, created] = await VerifiedCollection.findOrCreate({
-          where: { address },
-          defaults: { address },
-        });
-        if (!created) {
-          await record.update({ address });
-        }
-        records.push(record);
-      }
-
-      if (Array.isArray(addresses) && addresses.length > 0) {
-        for (const addr of addresses) {
-          const [record, created] = await VerifiedCollection.findOrCreate({
-            where: { address: addr },
-            defaults: { address: addr },
-          });
-          if (!created) {
-            await record.update({ address: addr });
-          }
-          records.push(record);
-        }
-      }
-
-      return respond(
-        res,
-        httpStatus.OK,
-        "Verified collection(s) created/updated successfully!",
-        { data: records }
-      );
-    } catch (error) {
-      logger.error(error);
-      return respond(
-        res,
-        httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
-      );
-    }
-  }
-
   static async getAllVerifiedCollections(req, res) {
     try {
       const { page = 1, limit = 50 } = req.query;
@@ -284,6 +239,263 @@ class AdminController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async createVerifiedCollection(req, res) {
+    try {
+      const { address, name } = req.body;
+
+      if (!address) {
+        return respond(res, httpStatus.BAD_REQUEST, "Address is required");
+      }
+
+      const existingCollection = await VerifiedCollection.findOne({
+        where: { address },
+      });
+
+      if (existingCollection) {
+        return respond(
+          res,
+          httpStatus.CONFLICT,
+          "Collection with this address already exists"
+        );
+      }
+
+      const collection = await VerifiedCollection.create({
+        address,
+        name: name || null,
+        isVerified: false,
+      });
+
+      return respond(
+        res,
+        httpStatus.CREATED,
+        "Verified collection created successfully!",
+        { collection }
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async updateVerifiedCollection(req, res) {
+    try {
+      const { id } = req.params;
+      const { address, name, isVerified } = req.body;
+
+      const collection = await VerifiedCollection.findByPk(id);
+
+      if (!collection) {
+        return respond(res, httpStatus.NOT_FOUND, "Collection not found");
+      }
+
+      // Check if address is being updated and if it already exists
+      if (address && address !== collection.address) {
+        const existingAddress = await VerifiedCollection.findOne({
+          where: { address },
+        });
+
+        if (existingAddress) {
+          return respond(
+            res,
+            httpStatus.CONFLICT,
+            "Address already exists for another collection"
+          );
+        }
+      }
+
+      await collection.update({
+        address: address || collection.address,
+        name: name !== undefined ? name : collection.name,
+        isVerified:
+          isVerified !== undefined ? isVerified : collection.isVerified,
+      });
+
+      return respond(res, httpStatus.OK, "Collection updated successfully", {
+        collection,
+      });
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async deleteVerifiedCollection(req, res) {
+    try {
+      const { id } = req.params;
+
+      const collection = await VerifiedCollection.findByPk(id);
+
+      if (!collection) {
+        return respond(res, httpStatus.NOT_FOUND, "Collection not found");
+      }
+
+      await collection.destroy();
+
+      return respond(res, httpStatus.OK, "Collection deleted successfully");
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async getVerifiedCollectionById(req, res) {
+    try {
+      const { id } = req.params;
+
+      const collection = await VerifiedCollection.findByPk(id);
+
+      if (!collection) {
+        return respond(res, httpStatus.NOT_FOUND, "Collection not found");
+      }
+
+      return respond(res, httpStatus.OK, "Collection retrieved successfully", {
+        collection,
+      });
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async toggleVerification(req, res) {
+    try {
+      const { id } = req.params;
+
+      const collection = await VerifiedCollection.findByPk(id);
+
+      if (!collection) {
+        return respond(res, httpStatus.NOT_FOUND, "Collection not found");
+      }
+
+      await collection.update({
+        isVerified: !collection.isVerified,
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        `Collection ${
+          collection.isVerified ? "verified" : "unverified"
+        } successfully`,
+        { collection }
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async bulkUploadFromCSV(req, res) {
+    try {
+      if (!req.file) {
+        return respond(res, httpStatus.BAD_REQUEST, "CSV file is required");
+      }
+
+      const csvData = req.file.buffer.toString();
+      const rows = csvData.split("\n");
+      const results = {
+        success: [],
+        failed: [],
+        duplicates: [],
+      };
+
+      // Skip header row if it exists
+      const startIndex = rows[0].toLowerCase().includes("address") ? 1 : 0;
+
+      for (let i = startIndex; i < rows.length; i++) {
+        const row = rows[i].trim();
+        if (!row) continue;
+
+        const columns = row.split(",").map((col) => col.trim());
+        const address = columns[0];
+        const name = columns[1] || null;
+
+        if (!address) {
+          results.failed.push({ row: i + 1, error: "Address is required" });
+          continue;
+        }
+
+        try {
+          // Check if address already exists
+          const existing = await VerifiedCollection.findOne({
+            where: { address },
+          });
+
+          if (existing) {
+            results.duplicates.push({ address, name });
+            continue;
+          }
+
+          const collection = await VerifiedCollection.create({
+            address,
+            name,
+            isVerified: false,
+          });
+
+          results.success.push(collection);
+        } catch (error) {
+          results.failed.push({ row: i + 1, address, error: error.message });
+        }
+      }
+
+      return respond(res, httpStatus.OK, "CSV upload processed", { results });
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async bulkDeleteCollections(req, res) {
+    try {
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return respond(res, httpStatus.BAD_REQUEST, "Array of IDs is required");
+      }
+
+      const deletedCount = await VerifiedCollection.destroy({
+        where: { id: ids },
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        `${deletedCount} collection(s) deleted successfully`
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
       );
     }
   }

@@ -3,6 +3,8 @@ const AdminController = require("../controllers/admin.controller");
 const auth = require("../config/auth");
 const isAdmin = require("../middlewares/isAdmin");
 const router = express.Router();
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Get all raffles
 router.get("/raffles", auth.bearer, isAdmin, AdminController.getAllRaffles);
@@ -23,20 +25,69 @@ router.put(
   AdminController.toggleSuspendStatus
 );
 
-// Upload Verified Collection
+// Upload Verified Collection via CSV
+router.post(
+  "/verified-collection/bulk-upload",
+  auth.bearer,
+  isAdmin,
+  upload.single("file"),
+  AdminController.bulkUploadFromCSV
+);
+
+// Create new Verified Collection
 router.post(
   "/verified-collection",
   auth.bearer,
   isAdmin,
-  AdminController.createOrUpdateVerifiedCollection
+  AdminController.createVerifiedCollection
 );
 
-//Get Verified Collections
+// Get all Verified Collections (with pagination)
 router.get(
   "/verified-collection",
   auth.bearer,
   isAdmin,
   AdminController.getAllVerifiedCollections
+);
+
+// Get single Verified Collection by ID
+router.get(
+  "/verified-collection/:id",
+  auth.bearer,
+  isAdmin,
+  AdminController.getVerifiedCollectionById
+);
+
+// Update Verified Collection
+router.put(
+  "/verified-collection/:id",
+  auth.bearer,
+  isAdmin,
+  AdminController.updateVerifiedCollection
+);
+
+// Delete Verified Collection
+router.delete(
+  "/verified-collection/:id",
+  auth.bearer,
+  isAdmin,
+  AdminController.deleteVerifiedCollection
+);
+
+// Bulk delete Verified Collections
+router.delete(
+  "/verified-collection/bulk/delete",
+  auth.bearer,
+  isAdmin,
+  AdminController.bulkDeleteCollections
+);
+
+// Toggle verification status
+router.patch(
+  "/verified-collection/:id/toggle-verify",
+  auth.bearer,
+  isAdmin,
+  AdminController.toggleVerification
 );
 
 // Get Top Creators

@@ -14,6 +14,15 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
+      name: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      isVerified: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,

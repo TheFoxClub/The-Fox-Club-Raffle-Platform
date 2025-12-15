@@ -14,6 +14,8 @@ module.exports = (sequelize, DataTypes) => {
   verified_collection.init(
     {
       address: DataTypes.STRING,
+      name: DataTypes.STRING,
+      isVerified: DataTypes.BOOLEAN,
     },
     {
       sequelize,
