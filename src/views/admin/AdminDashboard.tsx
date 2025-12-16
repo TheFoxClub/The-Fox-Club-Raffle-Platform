@@ -1,9 +1,18 @@
-import { Wallet, Ticket, Trophy, Coins, TrendingUp, Users } from "lucide-react";
+import {
+  Wallet,
+  Ticket,
+  Trophy,
+  Coins,
+  TrendingUp,
+  Users,
+  Copy,
+} from "lucide-react";
 import { StatCard } from "../../components/admin/StatCard";
 import Button from "../../components/ui/Button";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import server from "../../config/server";
+import { toast } from "react-toastify";
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
@@ -21,6 +30,35 @@ export default function AdminDashboard() {
   const shortWallet = (address: string) => {
     if (!address) return "";
     return address.slice(0, 6) + "..." + address.slice(-6);
+  };
+
+  const formatAmount = (amount: number, tokenType: string) => {
+    if (amount === null || amount === undefined) return `0 ${tokenType}`;
+
+    const TOKEN_LABELS: Record<string, string> = {
+      SOLANA: "SOL",
+      USDC: "USDC",
+    };
+
+    return `${amount} ${TOKEN_LABELS[tokenType] ?? tokenType}`;
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied!", {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } catch (err) {
+      toast.error("Failed to copy wallet address", {
+        position: "top-right",
+      });
+    }
   };
 
   useEffect(() => {
@@ -108,13 +146,17 @@ export default function AdminDashboard() {
                 >
                   <div className="flex-1">
                     <h3 className="font-semibold mb-1">{raffle.raffleName}</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <button
+                      onClick={() => copyToClipboard(raffle.creatorAddress)}
+                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition"
+                    >
                       {shortWallet(raffle.creatorAddress)}
-                    </p>
+                      <Copy className="h-3 w-3 opacity-50" />
+                    </button>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-primary">
-                      {raffle.revenueInSOL}
+                      {formatAmount(raffle.revenueInSOL, raffle.tokenType)}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {raffle.totalTicketsSold} tickets
@@ -187,7 +229,10 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               {topCreators.length > 0 ? (
                 topCreators.map((creator) => (
-                  <div key={creator.wallet} className="flex items-center gap-3">
+                  <div
+                    key={creator.walletAddress}
+                    className="flex items-center gap-3"
+                  >
                     <div
                       className={`h-10 w-10 rounded-full flex items-center justify-center font-bold ${
                         creator.rank === 1
@@ -200,11 +245,15 @@ export default function AdminDashboard() {
                       {creator.rank}
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-sm">
+                      <button
+                        onClick={() => copyToClipboard(creator.walletAddress)}
+                        className="flex items-center gap-1 text-sm font-medium hover:text-primary transition"
+                      >
                         {shortWallet(creator.walletAddress)}
-                      </p>
+                        <Copy className="h-3 w-3 opacity-50" />
+                      </button>
                       <p className="text-xs text-muted-foreground">
-                        {creator.totalRevenue} SOL
+                        {formatAmount(creator.totalRevenue, creator.tokenType)}
                       </p>
                     </div>
                   </div>
