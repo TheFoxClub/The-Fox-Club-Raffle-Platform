@@ -173,12 +173,6 @@ export default function AdminCollections() {
   // --- Bulk Delete ---
   const handleBulkDelete = async () => {
     if (!selectedIds.length) return;
-    // if (
-    //   !confirm(
-    //     `Are you sure you want to delete ${selectedIds.length} collection(s)?`
-    //   )
-    // )
-    //   return;
     try {
       const res = await server.delete(
         "/admin/verified-collection/bulk/delete",

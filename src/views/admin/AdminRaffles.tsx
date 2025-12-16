@@ -18,12 +18,7 @@ import {
 import { Switch } from "../../components/ui/Switch";
 import server from "../../config/server";
 import { toast } from "react-toastify";
-// const mockRaffles = [
-//   { id: 1, name: "Legendary Fox #001", creator: "7XYZ...abc1", token: "SOL", price: "0.5", sold: 489, total: 500, status: "Live", featured: true },
-//   { id: 2, name: "Golden Den Pass", creator: "8ABC...def2", token: "USDC", price: "10", sold: 378, total: 400, status: "Live", featured: false },
-//   { id: 3, name: "Fox Club VIP", creator: "9DEF...ghi3", token: "SOL", price: "1.0", sold: 312, total: 312, status: "Ended", featured: false },
-//   { id: 4, name: "Silver Fox Token", creator: "7XYZ...abc1", token: "BONK", price: "1000000", sold: 156, total: 200, status: "Live", featured: false },
-// ];
+
 interface RaffleDetail {
   id: number;
   raffleId: number;
@@ -42,6 +37,7 @@ interface Raffle {
   total: number;
   status: string;
   featured: boolean;
+  totalRevenue: number;
   raffle_detail?: RaffleDetail;
   endDate?: string;
 }
@@ -67,6 +63,7 @@ const mapRaffle = (r: any): Raffle => ({
   total: r.totalTickets,
   status: statusMap[r.status] ?? "Unknown",
   featured: r.raffle_detail?.isFeatured ?? false,
+  totalRevenue: Number(r.totalRevenue ?? 0),
   raffle_detail: r.raffle_detail,
   endDate: r.endDate,
 });
@@ -264,6 +261,7 @@ export default function AdminRaffles() {
                 <th className="p-4 font-medium">Token</th>
                 <th className="p-4 font-medium">Price</th>
                 <th className="p-4 font-medium">Tickets</th>
+                <th className="p-4 font-medium">Total Revenue</th>
                 <th className="p-4 font-medium">Status</th>
                 <th className="p-4 font-medium">Actions</th>
               </tr>
@@ -304,6 +302,10 @@ export default function AdminRaffles() {
                       {raffle.sold}/{raffle.total}
                     </span>
                   </td>
+                  <td className="p-4 font-semibold text-primary">
+                    {raffle.totalRevenue.toFixed(2)} {raffle.token}
+                  </td>
+
                   <td className="p-4">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -321,59 +323,6 @@ export default function AdminRaffles() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      {/* <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedRaffle(raffle);
-                              setOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit Raffle</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">
-                                Featured on Homepage
-                              </span>
-                              <Switch
-                                checked={isFeatured}
-                                onCheckedChange={setIsFeatured}
-                              />
-                            </div>
-                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">
-                                Status
-                              </span>
-                              <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Live">Live</SelectItem>
-                                  <SelectItem value="Suspended">
-                                    Suspend
-                                  </SelectItem>
-                                  <SelectItem value="Ended">End</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div> 
-                            <Button
-                              className="w-full gradient-primary"
-                              onClick={handleSaveChanges}
-                            >
-                              Save Changes
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog> */}
                       <Button
                         variant="ghost"
                         size="icon"

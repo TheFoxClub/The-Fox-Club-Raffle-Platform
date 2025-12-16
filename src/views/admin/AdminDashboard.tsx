@@ -32,17 +32,6 @@ export default function AdminDashboard() {
     return address.slice(0, 6) + "..." + address.slice(-6);
   };
 
-  const formatAmount = (amount: number, tokenType: string) => {
-    if (amount === null || amount === undefined) return `0 ${tokenType}`;
-
-    const TOKEN_LABELS: Record<string, string> = {
-      SOLANA: "SOL",
-      USDC: "USDC",
-    };
-
-    return `${amount} ${TOKEN_LABELS[tokenType] ?? tokenType}`;
-  };
-
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -156,7 +145,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-primary">
-                      {formatAmount(raffle.revenueInSOL, raffle.tokenType)}
+                      {raffle.revenueInSOL} SOL
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {raffle.totalTicketsSold} tickets
@@ -253,7 +242,7 @@ export default function AdminDashboard() {
                         <Copy className="h-3 w-3 opacity-50" />
                       </button>
                       <p className="text-xs text-muted-foreground">
-                        {formatAmount(creator.totalRevenue, creator.tokenType)}
+                        {creator.totalRevenue} SOL
                       </p>
                     </div>
                   </div>
