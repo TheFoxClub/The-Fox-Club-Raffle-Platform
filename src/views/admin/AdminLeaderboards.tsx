@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trophy, Download, RotateCcw } from "lucide-react";
+import { Trophy, Download, RotateCcw, Copy } from "lucide-react";
 import Button from "../../components/ui/Button";
 import {
   Tabs,
@@ -7,29 +7,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-import { useToast } from "../../hooks/use-toast";
+import { toast } from "react-toastify";
 import { useEffect } from "react";
 import server from "../../config/server";
 
-// const topHosts = [
-//   { wallet: "7XYZ...abc1", revenue: "1,245 SOL", raffles: 45, xp: 12450, streak: 15 },
-//   { wallet: "8ABC...def2", revenue: "987 SOL", raffles: 38, xp: 9870, streak: 12 },
-//   { wallet: "9DEF...ghi3", revenue: "756 SOL", raffles: 32, xp: 7560, streak: 8 },
-//   { wallet: "4GHI...jkl4", revenue: "645 SOL", raffles: 28, xp: 6450, streak: 10 },
-//   { wallet: "5JKL...mno5", revenue: "534 SOL", raffles: 24, xp: 5340, streak: 6 },
-// ];
-
-// const topBuyers = [
-//   { wallet: "4GHI...jkl4", spending: "2,345 SOL", tickets: 489, xp: 23450, streak: 20 },
-//   { wallet: "5JKL...mno5", spending: "1,876 SOL", tickets: 378, xp: 18760, streak: 18 },
-//   { wallet: "6MNO...pqr6", spending: "1,543 SOL", tickets: 312, xp: 15430, streak: 15 },
-//   { wallet: "7PQR...stu7", spending: "1,234 SOL", tickets: 256, xp: 12340, streak: 12 },
-//   { wallet: "8STU...vwx8", spending: "987 SOL", tickets: 198, xp: 9870, streak: 9 },
-// ];
-
 export default function AdminLeaderboards() {
   const [activeTab, setActiveTab] = useState("hosts");
-  const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [topHosts, setTopHosts] = useState<any[]>([]);
@@ -86,19 +69,25 @@ export default function AdminLeaderboards() {
   }, []);
 
   if (loading) return <p>Loading leaderboards...</p>;
+
   const handleExport = () => {
-    toast({
-      title: "✅ Export Started",
-      description: `Exporting ${activeTab} leaderboard data...`,
-    });
+    toast.info(`
+      title: "✅ Exporting ${activeTab} leaderboard data...`);
   };
 
   const handleReset = () => {
-    toast({
-      title: "⚠️ Reset Leaderboard",
-      description: "Are you sure? This action cannot be undone.",
-      variant: "destructive",
-    });
+    toast.warning(
+      "⚠️ Reset leaderboard initiated. This action cannot be undone."
+    );
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied");
+    } catch {
+      toast.error("Failed to copy wallet address");
+    }
   };
 
   return (
@@ -172,7 +161,13 @@ export default function AdminLeaderboards() {
                           </div>
                         </td>
                         <td className="p-4 font-medium">
-                          {shortWallet(host.walletAddress)}
+                          <button
+                            onClick={() => copyToClipboard(host.walletAddress)}
+                            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition"
+                          >
+                            {shortWallet(host.walletAddress)}
+                            <Copy className="h-3 w-3 opacity-50" />
+                          </button>
                         </td>
                         <td className="p-4 text-primary font-bold">
                           {formatAmount(host.totalRevenue, host.tokenType)}
@@ -250,7 +245,13 @@ export default function AdminLeaderboards() {
                           </div>
                         </td>
                         <td className="p-4 font-medium">
-                          {shortWallet(buyer.walletAddress)}
+                          <button
+                            onClick={() => copyToClipboard(buyer.walletAddress)}
+                            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition"
+                          >
+                            {shortWallet(buyer.walletAddress)}
+                            <Copy className="h-3 w-3 opacity-50" />
+                          </button>
                         </td>
                         <td className="p-4 text-accent font-bold">
                           {formatAmount(buyer.spending, buyer.tokenType)}

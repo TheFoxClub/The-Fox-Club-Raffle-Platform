@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Wallet, Activity } from "lucide-react";
+import { TrendingUp, Users, Wallet, Activity, Copy } from "lucide-react";
 import { StatCard } from "../../components/admin/StatCard";
 import {
   LineChart,
@@ -13,51 +13,120 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useState, useEffect } from "react";
+import server from "../../config/server";
+import { toast } from "react-toastify";
 
-// const volumeData = [
-//   { date: "Jan", volume: 1200 },
-//   { date: "Feb", volume: 1900 },
-//   { date: "Mar", volume: 2400 },
-//   { date: "Apr", volume: 3200 },
-//   { date: "May", volume: 2800 },
-//   { date: "Jun", volume: 3600 },
-// ];
+interface VolumeData {
+  date: string;
+  volume: number;
+}
 
-// const tokenData = [
-//   { name: "SOL", value: 45, color: "hsl(10 85% 58%)" },
-//   { name: "USDC", value: 30, color: "hsl(25 90% 55%)" },
-//   { name: "BONK", value: 15, color: "hsl(38 95% 52%)" },
-//   { name: "Others", value: 10, color: "hsl(240 5% 26%)" },
-// ];
+interface TokenData {
+  name: string;
+  value: number;
+  color: string;
+  [key: string]: string | number;
+}
 
-// const topWallets = [
-//   { wallet: "7XYZ...abc1", spending: "2,345 SOL", raffles: 45 },
-//   { wallet: "8ABC...def2", spending: "1,876 SOL", raffles: 38 },
-//   { wallet: "9DEF...ghi3", spending: "1,543 SOL", raffles: 32 },
-//   { wallet: "4GHI...jkl4", spending: "1,234 SOL", raffles: 28 },
-// ];
+interface TopWallet {
+  wallet: string;
+  spending: string;
+  raffles: number;
+}
 
 export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
 
-  // Fallback / placeholder data
-  const kpiData = {
+  const [kpiData, setKpiData] = useState({
     totalUsers: 0,
     activeWallets: 0,
     avgTicketPrice: 0,
     growthRate: 0,
-  };
+  });
 
-  const volumeData: { date: string; volume: number }[] = [];
-  const tokenData: { name: string; value: number; color: string }[] = [];
-  const topWallets: { wallet: string; spending: string; raffles: number }[] =
-    [];
+  const [volumeData, setVolumeData] = useState<VolumeData[]>([]);
+  const [tokenData, setTokenData] = useState<TokenData[]>([]);
+  const [topWallets, setTopWallets] = useState<TopWallet[]>([]);
+
+  const shortWallet = (wallet: string) =>
+    wallet.slice(0, 4) + "..." + wallet.slice(-4);
 
   useEffect(() => {
-    // Simulate API loading
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
+    const fetchAnalytics = async () => {
+      try {
+        const { data: res } = await server.get("/analytics");
+        if (res.success) {
+          const data = res.data;
+          // KPIs
+          setKpiData({
+            totalUsers: data.totalUsers,
+            activeWallets: data.activeUsers,
+            avgTicketPrice: data.averageTicketPrice.average,
+            growthRate: data.growthRate.percentage,
+          });
+
+          const mappedVolume = data.volumeOverTime.map((v: any) => ({
+            date: v.date,
+            volume: v.totalVolume,
+          }));
+          setVolumeData(mappedVolume);
+
+          const colors = [
+            "hsl(10 85% 58%)",
+            "hsl(25 90% 55%)",
+            "hsl(38 95% 52%)",
+            "hsl(240 5% 26%)",
+          ];
+
+          // Token type mapping
+          const TOKEN_LABELS: Record<string, string> = {
+            SOLANA: "SOL",
+            USDC: "USDC",
+          };
+
+          const mappedTokens = data.volumeByTokenType.map(
+            (t: any, index: number) => ({
+              name: TOKEN_LABELS[t.tokenType] || t.tokenType, // fallback to original
+              value: t.percentage,
+              color: colors[index % colors.length],
+            })
+          );
+
+          setTokenData(mappedTokens);
+
+          const { data: leaderboardRes } = await server.get(
+            "/admin/leaderboard"
+          );
+          if (leaderboardRes.success) {
+            const topBuyers = leaderboardRes.data.topBuyers.map((b: any) => ({
+              wallet: b.walletAddress,
+              spending: `${b.totalSpent} ${
+                b.tokenType === "SOLANA" ? "SOL" : b.tokenType
+              }`,
+              raffles: b.ticketsBought,
+            }));
+            setTopWallets(topBuyers);
+          }
+
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Failed to fetch analytics:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
   }, []);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied");
+    } catch {
+      toast.error("Failed to copy wallet address");
+    }
+  };
 
   if (loading)
     return (
@@ -202,7 +271,15 @@ export default function AdminAnalytics() {
                         {index + 1}
                       </div>
                     </td>
-                    <td className="p-4 font-medium">{wallet.wallet}</td>
+                    <td className="p-4 font-medium">
+                      <button
+                        onClick={() => copyToClipboard(wallet.wallet)}
+                        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition"
+                      >
+                        {shortWallet(wallet.wallet)}
+                        <Copy className="h-3 w-3 opacity-50" />
+                      </button>
+                    </td>
                     <td className="p-4 text-primary font-bold">
                       {wallet.spending}
                     </td>
