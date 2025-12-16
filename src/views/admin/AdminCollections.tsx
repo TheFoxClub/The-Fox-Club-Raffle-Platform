@@ -6,6 +6,7 @@ import {
   Edit,
   Upload,
   FileSpreadsheet,
+  Trash2,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -21,42 +22,11 @@ import {
 import server from "../../config/server";
 import { toast } from "react-toastify";
 
-// const mockCollections = [
-//   {
-//     id: 1,
-//     name: "Fox Club Genesis",
-//     mint: "FoxC...xyz1",
-//     verified: true,
-//     floor: "12.5 SOL",
-//   },
-//   {
-//     id: 2,
-//     name: "Den Pass Collection",
-//     mint: "DenP...abc2",
-//     verified: true,
-//     floor: "8.2 SOL",
-//   },
-//   {
-//     id: 3,
-//     name: "Golden Foxes",
-//     mint: "Gold...def3",
-//     verified: false,
-//     floor: "15.8 SOL",
-//   },
-//   {
-//     id: 4,
-//     name: "Silver Den",
-//     mint: "Silv...ghi4",
-//     verified: true,
-//     floor: "5.5 SOL",
-//   },
-// ];
 interface Collection {
   id: number;
   name: string;
-  // mint: string;
+  address: string;
   verified: boolean;
-  floor: string;
 }
 
 export default function AdminCollections() {
@@ -65,23 +35,33 @@ export default function AdminCollections() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
-  const [verifyCollection, setVerifyCollection] = useState(true);
+  const [newCollectionAddress, setNewCollectionAddress] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingCollection, setDeletingCollection] =
+    useState<Collection | null>(null);
+
+  const [editingCollection, setEditingCollection] = useState<Collection | null>(
+    null
+  );
+  const [editName, setEditName] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Bulk delete states
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   // FETCH VERIFIED COLLECTIONS
-  // MOVE fetchCollections OUTSIDE useEffect
   const fetchCollections = async () => {
     setLoading(true);
     try {
       const res = await server.get("/admin/verified-collection");
-
       setCollections(
         Array.isArray(res.data?.data?.collections)
           ? res.data.data.collections.map((c: any) => ({
               id: c.id,
-              name: c.address,
-              verified: true,
-              floor: "-", // placeholder
+              name: c.name,
+              address: c.address,
+              verified: c.isVerified,
             }))
           : []
       );
@@ -92,35 +72,29 @@ export default function AdminCollections() {
     }
   };
 
-  // FETCH ON COMPONENT MOUNT
   useEffect(() => {
     fetchCollections();
   }, []);
 
   const handleAddCollection = async () => {
-    if (!newCollectionName.trim()) {
-      toast.error("Collection name is required");
+    if (!newCollectionName.trim() || !newCollectionAddress.trim()) {
+      toast.error("Collection name and address are required");
       return;
     }
     try {
       setSaving(true);
-
       const res = await server.post("/admin/verified-collection", {
-        addresses: [newCollectionName],
-        verified: verifyCollection,
-        blockchainNetwork: "solana",
+        address: newCollectionAddress,
+        name: newCollectionName,
       });
-
-      if (res.data.success) {
+      if (res.data?.data?.collection) {
         toast.success("Collection added successfully!");
-
         fetchCollections();
         setOpen(false);
-
         setNewCollectionName("");
-        setVerifyCollection(true);
+        setNewCollectionAddress("");
       } else {
-        toast.error(res.data.message || "Failed to add collection");
+        toast.error(res.data?.message || "Failed to add collection");
       }
     } catch (error: any) {
       console.error("Error adding collection:", error);
@@ -129,50 +103,150 @@ export default function AdminCollections() {
       setSaving(false);
     }
   };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string;
-
-        const addresses = text
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line);
-
-        if (addresses.length === 0) {
-          toast.error("CSV is empty or invalid");
-          setUploading(false);
-          return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await server.post(
+        "/admin/verified-collection/bulk-upload",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      if (res.data?.success) {
+        toast.success("CSV uploaded successfully!");
+        fetchCollections();
+        const results = res.data?.data?.results;
+        if (results?.duplicates?.length) {
+          toast.info(
+            `${results.duplicates.length} duplicate entries were skipped`
+          );
         }
-
-        const res = await server.post(
-          "/admin/verified-collection?blockchainNetwork=solana",
-          { addresses }
-        );
-
-        if (res.data.success) {
-          toast.success("CSV uploaded successfully!");
-          // REFRESH COLLECTIONS
-          fetchCollections();
-        } else {
-          toast.error(res.data.message || "Error uploading CSV");
-        }
-      } catch (err: any) {
-        console.error(
-          "Error uploading CSV:",
-          err.response?.data || err.message
-        );
-        toast.error(err.response?.data?.message || "Error uploading CSV");
-      } finally {
-        setUploading(false);
+      } else {
+        toast.error(res.data?.message || "CSV upload failed");
       }
-    };
-    reader.readAsText(file);
+    } catch (err: any) {
+      console.error("CSV upload error:", err);
+      toast.error(err.response?.data?.message || "CSV upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleToggleVerify = async (id: number) => {
+    try {
+      const res = await server.patch(
+        `/admin/verified-collection/${id}/toggle-verify`
+      );
+      const updatedCollection = res.data?.data?.collection;
+      if (!updatedCollection) throw new Error("Invalid response");
+      setCollections((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, verified: updatedCollection.isVerified } : c
+        )
+      );
+      toast.success(res.data.message || "Verification status updated");
+    } catch (error) {
+      console.error("Toggle verify failed:", error);
+      toast.error("Failed to update verification status");
+    }
+  };
+
+  // --- Single Delete ---
+  const handleDeleteCollection = async (id: number) => {
+    try {
+      const res = await server.delete(`/admin/verified-collection/${id}`);
+      if (res.data?.success) {
+        toast.error(res.data.message || "Collection deleted successfully");
+        setCollections((prev) => prev.filter((c) => c.id !== id));
+      }
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast.error("Failed to delete collection");
+    }
+  };
+
+  // --- Bulk Delete ---
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return;
+    // if (
+    //   !confirm(
+    //     `Are you sure you want to delete ${selectedIds.length} collection(s)?`
+    //   )
+    // )
+    //   return;
+    try {
+      const res = await server.delete(
+        "/admin/verified-collection/bulk/delete",
+        { data: { ids: selectedIds } }
+      );
+      if (res.data?.success) {
+        toast.success(
+          res.data.message ||
+            `${selectedIds.length} collection(s) deleted successfully`
+        );
+        setCollections((prev) =>
+          prev.filter((c) => !selectedIds.includes(c.id))
+        );
+        setSelectedIds([]);
+        setBulkMode(false);
+      }
+    } catch (error) {
+      console.error("Bulk delete failed:", error);
+      toast.error("Failed to delete collections");
+    }
+  };
+
+  // --- Checkbox selection handler ---
+  const handleSelect = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleBulkMode = () => {
+    setBulkMode(!bulkMode);
+    setSelectedIds([]);
+  };
+
+  // --- Edit collection ---
+  const handleEditCollection = async () => {
+    if (!editingCollection) return;
+    if (!editName.trim()) {
+      toast.error("Collection name cannot be empty");
+      return;
+    }
+    try {
+      setSavingEdit(true);
+      const res = await server.put(
+        `/admin/verified-collection/${editingCollection.id}`,
+        {
+          name: editName,
+        }
+      );
+      if (res.data?.success) {
+        toast.success(res.data.message || "Collection updated successfully");
+        setCollections((prev) =>
+          prev.map((c) =>
+            c.id === editingCollection.id
+              ? { ...c, name: res.data.data.collection.name }
+              : c
+          )
+        );
+        setEditingCollection(null);
+      } else {
+        toast.error(res.data?.message || "Failed to update collection");
+      }
+    } catch (err: any) {
+      console.error("Edit collection error:", err);
+      toast.error(err.response?.data?.message || "Failed to update collection");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   return (
@@ -185,45 +259,94 @@ export default function AdminCollections() {
             Manage NFT collections that can host raffles
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Collection
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Collection</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Collection Name</Label>
-                <Input
-                  placeholder="Fox Club Genesis"
-                  value={newCollectionName}
-                  onChange={(e) => setNewCollectionName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Mint Address</Label>
-                <Input placeholder="FoxC...xyz1" />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Verify Immediately</Label>
-                <Switch defaultChecked />
-              </div>
-              <Button
-                className="w-full gradient-primary"
-                onClick={handleAddCollection}
-                disabled={saving}
-              >
-                {saving ? "Adding..." : "Add Collection"}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={toggleBulkMode}>
+            {bulkMode ? "Cancel Selection" : "Select Collections"}
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Collection
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Collection</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Collection Name</Label>
+                  <Input
+                    placeholder="Fox Club Genesis"
+                    value={newCollectionName}
+                    onChange={(e) => setNewCollectionName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mint Address</Label>
+                  <Input
+                    placeholder="FoxC...xyz1"
+                    value={newCollectionAddress}
+                    maxLength={50}
+                    onChange={(e) => setNewCollectionAddress(e.target.value)}
+                  />
+                </div>
+                <Button
+                  className="w-full gradient-primary"
+                  onClick={handleAddCollection}
+                  disabled={saving}
+                >
+                  {saving ? "Adding..." : "Add Collection"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {/* Bulk delete toolbar */}
+      {/* Bulk delete toolbar */}
+      {bulkMode && selectedIds.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-md">
+          <span className="text-sm font-medium">
+            {selectedIds.length} selected
+          </span>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="destructive">Delete Selected</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Confirm Bulk Delete</DialogTitle>
+              </DialogHeader>
+              <p className="py-2">
+                Are you sure you want to delete {selectedIds.length} collection
+                {selectedIds.length > 1 ? "s" : ""}? This action cannot be
+                undone.
+              </p>
+              <div className="flex justify-between gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setBulkMode(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    handleBulkDelete();
+                  }}
+                >
+                  Confirm Delete
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
 
       {/* CSV UPLOAD SECTION */}
       <div className="glass-card border border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50">
@@ -231,8 +354,6 @@ export default function AdminCollections() {
           <div className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center">
             <FileSpreadsheet className="h-8 w-8 text-primary" />
           </div>
-
-          {/* File Input */}
           <label className="mt-4 cursor-pointer">
             <input
               type="file"
@@ -259,13 +380,24 @@ export default function AdminCollections() {
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* {collections.map((collection: any) => ( */}
           {collections.map((collection) => (
             <div
               key={collection.id}
-              className="glass-card p-6 rounded-xl border border-border/50 hover:border-primary/50 transition-all hover:glow-primary flex flex-col justify-between"
+              className={`glass-card p-6 rounded-xl border border-border/50 hover:border-primary/50 transition-all hover:glow-primary flex flex-col justify-between ${
+                bulkMode && selectedIds.includes(collection.id)
+                  ? "border-primary"
+                  : ""
+              }`}
             >
               <div className="flex items-start justify-between mb-3">
+                {bulkMode && (
+                  <input
+                    type="checkbox"
+                    className="mr-2"
+                    checked={selectedIds.includes(collection.id)}
+                    onChange={() => handleSelect(collection.id)}
+                  />
+                )}
                 <div className="h-16 w-16 rounded-lg bg-gradient-primary/20 flex items-center justify-center">
                   <span className="text-2xl">🦊</span>
                 </div>
@@ -279,24 +411,125 @@ export default function AdminCollections() {
               <h3 className="font-semibold text-base mb-2 line-clamp-2 overflow-hidden text-ellipsis break-all">
                 {collection.name}
               </h3>
-
-              {/* <p className="text-xs text-muted-foreground mb-3">
-                {collection.mint}
+              <p
+                className="text-xs text-muted-foreground break-all mb-3 cursor-pointer hover:text-primary"
+                onClick={() => {
+                  navigator.clipboard.writeText(collection.address);
+                  toast.success("Mint address copied!");
+                }}
+                title="Click to copy"
+              >
+                {collection.address}
               </p>
-              <p className="text-sm text-primary font-medium mb-4">
-                Floor: {collection.floor}
-              </p> */}
 
-              <div className="flex items-center gap-2">
-                <Button variant="outline" className="flex-1" size="sm">
+              <div className="flex items-center gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  size="sm"
+                  onClick={() => {
+                    setEditingCollection(collection);
+                    setEditName(collection.name);
+                  }}
+                >
                   <Edit className="h-3 w-3 mr-1" />
                   Edit
                 </Button>
-                <Switch defaultChecked={collection.verified} />
+                <Switch
+                  checked={collection.verified}
+                  onCheckedChange={() => handleToggleVerify(collection.id)}
+                  title={
+                    collection.verified
+                      ? "Click to unverify this collection"
+                      : "Click to verify this collection"
+                  }
+                />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeletingCollection(collection)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+
+                {deletingCollection && (
+                  <Dialog
+                    open={!!deletingCollection}
+                    onOpenChange={() => setDeletingCollection(null)}
+                  >
+                    <DialogContent className="max-w-sm">
+                      <DialogHeader>
+                        <DialogTitle>Confirm Delete</DialogTitle>
+                      </DialogHeader>
+                      <p className="py-2">
+                        Are you sure you want to delete "
+                        {deletingCollection.name}"? This action cannot be
+                        undone.
+                      </p>
+                      <div className="flex justify-between gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setDeletingCollection(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => {
+                            handleDeleteCollection(deletingCollection.id);
+                            setDeletingCollection(null); // close modal after delete
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
             </div>
           ))}
         </div>
+      )}
+      {/* Edit Collection Modal */}
+      {editingCollection && (
+        <Dialog
+          open={!!editingCollection}
+          onOpenChange={() => setEditingCollection(null)}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Edit Collection Name</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <Label>Collection Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Enter collection name"
+                className="mt-2"
+              />
+            </div>
+            <div className="flex justify-between gap-2 mt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setEditingCollection(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                className="flex-1"
+                onClick={handleEditCollection}
+              >
+                {savingEdit ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
