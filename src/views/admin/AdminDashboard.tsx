@@ -133,7 +133,7 @@ export default function AdminDashboard() {
                   key={index}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-card/50 border border-border/30 hover:border-primary/50 transition-all gap-3"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-[200px]">
                     <h3 className="font-semibold mb-1">{raffle.raffleName}</h3>
                     <button
                       onClick={() => copyToClipboard(raffle.creatorAddress)}
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
                       <Copy className="h-3 w-3 opacity-50" />
                     </button>
                   </div>
-                  <div className="text-right">
+                  <div className="flex justify-between sm:flex-col sm:items-end gap-2 w-full sm:w-auto">
                     <p className="font-bold text-primary">
                       {raffle.revenueInSOL} SOL
                     </p>
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
                       {raffle.totalTicketsSold} tickets
                     </p>
                   </div>
-                  <div className="sm:ml-4">
+                  <div className="w-24 text-center">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
                         raffle.status === "LIVE"

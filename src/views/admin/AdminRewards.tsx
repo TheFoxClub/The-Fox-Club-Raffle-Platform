@@ -12,9 +12,16 @@ import { Progress } from "../../components/ui/Progress";
 import { Switch } from "../../components/ui/Switch";
 import { Label } from "../../components/ui/Label";
 //import { useToast } from "../../hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+
+type EligibleWallet = {
+  id: number;
+  address: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export default function AdminRewards() {
   // const { toast } = useToast();
@@ -25,18 +32,30 @@ export default function AdminRewards() {
   const [topHosts, setTopHosts] = useState<any[]>([]);
   const [topBuyers, setTopBuyers] = useState<any[]>([]);
 
+  // Wallets
   const [walletInput, setWalletInput] = useState("");
-  // const [eligibleWallets, setEligibleWallets] = useState<string[]>([]);
-  const [eligibleWallets, setEligibleWallets] = useState<string[]>([
-    "0xA1B2C3D4E5F6",
-    "0x1234567890AB",
-    "0xFEDCBA987654",
-    "0x0A1B2C3D4E5F",
-    "0xABCDE12345FA",
-    "0x98765FEDCBA0",
-    "0x112233445566",
-    "0xAABBCCDDEEFF",
-  ]);
+  const [eligibleWallets, setEligibleWallets] = useState<EligibleWallet[]>([]);
+
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [searchInput, setSearchInput] = useState(""); // Search input for wallet list
+
+  // Filter wallets in list based on searchInput
+  const filteredWalletList = searchInput
+    ? eligibleWallets.filter((w) =>
+        w.address.toLowerCase().includes(searchInput.toLowerCase())
+      )
+    : eligibleWallets;
+
+  const filteredWallets = walletInput
+    ? eligibleWallets
+        .filter(
+          (wallet) =>
+            wallet.address.toLowerCase().includes(walletInput.toLowerCase()) &&
+            wallet.address.toLowerCase() !== walletInput.toLowerCase()
+        )
+        .sort((a, b) => b.id - a.id)
+    : [];
 
   const shortWallet = (wallet: string) =>
     wallet.slice(0, 4) + "..." + wallet.slice(-4);
@@ -53,42 +72,88 @@ export default function AdminRewards() {
   };
 
   const handleExport = (type: string) => {
-    // toast({
-    //   title: "✅ Export Started",
-    //   description: `Exporting ${type} data to CSV...`,
-    // });
     toast.info(`Exporting ${type} data to CSV...`);
   };
 
   const handleAirdrop = () => {
-    // toast({
-    //   title: "🎁 Airdrop Triggered",
-    //   description: "Rewards are being distributed to top users",
-    // });
     toast.success("Airdrop triggered successfully");
   };
 
-  const handleAddWallet = () => {
-    if (!walletInput) return;
-
-    setEligibleWallets([walletInput, ...eligibleWallets]);
-    toast.success("Wallet added successfully");
-    setWalletInput("");
+  const fetchEligibleWallets = async () => {
+    const res = await server.get("/pool");
+    setEligibleWallets(res.data.data.rows.reverse());
   };
 
-  const handleDeleteWallet = () => {
-    if (!walletInput) return;
+  const handleAddWallet = async () => {
+    const address = walletInput.trim();
+    if (!address) return;
 
-    setEligibleWallets(eligibleWallets.filter((w) => w !== walletInput));
-    toast.warn("Wallet removed");
-    setWalletInput("");
+    const exists = eligibleWallets.some(
+      (w) => w.address.toLowerCase() === address.toLowerCase()
+    );
+
+    if (exists) {
+      toast.warning("Wallet already exists");
+      return;
+    }
+
+    try {
+      const res = await server.post("/pool", { address });
+      setEligibleWallets((prev) => [res.data.data, ...prev]);
+      toast.success("Wallet added successfully");
+      setWalletInput("");
+      setShowSuggestions(false);
+    } catch {
+      toast.error("Failed to add wallet");
+    }
   };
 
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
+  const handleDeleteWallet = async () => {
+    const address = walletInput.trim();
+    if (!address) return;
+
+    const exists = eligibleWallets.some(
+      (w) => w.address.toLowerCase() === address.toLowerCase()
+    );
+
+    if (!exists) {
+      toast.warning("Wallet not found");
+      return;
+    }
+
+    try {
+      await server.delete(`/pool?address=${address}`);
+      setEligibleWallets((prev) =>
+        prev.filter((wallet) => wallet.address !== address)
+      );
+      toast.success("Wallet removed successfully");
+      setWalletInput("");
+      setShowSuggestions(false);
+    } catch {
+      toast.error("Failed to delete wallet");
+    }
+  };
+
+  const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
     const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append("file", file);
 
-    toast.success(`CSV uploaded: ${file.name}`);
+    try {
+      await server.post("/pool/bulk-upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      toast.success("CSV uploaded successfully");
+      await fetchEligibleWallets();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to upload CSV");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const copyToClipboard = async (text: string) => {
@@ -103,19 +168,40 @@ export default function AdminRewards() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await server.get("/admin/leaderboard");
-        const { topHosts, topBuyers } = res.data.data;
+        const [leaderboardRes, walletRes] = await Promise.all([
+          server.get("/admin/leaderboard"),
+          server.get("/pool"),
+        ]);
 
-        setTopHosts(topHosts);
-        setTopBuyers(topBuyers);
+        setTopHosts(leaderboardRes.data.data.topHosts);
+        setTopBuyers(leaderboardRes.data.data.topBuyers);
+        setEligibleWallets(walletRes.data.data.rows);
       } catch (error) {
-        console.error("Error fetching top hosts:", error);
+        console.error("Failed to load admin data", error);
+        toast.error("Failed to load admin data");
       } finally {
         setLoading(false);
       }
     }
+
     fetchData();
   }, []);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        inputWrapperRef.current &&
+        !inputWrapperRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   if (loading) return <p>Loading rewards dashboard...</p>;
 
   return (
@@ -173,64 +259,123 @@ export default function AdminRewards() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50">
           <h2 className="text-xl font-bold">Add or Remove Wallets</h2>
-          <div className="flex flex-col justify-center h-full gap-3">
+          <div ref={inputWrapperRef} className="relative mt-8 mb-4">
             <input
-              type="text"
               value={walletInput}
-              onChange={(e) => setWalletInput(e.target.value)}
+              onChange={(e) => {
+                setWalletInput(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => walletInput && setShowSuggestions(true)}
               placeholder="Enter wallet address"
-              className="border border-border rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring=primary"
+              className="w-full border border-input rounded-lg p-2 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <div className="flex gap-2 mb-4">
-              <Button
-                onClick={handleAddWallet}
-                className="flex-1 flex items-center justify-center gap-2"
-              >
-                <Plus className="h-4 w-4" /> Add Wallet
-              </Button>
-              <Button
-                onClick={handleDeleteWallet}
-                variant="destructive"
-                className="flex-1 flex items-center justify-center gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Wallet
-              </Button>
-            </div>
 
-            <label className="cursor-pointer w-full border border-dashed rounded-lg p-4 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:bg-muted/10">
-              <Upload className="h-4 w-4" /> Upload CSV
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleCSVUpload}
-                className="hidden"
-              />
-            </label>
-            <p className="text-xs text-muted-foreground mt-1">
-              Upload a CSV with one wallet per row
-            </p>
+            {walletInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setWalletInput("");
+                  setShowSuggestions(false);
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            )}
+
+            {showSuggestions && walletInput && filteredWallets.length > 0 && (
+              <div className="absolute top-full left-0 z-20 w-full max-h-40 overflow-y-auto rounded-lg border bg-card shadow-lg mt-2">
+                {filteredWallets.map((wallet) => (
+                  <button
+                    key={wallet.id}
+                    type="button"
+                    onClick={() => {
+                      setWalletInput(wallet.address);
+                      setShowSuggestions(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted/30 font-mono"
+                  >
+                    {wallet.address}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          <div className="flex gap-2 mt-4 mb-4">
+            <Button
+              onClick={handleAddWallet}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> Add Wallet
+            </Button>
+            <Button
+              onClick={handleDeleteWallet}
+              variant="destructive"
+              disabled={!walletInput} // disable when input is empty
+              className={`flex-1 flex items-center justify-center gap-2 ${
+                !walletInput ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Wallet
+            </Button>
+          </div>
+
+          <label className="cursor-pointer w-full border border-dashed rounded-lg p-4 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:bg-muted/10">
+            <Upload className="h-4 w-4" /> Upload CSV
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCSVUpload}
+              className="hidden"
+            />
+          </label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Upload a CSV with one wallet per row
+          </p>
         </div>
 
         {/* Right: Scrollable wallet list */}
-        <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50 max-h-80 flex flex-col overflow-y-auto">
-          <h2 className="text-base font-semibold mb-2 sticky top-0 bg-card z-10 p-1">
-            Current Eligible Wallets
-          </h2>
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted/50">
-            {eligibleWallets.length > 0 ? (
-              eligibleWallets.map((wallet, index) => (
+        <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50 max-h-80 flex flex-col w-full overflow-y-auto">
+          <div className="sticky top-0 z-10 p-1 mb-2 flex flex-col gap-2">
+            <h2 className="text-base font-semibold">
+              Current Eligible Wallets
+            </h2>
+            <input
+              type="text"
+              placeholder="Search wallets..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted/50 w-full">
+            {filteredWalletList.length > 0 ? (
+              filteredWalletList.map((wallet) => (
                 <div
-                  key={index}
-                  className="flex justify-between items-center p-2 mb-1 rounded bg-card/50 border border-border/20"
+                  key={wallet.id}
+                  className="flex justify-between items-center p-2 mb-1 rounded bg-card/50 border border-border/20 w-full break-words"
                 >
-                  <span className="font-mono text-sm">{wallet}</span>
+                  {/* <span className="font-mono text-sm break-words">
+                      {wallet.address}
+                    </span> */}
+                  <p
+                    className="text-xs text-muted-foreground break-all mb-3 cursor-pointer hover:text-primary"
+                    onClick={() => {
+                      navigator.clipboard.writeText(wallet.address);
+                      toast.success("Wallet address copied!");
+                    }}
+                    title="Click to copy"
+                  >
+                    {wallet.address}
+                  </p>
                 </div>
               ))
             ) : (
               <p className="text-sm text-muted-foreground text-center">
-                No wallets added yet
+                No wallets found
               </p>
             )}
           </div>

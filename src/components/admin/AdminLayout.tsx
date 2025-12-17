@@ -14,7 +14,7 @@ import {
   Bell,
   ChevronLeft,
   Home,
-  X
+  X,
 } from "lucide-react";
 import Button from "../ui/Button";
 import { useSelector } from "react-redux";
@@ -30,7 +30,7 @@ const menuItems = [
   { icon: Ticket, label: "Raffles", path: "/admin/raffles" },
   { icon: Shield, label: "Collections", path: "/admin/collections" },
   { icon: Coins, label: "Tokens", path: "/admin/tokens" },
-  { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
+  // { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
   { icon: Gift, label: "Rewards", path: "/admin/rewards" },
   { icon: Trophy, label: "Leaderboards", path: "/admin/leaderboards" },
   { icon: TrendingUp, label: "Analytics", path: "/admin/analytics" },
@@ -126,7 +126,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarOpen ? "md:ml-0" : "md:ml-0"} ml-0 transition-all duration-300`}>
+      <div
+        className={`flex-1 ${
+          sidebarOpen ? "md:ml-0" : "md:ml-0"
+        } ml-0 transition-all duration-300`}
+      >
         {/* Top Bar */}
         <header className="bg-black border-b border-border/50 sticky top-0 z-40">
           <div className="flex items-center justify-between px-4 sm:px-6 py-4">
@@ -138,10 +142,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="md:hidden shrink-0"
               >
-                {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                {sidebarOpen ? (
+                  <ChevronLeft className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
               </Button>
               <h1 className="text-lg sm:text-xl font-bold truncate">
-                {menuItems.find((item) => isActive(item.path))?.label || "Dashboard"}
+                {menuItems.find((item) => isActive(item.path))?.label ||
+                  "Dashboard"}
               </h1>
             </div>
 
@@ -157,7 +166,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     {user.isAdmin ? "Admin" : "User"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {user.pubkey ? shortenAddress(user.pubkey) : "Not connected"}
+                    {user.pubkey
+                      ? shortenAddress(user.pubkey)
+                      : "Not connected"}
                   </p>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm">
@@ -175,9 +186,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="p-6">
-          {children}
-        </main>
+        <main className="p-6">{children}</main>
       </div>
     </div>
   );
