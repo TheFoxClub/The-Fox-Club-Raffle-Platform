@@ -246,14 +246,14 @@ export default function AdminCollections() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Verified Collections</h2>
           <p className="text-muted-foreground">
             Manage NFT collections that can host raffles
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 sm:items-center">
           <Button variant="outline" onClick={toggleBulkMode}>
             {bulkMode ? "Cancel Selection" : "Select Collections"}
           </Button>

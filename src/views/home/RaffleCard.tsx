@@ -32,7 +32,7 @@ export const RaffleCard = ({
   const progress = Math.min((sold / total) * 100, 100);
 
   return (
-    <Link to={`/raffle/${id}`}>
+    <Link to={`/raffle/raffle-${id}`}>
       <Card className="glass-card group hover:border-primary-50 transition-all duration-300 hover:glow-primary overflow-hidden border-primary/30">
         <div className="relative aspect-video overflow-hidden">
           <img

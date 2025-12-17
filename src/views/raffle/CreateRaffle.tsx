@@ -500,7 +500,7 @@ const CreateRaffle = () => {
           await fetchDrafts();
         } else {
           const createdId = res.data.data.raffle.id;
-          navigate(`/raffle/${createdId}`);
+          navigate(`/raffle/raffle-${createdId}`);
         }
       }
     } catch (e: any) {

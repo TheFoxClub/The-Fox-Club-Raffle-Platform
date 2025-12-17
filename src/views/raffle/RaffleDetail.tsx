@@ -86,7 +86,9 @@ function formatCountdown(endDateStr: string) {
 
 const RaffleDetail = () => {
   const { publicKey, signTransaction, connected } = useWallet();
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+
+  const raffleId = slug?.split("-").pop();
 
   const [raffle, setRaffle] = useState<RaffleType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -198,10 +200,10 @@ const RaffleDetail = () => {
   }, [raffle, ticketCount, publicKey, signTransaction, connected]);
 
   const fetchRaffle = useCallback(async () => {
-    if (!id) return;
+    if (!raffleId) return;
     try {
       setLoading(true);
-      const res = await server.get(`/raffle/${id}`);
+      const res = await server.get(`/raffle/${raffleId}`);
       if (res.data.success) {
         const data = res.data.data.raffle;
 
@@ -238,7 +240,7 @@ const RaffleDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [raffleId]);
 
   useEffect(() => {
     if (!raffle?.endDate) return;
