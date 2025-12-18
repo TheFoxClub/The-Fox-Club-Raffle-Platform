@@ -430,6 +430,7 @@ const RaffleDetail = () => {
                   className="bg-background-50"
                   size="icon"
                   onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
+                  disabled={!connected || ticketsLeft === 0}
                 >
                   -
                 </Button>
@@ -440,12 +441,14 @@ const RaffleDetail = () => {
                     setTicketCount(Math.max(1, parseInt(e.target.value) || 1))
                   }
                   className="flex h-10 w-full rounded-md text-center border border-border bg-background-50 rounded-md text-lg p-2 font-bold md:text-sm focus:ring-offset-2"
+                  disabled={!connected || ticketsLeft === 0}
                 />
                 <Button
                   variant="outline"
                   className="bg-background-50"
                   size="icon"
                   onClick={() => setTicketCount(ticketCount + 1)}
+                  disabled={!connected || ticketsLeft === 0}
                 >
                   +
                 </Button>
