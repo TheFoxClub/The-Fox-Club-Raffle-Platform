@@ -27,8 +27,14 @@ const checkRaffleAndFeaturedStatus = async () => {
       const oldStatus = raffle.status;
       let newStatus = oldStatus;
 
-      if (raffle.endedAt && raffle.endedAt < currentDate) {
-        // Raffle ended early (all tickets sold)
+      if (raffle.ticketsSold >= raffle.totalTickets && raffle.ticketsSold > 0) {
+        newStatus = RAFFLE_STATUS.ENDED;
+
+        if (!raffle.endedAt) {
+          raffle.endedAt = currentDate;
+        }
+      } else if (raffle.endedAt && raffle.endedAt < currentDate) {
+        // Raffle ended early (already marked as ended)
         newStatus = RAFFLE_STATUS.ENDED;
       } else if (raffle.endDate < currentDate) {
         // Raffle ended at scheduled end date
@@ -45,6 +51,11 @@ const checkRaffleAndFeaturedStatus = async () => {
         raffle.status = newStatus;
         await raffle.save();
 
+        const endedEarlyBySoldOut =
+          oldStatus !== RAFFLE_STATUS.ENDED &&
+          raffle.ticketsSold >= raffle.totalTickets &&
+          raffle.ticketsSold > 0;
+
         changedRaffles.push({
           id: raffle.id,
           title: raffle.title,
@@ -54,9 +65,13 @@ const checkRaffleAndFeaturedStatus = async () => {
           endDate: raffle.endDate,
           endedAt: raffle.endedAt,
           endedEarly:
-            raffle.endedAt &&
-            raffle.endedAt < currentDate &&
-            raffle.endDate > currentDate,
+            (raffle.endedAt &&
+              raffle.endedAt < currentDate &&
+              raffle.endDate > currentDate) ||
+            endedEarlyBySoldOut,
+          ticketsSold: raffle.ticketsSold,
+          totalTickets: raffle.totalTickets,
+          soldOut: endedEarlyBySoldOut,
         });
       }
     }
@@ -97,9 +112,17 @@ const checkRaffleAndFeaturedStatus = async () => {
       changedRaffles.forEach((raffle) => {
         const logMsg = `Raffle ${raffle.id} (${raffle.title}): ${raffle.oldStatus} → ${raffle.newStatus}`;
 
-        if (raffle.endedEarly) {
+        if (raffle.soldOut) {
           logger.info(
-            `${logMsg} | ENDED EARLY (tickets sold out) | Ended at: ${raffle.endedAt.toISOString()}`
+            `${logMsg} | SOLD OUT (${raffle.ticketsSold}/${
+              raffle.totalTickets
+            } tickets sold) | Ended at: ${
+              raffle.endedAt?.toISOString() || currentDate.toISOString()
+            }`
+          );
+        } else if (raffle.endedEarly && !raffle.soldOut) {
+          logger.info(
+            `${logMsg} | ENDED EARLY (manual/other reason) | Ended at: ${raffle.endedAt.toISOString()}`
           );
         } else if (raffle.newStatus === getStatusName(RAFFLE_STATUS.ENDED)) {
           logger.info(

@@ -44,6 +44,7 @@ export interface RaffleType {
   isFeatured: boolean;
   prizeValue: string;
   endDate?: string;
+  endedAt?: string;
 }
 
 function formatDateOnly(dateStr: string) {
@@ -228,6 +229,7 @@ const RaffleDetail = () => {
           // tokenMint: data.tokenMint,
           endDate: data.endDate,
           endTime: "",
+          endedAt: data.endedAt,
         };
 
         setRaffle(mappedRaffle);
@@ -246,7 +248,9 @@ const RaffleDetail = () => {
     if (!raffle?.endDate) return;
 
     const updateCountdown = () => {
-      const timeStr = formatCountdown(raffle.endDate!);
+      const timeStr = formatCountdown(
+        raffle.endedAt ? raffle.endedAt : raffle.endDate!
+      );
       setCountdown(timeStr);
     };
 
