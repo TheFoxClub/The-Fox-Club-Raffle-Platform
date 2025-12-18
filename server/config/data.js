@@ -60,6 +60,11 @@ const COMMISSION_RATES = {
   NON_HOLDER: 0.05, // 5% for non-holders
 };
 
+const COLLECTION_ISVERIFIED = {
+  TRUE: 1,
+  FALSE: 0,
+};
+
 function mapEnumValue(enumObj, value) {
   return Object.keys(enumObj).find((key) => enumObj[key] === value) || value;
 }
@@ -75,5 +80,6 @@ module.exports = {
   SPL_TOKEN_ADDRESS,
   SPL_TOKEN_SEND_TX_STATUS,
   COMMISSION_RATES,
+  COLLECTION_ISVERIFIED,
   mapEnumValue,
 };

@@ -159,7 +159,8 @@ const CreateRaffle = () => {
       }
       try {
         setNftLoading(true);
-        const res = await server.get(`/nfts/${user.pubkey}`);
+        // const res = await server.get(`/nfts/${user.pubkey}`);
+        const res = await server.get(`/nfts/onCollection/${user.pubkey}`);
         const nftsFromApi: any[] = res.data?.data?.nfts || [];
 
         const mapped = await Promise.all(

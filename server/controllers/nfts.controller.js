@@ -13,6 +13,8 @@ const redisClient = require("../util/redisClient");
 const umi = createUmi(SOLANA_RPC_POOL_DAS_API).use(dasApi());
 
 const CACHE_TTL = process.env.REDIS_TTL || 300;
+const { VerifiedCollection } = require("../models");
+const { COLLECTION_ISVERIFIED } = require("../config/data");
 
 class HolderController {
   static async getUserNftsFromCollection(req, res) {
@@ -23,12 +25,26 @@ class HolderController {
         return respond(res, httpStatus.BAD_REQUEST, "Missing wallet address");
       }
 
-      const cacheKey = `nfts:collection:${pubkey}:${
-        COLLECTION_ADDRESS || "all"
-      }`;
+      const verifiedCollections = await VerifiedCollection.findAll({
+        where: { isVerified: COLLECTION_ISVERIFIED.TRUE },
+        attributes: ["address", "name"],
+        raw: true,
+      });
+
+      if (!verifiedCollections.length) {
+        return respond(res, httpStatus.OK, "No verified collections found", {
+          total: 0,
+          nfts: [],
+        });
+      }
+
+      const collectionAddresses = verifiedCollections.map((c) => c.address);
+
+      const cacheKey = `nfts:collection:${pubkey}:${collectionAddresses.join(
+        ","
+      )}`;
 
       const cachedData = await redisClient.get(cacheKey);
-
       if (cachedData) {
         logger.info(`Cache hit for key: ${cacheKey}`);
         return respond(
@@ -36,28 +52,33 @@ class HolderController {
           httpStatus.OK,
           "NFTs fetched successfully (cached)!",
           {
-            total: cachedData.total,
-            nfts: cachedData.nfts,
+            ...cachedData,
             cached: true,
-            timestamp: cachedData.timestamp,
           }
         );
       }
 
       logger.info(`Cache miss for key: ${cacheKey}, fetching from blockchain`);
 
-      const searchParams = {
-        owner: publicKey(pubkey),
-      };
+      let allItems = [];
 
-      const collection = COLLECTION_ADDRESS;
-      if (collection) {
-        searchParams.grouping = ["collection", collection];
+      for (const collection of collectionAddresses) {
+        const result = await umi.rpc.searchAssets({
+          owner: publicKey(pubkey),
+          grouping: ["collection", collection],
+        });
+
+        if (result?.items?.length) {
+          allItems.push(...result.items);
+        }
       }
 
-      const result = await umi.rpc.searchAssets(searchParams);
+      const uniqueNftsMap = new Map();
+      for (const item of allItems) {
+        uniqueNftsMap.set(item.id, item);
+      }
 
-      const nfts = result.items.map((item) => ({
+      const nfts = Array.from(uniqueNftsMap.values()).map((item) => ({
         mint: item.id,
         name: item.content?.metadata?.name,
         uri: item.content?.json_uri,
@@ -67,7 +88,7 @@ class HolderController {
       }));
 
       const responseData = {
-        total: result.total,
+        total: nfts.length,
         nfts,
         timestamp: new Date().toISOString(),
       };
@@ -85,9 +106,7 @@ class HolderController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         "Failed to fetch NFTs.",
-        {
-          error: err.message,
-        }
+        { error: err.message }
       );
     }
   }
