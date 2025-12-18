@@ -277,7 +277,7 @@ class RaffleController {
 
       const raffle = await Raffle.findOne({
         where: { id },
-        include: [{ model: RaffleDetail }],
+        include: [{ model: RaffleDetail }, { model: RaffleReward }],
       });
 
       if (!raffle) {
@@ -425,6 +425,14 @@ class RaffleController {
       let totalWinners = 1;
       if (numberOfWinners || rewards) {
         totalWinners = numberOfWinners || rewards.length;
+      }
+
+      if (rewards && rewards.length && totalWinners > rewards.length) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `Number of winners (${totalWinners}) cannot be greater than total rewards (${rewards.length})`
+        );
       }
 
       const raffle = await Raffle.create({
