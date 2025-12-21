@@ -24,6 +24,24 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
 import { storeSignature } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
+import WinnerModal from "../../components/ui/WinnerModal";
+
+export const RAFFLE_REWARD_TYPES = {
+  NFT: 0,
+  SPL_TOKEN: 1,
+  SPL_TOKEN_2022: 2,
+};
+
+export interface RaffleReward {
+  id: number;
+  raffleId: number;
+  rewardType: number;
+  rewardName: string;
+  mintAddress: string;
+  amount: string;
+  imageUrl: string;
+  metadataJson: string;
+}
 
 export interface RaffleType {
   id: number;
@@ -45,12 +63,13 @@ export interface RaffleType {
   prizeValue: string;
   endDate?: string;
   endedAt?: string;
+  rewards?: RaffleReward[];
+  winnersAddresses?: string[]; // list of winner pubkeys
+  participants?: string[]; // list of all participants pubkeys
 }
 
-function formatDateOnly(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toISOString().split("T")[0];
-}
+const formatDateOnly = (dateStr: string) =>
+  new Date(dateStr).toISOString().split("T")[0];
 
 function formatCountdown(endDateStr: string) {
   const end = new Date(endDateStr).getTime();
@@ -95,6 +114,12 @@ const RaffleDetail = () => {
   const [loading, setLoading] = useState(true);
   const [ticketCount, setTicketCount] = useState(1);
   const [countdown, setCountdown] = useState<string>("");
+  const [showAllRewards, setShowAllRewards] = useState(false);
+  const [winnerModalVisible, setWinnerModalVisible] = useState(false);
+  const [nonWinnerBannerVisible, setNonWinnerBannerVisible] = useState(false);
+  const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
+  const winners = raffle?.winnersAddresses ?? [];
+
   const TOKEN_MAP: Record<number, string> = {
     0: "SOL",
     1: "USDT",
@@ -230,6 +255,9 @@ const RaffleDetail = () => {
           endDate: data.endDate,
           endTime: "",
           endedAt: data.endedAt,
+          rewards: data.raffle_rewards || [],
+          winnersAddresses: data.winnersAddresses || [],
+          participants: data.participants || [],
         };
 
         setRaffle(mappedRaffle);
@@ -246,23 +274,43 @@ const RaffleDetail = () => {
 
   useEffect(() => {
     if (!raffle?.endDate) return;
-
     const updateCountdown = () => {
       const timeStr = formatCountdown(
         raffle.endedAt ? raffle.endedAt : raffle.endDate!
       );
       setCountdown(timeStr);
+
+      // Live update: raffle ended
+      if (timeStr === "Ended" && !raffleEndedFetched) {
+        fetchRaffle();
+        setRaffleEndedFetched(true);
+      }
     };
 
-    updateCountdown(); // initialize immediately
+    updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
-
     return () => clearInterval(interval);
-  }, [raffle?.endDate]);
+  }, [raffle?.endDate, fetchRaffle, raffleEndedFetched]);
 
   useEffect(() => {
     fetchRaffle();
   }, [fetchRaffle]);
+
+  useEffect(() => {
+    if (!raffle || !publicKey || !raffle.endedAt) return;
+
+    const key = `raffle-${raffle.id}-result-seen`;
+    if (localStorage.getItem(key)) return;
+
+    const user = publicKey.toBase58();
+    if (!raffle.participants?.includes(user)) return;
+
+    if (raffle.winnersAddresses?.includes(user)) {
+      setWinnerModalVisible(true);
+    } else {
+      setNonWinnerBannerVisible(true);
+    }
+  }, [raffle, publicKey]);
 
   if (loading)
     return (
@@ -281,8 +329,40 @@ const RaffleDetail = () => {
   const ticketsLeft = Math.max(raffle.total - raffle.sold, 0);
   const totalCost = (raffle.price * ticketCount).toFixed(2);
 
+  const isEnded = countdown === "Ended" || !!raffle.endedAt;
+  const isSoldOut = raffle.total - raffle.sold <= 0;
+
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Winner Modal */}
+      {winnerModalVisible && publicKey && (
+        <WinnerModal
+          raffle={raffle}
+          publicKey={publicKey.toBase58()}
+          onClose={() => {
+            localStorage.setItem(`raffle-${raffle.id}-result-seen`, "true");
+            setWinnerModalVisible(false);
+          }}
+        />
+      )}
+
+      {/* Non-winner Banner */}
+      {nonWinnerBannerVisible && (
+        <div className="flex justify-between items-start bg-yellow-50 border border-yellow-300 text-yellow-900 p-4 rounded mb-4">
+          <p>
+            You didn’t win this time — thanks for participating. Better luck
+            next time 🍀
+          </p>
+          <button
+            onClick={() => {
+              localStorage.setItem(`raffle-${raffle.id}-result-seen`, "true");
+              setNonWinnerBannerVisible(false);
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 overflow-hidden">
@@ -347,6 +427,110 @@ const RaffleDetail = () => {
             </div>
           </Card>
 
+          {/* Reward Section */}
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
+            <h2 className="text-lg font-bold">Rewards</h2>
+
+            {raffle.rewards && raffle.rewards.length > 0 ? (
+              <>
+                <div className="space-y-4">
+                  {(showAllRewards
+                    ? raffle.rewards
+                    : raffle.rewards.slice(0, 3)
+                  ).map((reward) => (
+                    <div
+                      key={reward.id}
+                      className="flex items-center gap-6 bg-card/40 border border-border/40 rounded-lg p-4"
+                    >
+                      <img
+                        src={reward.imageUrl}
+                        alt={reward.rewardName}
+                        className="w-14 h-14 rounded-md object-cover"
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">
+                          {reward.rewardName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Amount: {parseFloat(reward.amount)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Mint: {reward.mintAddress.slice(0, 4)}…
+                          {reward.mintAddress.slice(-4)}
+                        </p>
+                        <a
+                          href={`https://solscan.io/token/${reward.mintAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline w-fit"
+                        >
+                          View on Solscan
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {raffle.rewards.length > 3 && (
+                  <Button
+                    variant="ghost"
+                    className="text-sm text-primary px-0"
+                    onClick={() => setShowAllRewards(!showAllRewards)}
+                  >
+                    {showAllRewards
+                      ? "Show less"
+                      : `Show all rewards (${raffle.rewards.length})`}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Reward details not available.
+              </p>
+            )}
+          </Card>
+
+          {/* 🏆 WINNERS SECTION */}
+          {/* Winners Section */}
+          {raffle.endedAt && (
+            <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-accent" />
+                Winners
+              </h2>
+
+              {winners.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  Winners will be announced soon.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {winners.map((address, index) => (
+                    <div
+                      key={address}
+                      className="flex items-center justify-between bg-card/40 border border-border/40 rounded-lg p-4"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-sm">
+                          Winner #{index + 1}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {address.slice(0, 4)}…{address.slice(-4)}
+                        </span>
+                      </div>
+
+                      {raffle.rewards?.[index] && (
+                        <span className="text-sm font-medium">
+                          {raffle.rewards[index].rewardName}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
           {/* Host Section */}
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
             <h2 className="text-lg font-bold mb-4">Hosted By</h2>
@@ -385,9 +569,11 @@ const RaffleDetail = () => {
                   </span>
                 </div>
 
-                <span className="text-accent font-semibold">
-                  {ticketsLeft} left
-                </span>
+                {!isSoldOut && (
+                  <span className="text-accent font-semibold">
+                    {ticketsLeft} left
+                  </span>
+                )}
               </div>
               <Progress
                 value={(raffle.sold / raffle.total) * 100}
@@ -419,41 +605,42 @@ const RaffleDetail = () => {
             </div>
 
             {/* Countdown */}
-
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-muted-foreground">
-                Number of Tickets
-              </label>
-              <div className="flex items-center gap-3 mt-2">
-                <Button
-                  variant="outline"
-                  className="bg-background-50"
-                  size="icon"
-                  onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
-                  disabled={!connected || ticketsLeft === 0}
-                >
-                  -
-                </Button>
-                <input
-                  type="number"
-                  value={ticketCount}
-                  onChange={(e) =>
-                    setTicketCount(Math.max(1, parseInt(e.target.value) || 1))
-                  }
-                  className="flex h-10 w-full rounded-md text-center border border-border bg-background-50 rounded-md text-lg p-2 font-bold md:text-sm focus:ring-offset-2"
-                  disabled={!connected || ticketsLeft === 0}
-                />
-                <Button
-                  variant="outline"
-                  className="bg-background-50"
-                  size="icon"
-                  onClick={() => setTicketCount(ticketCount + 1)}
-                  disabled={!connected || ticketsLeft === 0}
-                >
-                  +
-                </Button>
+            {!isEnded && !isSoldOut && (
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Number of Tickets
+                </label>
+                <div className="flex items-center gap-3 mt-2">
+                  <Button
+                    variant="outline"
+                    className="bg-background-50"
+                    size="icon"
+                    onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
+                    disabled={!connected || ticketsLeft === 0}
+                  >
+                    -
+                  </Button>
+                  <input
+                    type="number"
+                    value={ticketCount}
+                    onChange={(e) =>
+                      setTicketCount(Math.max(1, parseInt(e.target.value) || 1))
+                    }
+                    className="flex h-10 w-full rounded-md text-center border border-border bg-background-50 rounded-md text-lg p-2 font-bold md:text-sm focus:ring-offset-2"
+                    disabled={!connected || ticketsLeft === 0}
+                  />
+                  <Button
+                    variant="outline"
+                    className="bg-background-50"
+                    size="icon"
+                    onClick={() => setTicketCount(ticketCount + 1)}
+                    disabled={!connected || ticketsLeft === 0}
+                  >
+                    +
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
             {/* Total Cost */}
             <div className="flex items-center bg-card/50 backdrop-blur-xl border border-border/50 justify-between border-primary/30 p-4 rounded-lg bg-primary-10">
               <span className="font-semibold text-muted-foreground">
@@ -465,14 +652,24 @@ const RaffleDetail = () => {
             </div>
 
             {/* Buy Button */}
-            <Button
-              className="w-full mt-4 gradient-primary glow-primary h-12 text-lg"
-              onClick={handleBuyTickets}
-              disabled={!connected || ticketsLeft === 0}
-            >
-              <Ticket className="h-5 w-5 mr-2" />
-              Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
-            </Button>
+            {isEnded ? (
+              <div className="w-full mt-4 h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold">
+                Raffle Ended
+              </div>
+            ) : isSoldOut ? (
+              <div className="w-full mt-4 h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold">
+                Sold Out
+              </div>
+            ) : (
+              <Button
+                className="w-full mt-4 gradient-primary glow-primary h-12 text-lg"
+                onClick={handleBuyTickets}
+                disabled={!connected}
+              >
+                <Ticket className="h-5 w-5 mr-2" />
+                Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
+              </Button>
+            )}
 
             {/* Info */}
             <div className="bg-card/50 backdrop-blur-xl border border-accent/30 rounded-lg flex gap-3 p-4">
@@ -480,8 +677,8 @@ const RaffleDetail = () => {
               <div className="text-sm space-y-1">
                 <p className="font-semibold">NFT Holder Discount</p>
                 <p className="text-muted-foreground">
-                  Connet a wallet with verified NFTs to get 2.5% fees instead of
-                  5%
+                  Connect a wallet with verified NFTs to get 2.5% fees instead
+                  of 5%
                 </p>
               </div>
             </div>
