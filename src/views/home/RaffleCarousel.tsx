@@ -83,13 +83,13 @@ export default function RaffleCarousel() {
   return (
     <Card className=" overflow-hidden glow-primary border-primary/30">
       <div className="relative">
-        <div className="grid md:grid-cols-2 gap-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
           {/* Image */}
           <div className="relative aspect-video md:aspect-auto">
             <img
               src={data.image}
               alt={data.title}
-              className="w-full h-86 object-cover"
+              className="w-full h-90 object-cover"
             />
             {/* Verified Badge */}
             {data.isVerified && (
@@ -100,17 +100,17 @@ export default function RaffleCarousel() {
           </div>
 
           {/* Details */}
-          <div className="p-8 flex flex-col justify-center space-y-6 relative">
+          <div className="p-4 md:p-8 flex flex-col justify-between space-y-6 relative">
             {/* Featured Raffle Badge */}
             <div>
               <div className="inline-flex items-center rounded-full px-2.5 py-0.5 mb-4 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
                 Featured Raffle
               </div>
 
-              <h2 className="text-2xl font-bold mb-3 text-gradient">
+              <h2 className="text-xl md:text-2xl font-bold mb-3 text-gradient">
                 {data.title}
               </h2>
-              <p className="text-muted-foreground text-md">
+              <p className="text-muted-foreground text-base">
                 {data.description}
               </p>
             </div>
@@ -139,8 +139,8 @@ export default function RaffleCarousel() {
             {/* Button + Arrows */}
             <div className="flex items-center gap-3">
               <Button
-                className="gradient-primary glow-primary text-white rounded-xl text-sm flex-1"
-                onClick={() => navigate(`/raffle/${data.id}`)}
+                className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
+                onClick={() => navigate(`/raffle/raffle-${data.id}`)}
               >
                 Enter Raffle
               </Button>
@@ -148,13 +148,13 @@ export default function RaffleCarousel() {
               <div className="flex gap-2">
                 <button
                   onClick={prev}
-                  className="p-2 bg-[#1a1a1a] rounded-xl hover:bg-[#262626] flex items-center justify-center"
+                  className="p-2 bg-background border-input rounded-xl hover:bg-[#262626]"
                 >
                   <ChevronLeft />
                 </button>
                 <button
                   onClick={next}
-                  className="p-2 bg-[#1a1a1a] rounded-xl hover:bg-[#262626] flex items-center justify-center"
+                  className="p-2 bg-background border-input rounded-xl hover:bg-[#262626]"
                 >
                   <ChevronRight />
                 </button>

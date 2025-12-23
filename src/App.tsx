@@ -110,7 +110,7 @@ function App() {
             }
           />
           <Route
-            path="/raffle/:id"
+            path="/raffle/:slug"
             element={
               <Layout>
                 <RaffleDetail />

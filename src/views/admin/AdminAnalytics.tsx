@@ -223,8 +223,8 @@ export default function AdminAnalytics() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "hsl(240 10% 7%)",
-                    border: "1px solid hsl(240 6% 20%)",
+                    backgroundColor: "hsla(0, 1%, 87%, 1.00)",
+                    border: "1px solid hsla(0, 0%, 63%, 1.00)",
                     borderRadius: "8px",
                   }}
                 />

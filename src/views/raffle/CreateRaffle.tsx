@@ -73,6 +73,7 @@ const CreateRaffle = () => {
   const [endDate, setEndDate] = useState("");
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [startNow, setStartNow] = useState(true);
 
   const [errors, setErrors] = useState<{
     [key: string]: string | undefined;
@@ -106,11 +107,21 @@ const CreateRaffle = () => {
   useEffect(() => {
     const totalPrizes = selectedNFTs.length + selectedTokens.length;
 
-    // only auto-set if user hasn't typed anything
-    if (numberOfWinners === 1 || numberOfWinners > totalPrizes) {
-      setNumberOfWinners(totalPrizes > 0 ? totalPrizes : 1);
+    if (totalPrizes === 0) {
+      setNumberOfWinners(1);
+      return;
     }
-  }, [selectedNFTs, selectedTokens]);
+
+    setNumberOfWinners((prev) => {
+      // If rewards were removed, clamp winners
+      if (prev > totalPrizes) return totalPrizes;
+
+      // If rewards increased and winners matched old count, auto-increase
+      if (prev === totalPrizes - 1) return totalPrizes;
+
+      return prev;
+    });
+  }, [selectedNFTs.length, selectedTokens.length]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -279,6 +290,18 @@ const CreateRaffle = () => {
     setSelectedTokens((prev) => prev.filter((t) => t.mint !== mint));
   };
 
+  // 🔹 AUTO-SET START DATE WHEN startNow IS TRUE
+  useEffect(() => {
+    if (startNow) {
+      const now = new Date();
+      const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+
+      setStartDate(localISO);
+    }
+  }, [startNow]);
+
   const validateForm = (isDraft = false) => {
     if (isDraft) return true;
 
@@ -315,7 +338,7 @@ const CreateRaffle = () => {
       newErrors.numberOfWinners =
         "Number of winners cannot exceed total prizes";
     }
-    if (!startDate) newErrors.startDate = "Start date is required";
+    if (!startNow && !startDate) newErrors.startDate = "Start date is required";
     if (!endDate) newErrors.endDate = "End date is required";
     if (!selectedTokenType)
       newErrors.selectedTokenType = "Please select a token";
@@ -326,8 +349,10 @@ const CreateRaffle = () => {
       newErrors.endDateError = "End date must be after start date";
     }
 
-    if (start < new Date()) {
-      newErrors.startDateError = "Start date cannot be in the past";
+    if (!startNow) {
+      if (start < new Date()) {
+        newErrors.startDateError = "Start date cannot be in the past";
+      }
     }
 
     // Only require image for non-draft submissions
@@ -442,6 +467,7 @@ const CreateRaffle = () => {
         setLoading(false);
         return;
       }
+      const finalStartDate = startNow ? new Date().toISOString() : startDate;
 
       const payload = {
         title: title.trim(),
@@ -450,7 +476,7 @@ const CreateRaffle = () => {
         ticketPrice,
         tokenType: selectedTokenType || "SOLANA",
         numberOfWinners,
-        startDate,
+        startDate: finalStartDate,
         endDate,
         status,
         requiresNftVerification: false,
@@ -501,7 +527,7 @@ const CreateRaffle = () => {
           await fetchDrafts();
         } else {
           const createdId = res.data.data.raffle.id;
-          navigate(`/raffle/${createdId}`);
+          navigate(`/raffle/raffle-${createdId}`);
         }
       }
     } catch (e: any) {
@@ -666,17 +692,6 @@ const CreateRaffle = () => {
   return (
     <div className="container mx-auto px-4 py-2 max-w-4xl">
       <div className="mb-6">
-        {/* Fetch Drafts Button */}
-        {/* <div className="flex justify-end mb-4">
-          <Button
-            onClick={fetchDrafts}
-            disabled={draftLoading || !user.isAuthenticated}
-            variant="outline"
-            className="gap-2">
-            {draftLoading ? "Loading..." : "Fetch Saved Drafts"}
-          </Button>
-        </div> */}
-
         {/* Saved Draft Display */}
         {savedDraft && (
           <div className="p-4 border border-accent/50 bg-accent/10 rounded-lg">
@@ -1234,9 +1249,19 @@ const CreateRaffle = () => {
                 <Input
                   type="number"
                   value={numberOfWinners}
-                  onChange={(e) => setNumberOfWinners(Number(e.target.value))}
-                  placeholder="1"
-                  defaultValue="1"
+                  min={1}
+                  max={selectedNFTs.length + selectedTokens.length}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    const max = selectedNFTs.length + selectedTokens.length;
+
+                    setNumberOfWinners(Math.min(Math.max(1, value), max));
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      numberOfWinners: undefined,
+                    }));
+                  }}
                   className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
                 {errors.numberOfWinners && (
@@ -1255,6 +1280,17 @@ const CreateRaffle = () => {
             <h1 className="text-2xl font-bold">Duration</h1>
           </div>
 
+          {/* 🔹 START IMMEDIATELY TOGGLE */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={startNow}
+              onChange={(e) => setStartNow(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <label className="text-sm font-medium">Start immediately</label>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-6">
             <div ref={startDateRef}>
               <label className="text-sm font-medium">Start Date & Time *</label>
@@ -1262,6 +1298,7 @@ const CreateRaffle = () => {
                 <Input
                   type="datetime-local"
                   value={startDate}
+                  disabled={startNow}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />

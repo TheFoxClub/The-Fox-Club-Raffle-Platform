@@ -178,7 +178,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       onValueChange={handleTabChange}
       className="space-y-2 z-20 mt-10"
     >
-      <TabsList className=" p-1 w-full sm:w-auto">
+      <TabsList className="p-1 sm:w-auto">
         <TabsTrigger value="live" className="gap-2 flex-1 sm:flex-none">
           <Flame className="h-4 w-4" />
           Live Raffles
@@ -219,7 +219,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
               };
 
               return (
-                <Link to={`/raffle/${raffle.id}`} key={raffle.id}>
+                <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
                   <RaffleCard {...mappedRaffle} />
                 </Link>
               );
@@ -245,7 +245,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
           </span>
         </div>
         {Array.isArray(endedRaffles) && endedRaffles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ">
             {endedRaffles.map((raffle) => {
               const mappedRaffle = {
                 id: raffle.id,
@@ -263,7 +263,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
               };
 
               return (
-                <Link to={`/raffle/${raffle.id}`} key={raffle.id}>
+                <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
                   <RaffleCard {...mappedRaffle} />
                 </Link>
               );
@@ -307,7 +307,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
               };
 
               return (
-                <Link to={`/raffle/${raffle.id}`} key={raffle.id}>
+                <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
                   <RaffleCard {...mappedRaffle} />
                 </Link>
               );
