@@ -1,3 +1,4 @@
+const { VerifiedToken, User } = require("../models");
 const {
   fetchMetadataFromSeeds,
 } = require("@metaplex-foundation/mpl-token-metadata");
@@ -160,6 +161,173 @@ class TokenController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         "Failed to Fetch SPL Tokens and Token2022 Tokens"
+      );
+    }
+  }
+
+  static async getUserVerifiedTokens(req, res) {
+    try {
+      const userId = req.payload.id;
+
+      const user = await User.findOne({ where: { id: userId } });
+
+      if (!user) {
+        return respond(res, httpStatus.BAD_REQUEST, "User Not Found");
+      }
+
+      const wallet = new PublicKey(user.pubkey);
+      const walletAddress = wallet.toString();
+
+      const verifiedTokens = await VerifiedToken.findAll({
+        where: { isVerified: true },
+        attributes: ["address", "name", "decimals"],
+        raw: true,
+      });
+
+      if (!verifiedTokens.length) {
+        return respond(
+          res,
+          httpStatus.OK,
+          {
+            splTokens: [],
+            token2022Tokens: [],
+            cached: false,
+            timestamp: new Date().toISOString(),
+          },
+          "No verified tokens found"
+        );
+      }
+
+      const verifiedMintSet = new Set(verifiedTokens.map((t) => t.address));
+
+      // Cache key based on wallet + verified mints
+      const tokensCacheKey = `tokens:verified:${walletAddress}:${[
+        ...verifiedMintSet,
+      ].join(",")}`;
+
+      const metadataCacheKeyPrefix = `metadata:mint:`;
+
+      const cachedTokens = await redisClient.get(tokensCacheKey);
+      if (cachedTokens) {
+        logger.info(`Cache hit for tokens: ${tokensCacheKey}`);
+        return respond(
+          res,
+          httpStatus.OK,
+          {
+            ...cachedTokens,
+            cached: true,
+          },
+          "Verified Tokens Fetched Successfully (Cached)"
+        );
+      }
+
+      logger.info(
+        `Cache miss for tokens: ${tokensCacheKey}, fetching from blockchain`
+      );
+
+      const connection = new Connection(SOLANA_RPC_HOST, "confirmed");
+      const umi = createUmi(SOLANA_RPC_HOST);
+
+      const [tokenAccounts, token2022Accounts] = await Promise.all([
+        connection.getParsedTokenAccountsByOwner(wallet, {
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        connection.getParsedTokenAccountsByOwner(wallet, {
+          programId: TOKEN_2022_PROGRAM_ID,
+        }),
+      ]);
+
+      const filterVerified = (accounts) =>
+        accounts.value.filter((acc) =>
+          verifiedMintSet.has(acc.account.data.parsed.info.mint)
+        );
+
+      const verifiedSplAccounts = filterVerified(tokenAccounts);
+      const verifiedToken2022Accounts = filterVerified(token2022Accounts);
+
+      async function addMetadataForTokens(accounts) {
+        return Promise.all(
+          accounts.map(async (acc) => {
+            const mint = acc.account.data.parsed.info.mint;
+            const metadataCacheKey = `${metadataCacheKeyPrefix}${mint}`;
+
+            let name = null;
+            let symbol = null;
+            let uri = null;
+
+            const cachedMetadata = await redisClient.get(metadataCacheKey);
+            if (cachedMetadata) {
+              ({ name, symbol, uri } = cachedMetadata);
+            } else {
+              try {
+                const metadata = await fetchMetadataFromSeeds(umi, {
+                  mint: publicKey(mint),
+                });
+
+                name = metadata.name;
+                symbol = metadata.symbol;
+                uri = metadata.uri;
+
+                await redisClient.set(
+                  metadataCacheKey,
+                  { name, symbol, uri },
+                  METADATA_CACHE_TTL
+                );
+              } catch {
+                await redisClient.set(
+                  metadataCacheKey,
+                  { name: null, symbol: null, uri: null },
+                  METADATA_CACHE_TTL
+                );
+              }
+            }
+
+            return {
+              mint,
+              amount: acc.account.data.parsed.info.tokenAmount,
+              metadata: { name, symbol, uri },
+            };
+          })
+        );
+      }
+
+      const splTokens = await addMetadataForTokens(verifiedSplAccounts);
+      const token2022Tokens = await addMetadataForTokens(
+        verifiedToken2022Accounts
+      );
+
+      const responseData = {
+        splTokens,
+        token2022Tokens,
+        timestamp: new Date().toISOString(),
+      };
+
+      await redisClient.set(tokensCacheKey, responseData, TOKENS_CACHE_TTL);
+
+      return respond(
+        res,
+        httpStatus.OK,
+        {
+          ...responseData,
+          cached: false,
+        },
+        "Verified Tokens Fetched Successfully"
+      );
+    } catch (error) {
+      logger.error(error);
+
+      if (error.message.includes("Invalid public key")) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Invalid wallet address provided"
+        );
+      }
+
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to fetch verified tokens"
       );
     }
   }

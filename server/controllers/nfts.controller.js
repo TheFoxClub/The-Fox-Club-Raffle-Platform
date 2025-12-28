@@ -1,3 +1,4 @@
+const { User } = require("../models");
 const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
@@ -19,11 +20,10 @@ const { COLLECTION_ISVERIFIED } = require("../config/data");
 class HolderController {
   static async getUserNftsFromCollection(req, res) {
     try {
-      const { pubkey } = req.params;
+      const userId = req.payload.id;
+      const user = await User.findOne({ where: { id: userId } });
 
-      if (!pubkey) {
-        return respond(res, httpStatus.BAD_REQUEST, "Missing wallet address");
-      }
+      const pubkey = user.pubkey;
 
       const verifiedCollections = await VerifiedCollection.findAll({
         where: { isVerified: COLLECTION_ISVERIFIED.TRUE },

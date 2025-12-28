@@ -171,7 +171,7 @@ const CreateRaffle = () => {
       try {
         setNftLoading(true);
         // const res = await server.get(`/nfts/${user.pubkey}`);
-        const res = await server.get(`/nfts/onCollection/${user.pubkey}`);
+        const res = await server.get(`/nfts/onCollection`);
         const nftsFromApi: any[] = res.data?.data?.nfts || [];
 
         const mapped = await Promise.all(
@@ -229,7 +229,7 @@ const CreateRaffle = () => {
       try {
         setTokenLoading(true);
         // const res = await server.get(`/tokens/${user.pubkey}`);
-        const res = await server.get(`/tokens/verified/${user.pubkey}`);
+        const res = await server.get(`/tokens/verified`);
         const spl = res.data?.message?.splTokens || [];
         const mapped = spl.map((t: any, idx: number) => {
           const info = t.account?.data?.parsed?.info;

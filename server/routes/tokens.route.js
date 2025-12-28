@@ -4,13 +4,11 @@ const auth = require("../config/auth");
 const TokenController = require("../controllers/tokens.controller");
 const isAdmin = require("../middlewares/isAdmin");
 
+// Get Verified Tokens of logged in user
+router.get("/verified", auth.bearer, TokenController.getUserVerifiedTokens);
+
 // GET SPL Tokens and Token2022 Tokens of a wallet
 router.get("/:pubkey", auth.bearer, TokenController.getUserTokens);
-router.get(
-  "/verified/:pubkey",
-  auth.bearer,
-  TokenController.getUserVerifiedTokens
-);
 
 router.get("/:pubkey/mint/:mint", TokenController.getTokensByMint);
 router.delete("/cache/:pubkey", TokenController.clearTokenCache);

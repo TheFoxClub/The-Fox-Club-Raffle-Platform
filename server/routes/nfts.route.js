@@ -6,7 +6,7 @@ const HolderController = require("../controllers/nfts.controller");
 
 // Get NFTs of a user from the collection configured in .env
 router.get(
-  "/onCollection/:pubkey",
+  "/onCollection",
   auth.bearer,
   HolderController.getUserNftsFromCollection
 );
