@@ -6,6 +6,11 @@ const isAdmin = require("../middlewares/isAdmin");
 
 // GET SPL Tokens and Token2022 Tokens of a wallet
 router.get("/:pubkey", auth.bearer, TokenController.getUserTokens);
+router.get(
+  "/verified/:pubkey",
+  auth.bearer,
+  TokenController.getUserVerifiedTokens
+);
 
 router.get("/:pubkey/mint/:mint", TokenController.getTokensByMint);
 router.delete("/cache/:pubkey", TokenController.clearTokenCache);

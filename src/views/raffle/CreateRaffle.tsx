@@ -228,12 +228,15 @@ const CreateRaffle = () => {
 
       try {
         setTokenLoading(true);
-        const res = await server.get(`/tokens/${user.pubkey}`);
+        // const res = await server.get(`/tokens/${user.pubkey}`);
+        const res = await server.get(`/tokens/verified/${user.pubkey}`);
         const spl = res.data?.message?.splTokens || [];
         const mapped = spl.map((t: any, idx: number) => {
           const info = t.account?.data?.parsed?.info;
-          const mint = info?.mint || `unknown-${idx}`;
-          const amount = info?.tokenAmount?.uiAmount ?? 0;
+          // const mint = info?.mint || `unknown-${idx}`;
+          const mint = t.mint;
+          // const amount = info?.tokenAmount?.uiAmount ?? 0;
+          const amount = t?.amount?.uiAmount ?? 0;
           const programId = t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
           const name = t.metadata?.name || `Token ${mint.slice(0, 6)}...`;
           // const name = info?.tokenAmount?.decimals
