@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Copy } from "lucide-react";
 import Button from "../../components/ui/Button";
 // import { Input } from "../../components/ui/Input";
 // import { Label } from "../../components/ui/Label";
@@ -51,7 +51,7 @@ export default function AdminTokens() {
     decimals: number;
     programId: string;
   } | null>(null);
-  const [solanaVerified, setSolanaVerified] = useState(solanaToken.active);
+  // const [solanaVerified, setSolanaVerified] = useState(solanaToken.active);
 
   useEffect(() => {
     if (!open || !user.isAuthenticated) return;
@@ -167,6 +167,24 @@ export default function AdminTokens() {
     }
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Mint address copied!", {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } catch (err) {
+      toast.error("Failed to copy mint address", {
+        position: "top-right",
+      });
+    }
+  };
+
   return (
     <div className="w-84 md:w-full">
       {/* Header */}
@@ -268,14 +286,18 @@ export default function AdminTokens() {
               <tr className="border-b border-border/30 hover:bg-muted/20 transition-colors">
                 <td className="p-4 font-medium">{solanaToken.name}</td>
                 <td className="p-4">
-                  <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                  <button
+                    className="flex items-center gap-1 hover:text-primary transition"
+                    onClick={() => copyToClipboard(solanaToken.mint)}
+                  >
                     {truncateAddress(solanaToken.mint)}
-                  </span>
+                    <Copy className="h-3 w-3 opacity-50 ml-1" />
+                  </button>
                 </td>
                 <td className="p-4 text-muted-foreground">
                   {solanaToken.decimals}
                 </td>
-                <td className="p-4">
+                {/* <td className="p-4">
                   <Switch
                     checked={solanaVerified}
                     onCheckedChange={(val) => {
@@ -287,7 +309,7 @@ export default function AdminTokens() {
                       }
                     }}
                   />
-                </td>
+                </td> */}
               </tr>
 
               {verifiedTokens.map((token) => (
@@ -297,9 +319,13 @@ export default function AdminTokens() {
                 >
                   <td className="p-4 font-medium">{token.name}</td>
                   <td className="p-4">
-                    <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                    <button
+                      className="flex items-center gap-1 hover:text-primary transition"
+                      onClick={() => copyToClipboard(token.address)}
+                    >
                       {truncateAddress(token.address)}
-                    </span>
+                      <Copy className="h-3 w-3 opacity-50 ml-1" />
+                    </button>
                   </td>
                   <td className="p-4 text-muted-foreground">
                     {token.decimals}
