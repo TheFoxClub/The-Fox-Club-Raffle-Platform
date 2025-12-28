@@ -4,6 +4,7 @@ const {
   User,
   UserInfo,
   VerifiedCollection,
+  VerifiedToken,
   Sequelize,
   sequelize,
 } = require("../models");
@@ -11,7 +12,7 @@ const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
-const { Op } = require("sequelize");
+const { Op, where } = require("sequelize");
 const {
   TOKEN_TYPE,
   RAFFLE_STATUS,
@@ -617,9 +618,10 @@ class AdminController {
           ) as totalTicketsSold
         FROM raffles r
         LEFT JOIN users u ON r.userId = u.id
+        WHERE r.status <> 0
         ORDER BY revenue DESC
         LIMIT ?
-      `,
+        `,
         {
           replacements: [parseInt(limit, 10)],
         }
@@ -672,6 +674,198 @@ class AdminController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         "Failed to fetch top hosts and buyers"
+      );
+    }
+  }
+
+  // ---------Verified Token APIs-------------
+  static async getAllTokens(req, res) {
+    try {
+      const { page = 1, limit = 50 } = req.query;
+      const offset = (page - 1) * limit;
+
+      const { count, rows: tokens } = await VerifiedToken.findAndCountAll({
+        order: [["createdAt", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Verified tokens retrieved successfully",
+        {
+          tokens,
+          pagination: {
+            total: count,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(count / limit),
+          },
+        }
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  // Get all verified tokens(only verified)
+  static async getAllVerifiedTokens(req, res) {
+    try {
+      const { page = 1, limit = 50 } = req.query;
+      const offset = (page - 1) * limit;
+
+      const { count, rows: tokens } = await VerifiedToken.findAndCountAll({
+        where: { isVerified: true },
+        order: [["createdAt", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Verified tokens retrieved successfully",
+        {
+          tokens,
+          pagination: {
+            total: count,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(count / limit),
+          },
+        }
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async createVerifiedToken(req, res) {
+    try {
+      const { address, name, decimals } = req.body;
+
+      if (!address) {
+        return respond(res, httpStatus.BAD_REQUEST, "Address is required");
+      }
+
+      const existingToken = await VerifiedToken.findOne({
+        where: { address },
+      });
+
+      if (existingToken) {
+        return respond(
+          res,
+          httpStatus.CONFLICT,
+          "Token with this address already exists"
+        );
+      }
+
+      const token = await VerifiedToken.create({
+        address,
+        name: name || null,
+        decimals,
+        isVerified: false,
+      });
+
+      return respond(
+        res,
+        httpStatus.CREATED,
+        "Verified token created successfully!",
+        { token }
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async deleteVerifiedToken(req, res) {
+    try {
+      const { id } = req.params;
+
+      const token = await VerifiedToken.findByPk(id);
+
+      if (!token) {
+        return respond(res, httpStatus.NOT_FOUND, "Token not found");
+      }
+
+      await token.destroy();
+
+      return respond(res, httpStatus.OK, "Token deleted successfully");
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async getVerifiedTokenById(req, res) {
+    try {
+      const { id } = req.params;
+
+      const token = await VerifiedToken.findByPk(id);
+
+      if (!token) {
+        return respond(res, httpStatus.NOT_FOUND, "Token not found");
+      }
+
+      return respond(res, httpStatus.OK, "Token retrieved successfully", {
+        token,
+      });
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
+      );
+    }
+  }
+
+  static async toggleTokenVerification(req, res) {
+    try {
+      const { id } = req.params;
+
+      const token = await VerifiedToken.findByPk(id);
+
+      if (!token) {
+        return respond(res, httpStatus.NOT_FOUND, "Token not found");
+      }
+
+      await token.update({
+        isVerified: !token.isVerified,
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        `Token ${token.isVerified ? "verified" : "unverified"} successfully`,
+        { token }
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error)
       );
     }
   }

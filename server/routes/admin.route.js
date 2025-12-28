@@ -117,4 +117,53 @@ router.get(
 // Get top hosts and buyers
 router.get("/leaderboard", AdminController.getTopHostsAndBuyers);
 
+// Verified Tokens Routes:
+// Add new Token
+router.post(
+  "/verified-token",
+  auth.bearer,
+  isAdmin,
+  AdminController.createVerifiedToken
+);
+
+// Get all Tokens (with pagination)
+router.get(
+  "/verified-token",
+  auth.bearer,
+  isAdmin,
+  AdminController.getAllTokens
+);
+
+// Get All Verified Tokens
+router.get(
+  "/verified-token/verified",
+  auth.bearer,
+  isAdmin,
+  AdminController.getAllVerifiedTokens
+);
+
+// Get single Token by ID
+router.get(
+  "/verified-token/:id",
+  auth.bearer,
+  isAdmin,
+  AdminController.getVerifiedTokenById
+);
+
+// Delete Token
+router.delete(
+  "/verified-token/:id",
+  auth.bearer,
+  isAdmin,
+  AdminController.deleteVerifiedToken
+);
+
+// Toggle verification status
+router.patch(
+  "/verified-token/:id/toggle-verify",
+  auth.bearer,
+  isAdmin,
+  AdminController.toggleTokenVerification
+);
+
 module.exports = router;
