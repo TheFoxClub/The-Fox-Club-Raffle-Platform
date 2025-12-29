@@ -449,15 +449,20 @@ const RaffleDetail = () => {
                       />
 
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">
+                        <p className="font-semibold text-sm sm:text-base truncate sm:whitespace-normal sm:break-words">
                           {reward.rewardName}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Amount: {parseFloat(reward.amount)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Mint: {reward.mintAddress.slice(0, 4)}…
-                          {reward.mintAddress.slice(-4)}
+                          <span className="sm:hidden">
+                            Mint: {reward.mintAddress.slice(0, 4)}…
+                            {reward.mintAddress.slice(-4)}
+                          </span>
+                          <span className="hidden sm:inline break-all">
+                            Mint: {reward.mintAddress}
+                          </span>
                         </p>
                         <a
                           href={`https://solscan.io/token/${reward.mintAddress}`}
@@ -492,44 +497,44 @@ const RaffleDetail = () => {
 
           {/* 🏆 WINNERS SECTION */}
           {/* Winners Section */}
-          {raffle.endedAt && (
-            <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-accent" />
-                Winners
-              </h2>
+          {/* {raffle.endedAt && ( */}
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-accent" />
+              Winners
+            </h2>
 
-              {winners.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  Winners will be announced soon.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {winners.map((address, index) => (
-                    <div
-                      key={address}
-                      className="flex items-center justify-between bg-card/40 border border-border/40 rounded-lg p-4"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-sm">
-                          Winner #{index + 1}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {address.slice(0, 4)}…{address.slice(-4)}
-                        </span>
-                      </div>
-
-                      {raffle.rewards?.[index] && (
-                        <span className="text-sm font-medium">
-                          {raffle.rewards[index].rewardName}
-                        </span>
-                      )}
+            {winners.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Winners will be announced soon.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {winners.map((address, index) => (
+                  <div
+                    key={address}
+                    className="flex items-center justify-between bg-card/40 border border-border/40 rounded-lg p-4"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-sm">
+                        Winner #{index + 1}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {address.slice(0, 4)}…{address.slice(-4)}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
+
+                    {raffle.rewards?.[index] && (
+                      <span className="text-sm font-medium">
+                        {raffle.rewards[index].rewardName}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+          {/* )} */}
 
           {/* Host Section */}
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
@@ -569,7 +574,7 @@ const RaffleDetail = () => {
                   </span>
                 </div>
 
-                {!isSoldOut && (
+                {!isSoldOut && !isEnded && (
                   <span className="text-accent font-semibold">
                     {ticketsLeft} left
                   </span>
