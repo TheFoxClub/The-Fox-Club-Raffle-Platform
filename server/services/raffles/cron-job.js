@@ -2,12 +2,14 @@ const { Op } = require("sequelize");
 const { RAFFLE_STATUS } = require("../../config/data");
 const { Raffle, RaffleDetail } = require("../../models");
 const logger = require("../../util/logger");
+const WinnerSelectionService = require("./winner-selection");
 
 const checkRaffleAndFeaturedStatus = async () => {
   try {
     const currentDate = new Date();
     let changedRaffles = [];
     let changedFeatured = [];
+    let winnersSelected = [];
 
     const allActiveRaffles = await Raffle.findAll({
       include: [
@@ -73,6 +75,33 @@ const checkRaffleAndFeaturedStatus = async () => {
           totalTickets: raffle.totalTickets,
           soldOut: endedEarlyBySoldOut,
         });
+
+        // If raffle just ended, select winners
+        if (
+          newStatus === RAFFLE_STATUS.ENDED &&
+          !raffle.winnersSelected &&
+          raffle.ticketsSold > 0
+        ) {
+          try {
+            const winnerResult = await WinnerSelectionService.selectWinners(
+              raffle.id
+            );
+            winnersSelected.push({
+              raffleId: raffle.id,
+              title: raffle.title,
+              numberOfWinners: winnerResult.numberOfWinners,
+              winners: winnerResult.winners,
+            });
+            logger.info(
+              `Winners automatically selected for raffle ${raffle.id}: ${winnerResult.numberOfWinners} winners`
+            );
+          } catch (winnerError) {
+            logger.error(
+              `Failed to select winners for raffle ${raffle.id}:`,
+              winnerError
+            );
+          }
+        }
       }
     }
 
@@ -104,9 +133,13 @@ const checkRaffleAndFeaturedStatus = async () => {
       });
     }
 
-    if (changedRaffles.length > 0 || changedFeatured.length > 0) {
+    if (
+      changedRaffles.length > 0 ||
+      changedFeatured.length > 0 ||
+      winnersSelected.length > 0
+    ) {
       logger.info(
-        `RAFFLE STATUS CHECK: ${changedRaffles.length} raffle status updates, ${changedFeatured.length} featured status updates`
+        `RAFFLE STATUS CHECK: ${changedRaffles.length} raffle status updates, ${changedFeatured.length} featured status updates, ${winnersSelected.length} winner selections`
       );
 
       changedRaffles.forEach((raffle) => {
@@ -141,6 +174,19 @@ const checkRaffleAndFeaturedStatus = async () => {
             featured.raffleId
           }  | Was featured until: ${featured.featuredUntil.toISOString()}`
         );
+      });
+
+      winnersSelected.forEach((selection) => {
+        logger.info(
+          `Winners selected for raffle ${selection.raffleId} (${selection.title}): ${selection.numberOfWinners} winners`
+        );
+        selection.winners.forEach((winner, index) => {
+          logger.info(
+            `  Winner ${index + 1}: User ${winner.userId} (${
+              winner.userPubkey
+            }) - Ticket #${winner.ticketNumber} - Reward: ${winner.rewardName}`
+          );
+        });
       });
     } else {
       logger.info("RAFFLE STATUS CHECK: No changes required.");

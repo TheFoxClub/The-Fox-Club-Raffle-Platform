@@ -1,4 +1,4 @@
-// import { Progress } from "../../components/ui/Progress";
+import { useState, useEffect } from "react";
 import Button from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import {
@@ -11,6 +11,8 @@ import {
   Calendar,
   Coins,
   CheckCircle,
+  Gift,
+  AlertCircle,
 } from "lucide-react";
 import {
   Tabs,
@@ -18,12 +20,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-import { useState, useEffect } from "react";
 import server from "../../config/server";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../../redux/store";
 import { setUser, setLoading } from "../../redux/userSlice";
 import { Link } from "react-router-dom";
+import ClaimReward from "../claim/ClaimReward";
 
 type HostedRaffle = {
   id: number;
@@ -46,8 +48,39 @@ type ExtendedUser = {
   rafflesWon?: number;
   ticketsPurchased?: number;
   reputation?: number;
-  xp?: number; // current XP
+  xp?: number;
   xpGoal?: number;
+};
+
+type ClaimableReward = {
+  id: string | number;
+  raffleId: string | number;
+  raffleTitle: string;
+  rewardName: string;
+  amount: number;
+  rewardType: string;
+  mintAddress: string;
+  imageUrl?: string;
+  isClaimed: boolean;
+  claimedAt?: string | null;
+  transferSignature?: string;
+  receiverWallet?: string;
+  transferredAt?: string;
+};
+
+type Win = {
+  id: string | number;
+  raffleId: string | number;
+  raffleTitle: string;
+  rewardId: string | number;
+  rewardName: string;
+  amount: number;
+  rewardType: string;
+  mintAddress: string;
+  imageUrl?: string;
+  isClaimed: boolean;
+  claimedAt?: string | null;
+  winDate: string;
 };
 
 const Profile = () => {
@@ -65,11 +98,15 @@ const Profile = () => {
 
   const [ticketsBought, setTicketsBought] = useState(0);
   const [totalSolSpent, setTotalSolSpent] = useState(0);
-
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
     []
   );
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
+  const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>(
+    []
+  );
+  const [wins, setWins] = useState<Win[]>([]);
+  const [loadingRewards, setLoadingRewards] = useState(false);
 
   const formatEndDate = (dateString: string) => {
     if (!dateString) return "N/A";
@@ -88,7 +125,16 @@ const Profile = () => {
       : `Ended ${formattedDate}`;
   };
 
-  //fetch user info from backend
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  // Fetch user info, hosted raffles, and tickets
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -107,6 +153,7 @@ const Profile = () => {
         );
 
         if (userData.id) {
+          // Fetch hosted raffles
           const resRaffles = await server.get(`/raffle/user/${userData.id}`);
           const raffles = resRaffles.data.data.raffles || [];
 
@@ -124,7 +171,12 @@ const Profile = () => {
               })
             )
           );
+
+          // Fetch wins
+          await fetchWins(userData.id);
         }
+
+        // Fetch purchased tickets
         const resTickets = await server.get("/ticket/user-tickets");
         const tickets = resTickets.data?.data?.tickets ?? [];
 
@@ -141,8 +193,7 @@ const Profile = () => {
               t.Raffle?.status === 2
                 ? "active"
                 : t.Raffle?.status === 3
-                ? //? "won"
-                  "Ended"
+                ? "Ended"
                 : "upcoming",
             endDate: t.endsAt ? t.endsAt.split("T")[0] : "N/A",
             totalTickets: t.progress?.total ?? 0,
@@ -151,12 +202,88 @@ const Profile = () => {
         );
       } catch (error) {
         dispatch(setLoading(false));
-        console.error("Error fetching user info or hosted raffles:", error);
+        console.error("Error fetching user data:", error);
       }
     };
 
     fetchData();
   }, [dispatch]);
+
+  // Fetch claimable rewards and wins
+  useEffect(() => {
+    if (user_info?.id) {
+      fetchClaimableRewards();
+    }
+  }, [user_info?.id]);
+
+  const fetchClaimableRewards = async () => {
+    setLoadingRewards(true);
+    try {
+      const response = await server.get("/raffle/claimable-rewards");
+      if (response.data.success) {
+        const rewards = response.data.data.rewards || [];
+        setClaimableRewards(rewards);
+
+        // Update wins with claimable status
+        const updatedWins = wins.map((win) => ({
+          ...win,
+          isClaimed: rewards.some(
+            (reward: ClaimableReward) =>
+              reward.id === win.rewardId && reward.isClaimed
+          ),
+        }));
+        setWins(updatedWins);
+      }
+    } catch (error) {
+      console.error("Failed to fetch claimable rewards:", error);
+    } finally {
+      setLoadingRewards(false);
+    }
+  };
+
+  const fetchWins = async (userId: number) => {
+    try {
+      const response = await server.get("/raffle/user/wins");
+      if (response.data.success) {
+        const winsData = response.data.data.wins || [];
+        setWins(winsData);
+      }
+    } catch (error) {
+      console.error("Failed to fetch wins:", error);
+    }
+  };
+
+  const handleRewardClaimed = (rewardId: string | number) => {
+    // Update claimable rewards
+    setClaimableRewards((prev) =>
+      prev.map((reward) =>
+        reward.id === rewardId
+          ? { ...reward, isClaimed: true, claimedAt: new Date().toISOString() }
+          : reward
+      )
+    );
+
+    // Update wins
+    setWins((prev) =>
+      prev.map((win) =>
+        win.rewardId === rewardId
+          ? { ...win, isClaimed: true, claimedAt: new Date().toISOString() }
+          : win
+      )
+    );
+
+    // Update raffles won count
+    dispatch(
+      setUser({
+        user_info: {
+          ...user_info,
+          rafflesWon: (user_info?.rafflesWon || 0) + 1,
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      })
+    );
+  };
 
   if (isLoading) {
     return (
@@ -165,15 +292,6 @@ const Profile = () => {
       </div>
     );
   }
-
-  // // Handle loading/empty state gracefully
-  // if (!user || Object.keys(user).length === 0) {
-  //   return (
-  //     <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-300">
-  //       <p>Loading user data...</p>
-  //     </div>
-  //   );
-  // }
 
   return (
     <div className="container mx-auto px-4 py-2">
@@ -266,9 +384,36 @@ const Profile = () => {
           </Card>
         </div>
 
+        {claimableRewards.length > 0 && (
+          <Card className="bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Gift className="h-6 w-6 text-primary" />
+                <div>
+                  <h3 className="font-bold">
+                    You have {claimableRewards.length} unclaimed reward(s)!
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Go to the "Wins" tab to claim your rewards
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="cursor-pointer"
+                onClick={() =>
+                  document.querySelector('[data-tab="won"]')?.click()
+                }
+              >
+                View Rewards
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Tabs section */}
         <Tabs defaultValue="purchasedTickets" className="space-y-4 mt-10">
-          <TabsList className=" p-1 w-full sm:w-auto">
+          <TabsList className="p-1 w-full sm:w-auto">
             <TabsTrigger
               value="purchasedTickets"
               className="flex-1 md:flex-none"
@@ -278,172 +423,280 @@ const Profile = () => {
             <TabsTrigger value="hostedRaffles" className="flex-1 md:flex-none">
               Hosted Raffles
             </TabsTrigger>
-            <TabsTrigger value="won" className="flex-1 md:flex-none">
-              Wins
+            <TabsTrigger
+              value="won"
+              className="flex-1 md:flex-none"
+              data-tab="won"
+            >
+              Wins{" "}
+              {claimableRewards.length > 0 && (
+                <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {claimableRewards.length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="purchasedTickets" className="space-y-4">
-            {purchasedTickets.length === 0 && (
+            {purchasedTickets.length === 0 ? (
               <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
                 <p className="text-center text-muted-foreground">
                   You haven't bought any tickets yet. Explore raffles and join
                   one to get started!
                 </p>
               </Card>
-            )}
-            {purchasedTickets.map((ticket) => (
-              <Card
-                key={ticket.id}
-                className="bg-card/50 backdrop-blur-xl p-6 border border-border/50"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-bold">
-                        {ticket.raffleTitle}
-                      </h3>
-                      {ticket.status === "active" ? (
-                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
-                          Active
+            ) : (
+              purchasedTickets.map((ticket) => (
+                <Card
+                  key={ticket.id}
+                  className="bg-card/50 backdrop-blur-xl p-6 border border-border/50"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-bold">
+                          {ticket.raffleTitle}
+                        </h3>
+                        {ticket.status === "active" ? (
+                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
+                            Active
+                          </div>
+                        ) : ticket.status === "ended" ? (
+                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
+                            Ended
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="flex items-center text-sm text-muted-foreground gap-4">
+                        <div className="flex items-center gap-1">
+                          <Ticket className="h-4 w-4" />
+                          <span>{ticket.ticketNumbers.length} tickets</span>
                         </div>
-                      ) : ticket.status === "ended" ? (
-                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
-                          Ended
-                        </div>
-                      ) : null}
-                    </div>
 
-                    <div className="flex items-center text-sm text-muted-foreground gap-4">
-                      <div className="flex items-center gap-1">
-                        <Ticket className="h-4 w-4" />
-                        <span>{ticket.ticketNumbers.length} tickets</span>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <Coins className="h-4 w-4" />
-                        <span>
-                          {ticket.spent} {ticket.token} spent
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatEndDate(ticket.endDate)}</span>
-                      </div>
-                    </div>
-                    {/* Ticket numbers inline */}
-                    {ticket.ticketNumbers?.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
-                        <span className="text-muted-foreground">
-                          {ticket.ticketNumbers.length === 1
-                            ? "Ticket Number:"
-                            : "Ticket Numbers:"}
-                        </span>
-
-                        {ticket.ticketNumbers.map((num: number) => (
-                          <span
-                            key={num}
-                            className="px-2 py-0.5 rounded-md bg-secondary/20 text-secondary border border-secondary/30"
-                          >
-                            #{num}
+                        <div className="flex items-center gap-1">
+                          <Coins className="h-4 w-4" />
+                          <span>
+                            {ticket.spent} {ticket.token} spent
                           </span>
-                        ))}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>{formatEndDate(ticket.endDate)}</span>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  <Link to={`/raffle/${ticket.raffleId}`}>
-                    <Button variant="outline">View Raffle</Button>
-                  </Link>
-                </div>
-              </Card>
-            ))}
+                      {ticket.ticketNumbers?.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+                          <span className="text-muted-foreground">
+                            {ticket.ticketNumbers.length === 1
+                              ? "Ticket Number:"
+                              : "Ticket Numbers:"}
+                          </span>
+
+                          {ticket.ticketNumbers.map((num: number) => (
+                            <span
+                              key={num}
+                              className="px-2 py-0.5 rounded-md bg-secondary/20 text-secondary border border-secondary/30"
+                            >
+                              #{num}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <Link to={`/raffle/${ticket.raffleId}`}>
+                      <Button variant="outline">View Raffle</Button>
+                    </Link>
+                  </div>
+                </Card>
+              ))
+            )}
           </TabsContent>
 
           <TabsContent value="hostedRaffles" className="space-y-6">
-            {hostedRafflesData.length === 0 && (
+            {hostedRafflesData.length === 0 ? (
               <p className="text-center text-muted-foreground">
                 No raffles hosted yet.
               </p>
+            ) : (
+              hostedRafflesData.map((raffle) => (
+                <Card
+                  key={raffle.id}
+                  className="bg-card/50 backdrop-blur-xl border border-border/50 p-6"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-bold">{raffle.title}</h3>
+                        {raffle.status === 2 && (
+                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-500 text-white w-fit">
+                            Active
+                          </div>
+                        )}
+                        {raffle.status === 3 && (
+                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
+                            Completed
+                          </div>
+                        )}
+                        {raffle.status === 1 && (
+                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
+                            Upcoming
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center text-sm text-muted-foreground gap-4">
+                        <div className="flex items-center gap-1">
+                          <Ticket className="h-4 w-4" />
+                          <span>
+                            {raffle.ticketsSold} / {raffle.totalTickets} sold
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <Coins className="h-4 w-4 text-accent" />
+                          <span>
+                            {(raffle.revenue ?? 0).toFixed(4)} {raffle.token}{" "}
+                            revenue
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>{raffle.endDate}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button variant="outline">Manage</Button>
+                      <Link to={`/raffle/${raffle.id}`}>
+                        <Button variant="outline">View</Button>
+                      </Link>
+                    </div>
+                  </div>
+                </Card>
+              ))
             )}
-
-            {hostedRafflesData.map((raffle) => (
-              <Card
-                key={raffle.id}
-                className="bg-card/50 backdrop-blur-xl border border-border/50 p-6"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-bold">{raffle.title}</h3>
-                      {raffle.status === 2 && (
-                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-500 text-white w-fit">
-                          Active
-                        </div>
-                      )}
-                      {raffle.status === 3 && (
-                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
-                          Completed
-                        </div>
-                      )}
-                      {raffle.status === 1 && (
-                        <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
-                          Upcoming
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center text-sm text-muted-foreground gap-4">
-                      <div className="flex items-center gap-1">
-                        <Ticket className="h-4 w-4" />
-                        <span>
-                          {raffle.ticketsSold} / {raffle.totalTickets} sold
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <Coins className="h-4 w-4 text-accent" />
-                        <span>
-                          {(raffle.revenue ?? 0).toFixed(4)} {raffle.token}{" "}
-                          revenue
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{raffle.endDate}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button variant="outline">Manage</Button>
-                    <Link to={`/raffle/${raffle.id}`}>
-                      <Button variant="outline">View</Button>
-                    </Link>
-                  </div>
-                </div>
-              </Card>
-            ))}
           </TabsContent>
 
           <TabsContent value="won" className="space-y-4">
-            <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
-              <p className="mx-10 text-center text-muted-foreground">
-                No wins yet! Keep participating and try your luck.
-              </p>
-            </Card>
+            {loadingRewards ? (
+              <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
+                <p className="text-center text-muted-foreground">
+                  Loading your rewards...
+                </p>
+              </Card>
+            ) : wins.length === 0 ? (
+              <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
+                <p className="text-center text-muted-foreground">
+                  No wins yet! Keep participating and try your luck.
+                </p>
+              </Card>
+            ) : (
+              wins.map((win) => (
+                <Card
+                  key={win.id}
+                  className="bg-card/50 backdrop-blur-xl border border-border/50 p-6"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        {win.imageUrl ? (
+                          <img
+                            src={win.imageUrl}
+                            alt={win.rewardName}
+                            className="h-16 w-16 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                            <Gift className="h-8 w-8 text-primary" />
+                          </div>
+                        )}
+                      </div>
 
-            {/* <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6">
-              <div className="flex items-center gap-4">
-                <Trophy className="h-12 w-12 text-accent" />
-                <div>
-                  <h3 className="font-bold text-lg">Fox Club Merchandise</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Won on October 15, 2025 • Prize claimed
-                  </p>
-                </div>
-              </div>
-            </Card> */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold">
+                            {win.rewardName}
+                          </h3>
+                          {win.isClaimed ? (
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-500/20 text-green-400">
+                              <CheckCircle size={12} className="mr-1" />
+                              Claimed
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary/20 text-primary">
+                              <AlertCircle size={12} className="mr-1" />
+                              Ready to Claim
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center text-sm text-muted-foreground gap-4">
+                          <div className="flex items-center gap-1">
+                            <Gift className="h-3 w-3" />
+                            <span>
+                              {win.amount} {win.rewardType}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>Won on {formatDate(win.winDate)}</span>
+                          </div>
+
+                          {win.claimedAt && (
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                              <span>
+                                Claimed on {formatDate(win.claimedAt)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {win.mintAddress && (
+                          <p className="text-xs text-muted-foreground break-all">
+                            Mint: {win.mintAddress}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Claim Button */}
+                    <div className="flex-shrink-0">
+                      {!win.isClaimed ? (
+                        <ClaimReward
+                          raffleId={win.raffleId}
+                          reward={{
+                            id: win.rewardId,
+                            isClaimed: win.isClaimed,
+                            rewardName: win.rewardName,
+                            mintAddress: win.mintAddress,
+                            amount: win.amount,
+                          }}
+                          onClaimed={() => handleRewardClaimed(win.rewardId)}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-5 w-5" />
+                            <span>Claimed</span>
+                          </div>
+                          <Link to={`/raffle/${win.raffleId}`}>
+                            <Button variant="outline" size="sm">
+                              View Raffle
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
           </TabsContent>
         </Tabs>
       </div>

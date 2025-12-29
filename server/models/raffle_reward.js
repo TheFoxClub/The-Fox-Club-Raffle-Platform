@@ -13,6 +13,26 @@ module.exports = (sequelize, DataTypes) => {
         targetKey: "id",
         foreignKey: "raffleId",
       });
+      this.belongsTo(models.User, {
+        targetKey: "id",
+        foreignKey: "winnerId",
+        as: "winner",
+      });
+      this.belongsTo(models.RaffleTicket, {
+        targetKey: "id",
+        foreignKey: "winnerTicketId",
+        as: "winnerTicket",
+      });
+      this.belongsTo(models.SplTokenSendTransaction, {
+        targetKey: "id",
+        foreignKey: "splTokenTransferTxId",
+        as: "transferTransaction",
+      });
+      this.belongsTo(models.SplTokenSendTransaction, {
+        targetKey: "id",
+        foreignKey: "splTokenClaimTxId",
+        as: "claimTransaction",
+      });
     }
   }
   raffle_reward.init(
@@ -24,6 +44,11 @@ module.exports = (sequelize, DataTypes) => {
       amount: DataTypes.DECIMAL(18, 6),
       imageUrl: DataTypes.STRING,
       metadataJson: DataTypes.JSON,
+      winnerId: DataTypes.INTEGER,
+      winnerTicketId: DataTypes.INTEGER,
+      isClaimed: DataTypes.BOOLEAN,
+      splTokenTransferTxId: DataTypes.INTEGER,
+      splTokenClaimTxId: DataTypes.INTEGER,
     },
     {
       sequelize,

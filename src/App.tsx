@@ -35,8 +35,8 @@ import { authenticateUser } from "./redux/actions/userAction";
 function App() {
   // let endpoint = "https://api.devnet.solana.com";
 
-  // if (import.meta.env.REACT_APP_SOLANA_RPC_POOL_DAS_API) {
-  //   endpoint = import.meta.env.REACT_APP_SOLANA_RPC_POOL_DAS_API;
+  // if (import.meta.env.VITE_SOLANA_RPC_POOL_DAS_API) {
+  //   endpoint = import.meta.env.VITE_SOLANA_RPC_POOL_DAS_API;
   // }
 
   const dispatch = useAppDispatch();

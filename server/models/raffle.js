@@ -47,6 +47,10 @@ module.exports = (sequelize, DataTypes) => {
       claimedAmount: DataTypes.DECIMAL(10, 9),
       platformRevenue: DataTypes.DECIMAL(10, 9),
       totalRevenue: DataTypes.DECIMAL(10, 9),
+      winnersSelected: DataTypes.BOOLEAN,
+      winnersSelectedAt: DataTypes.DATE,
+      winnerSelectionSeed: DataTypes.STRING,
+      platformWallet: DataTypes.STRING,
     },
     {
       sequelize,

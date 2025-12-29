@@ -18,4 +18,6 @@ module.exports.BET_RECEIVER_WALLET = process.env.BET_RECEIVER_WALLET;
 
 module.exports.JWT_SECRET = process.env.JWT_SECRET || "secret-key";
 
+module.exports.CHECKSUM_SECRET_KEY = process.env.CHECKSUM_SECRET_KEY || "default-checksum-secret-key";
+
 module.exports.COLLECTION_ADDRESS = process.env.COLLECTION_ADDRESS || "";
