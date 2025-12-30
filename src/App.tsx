@@ -10,6 +10,7 @@ import CreateRaffle from "./views/raffle/CreateRaffle";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import MyWalletWrapper from "./helpers/wallet-hooks/MyWalletWrapper";
+import WalletWrapper from "./components/WalletWrapper";
 import { useSelector } from "react-redux";
 import type { RootState } from "./redux/store";
 import Loading from "./components/reusable/Loading";
@@ -54,20 +55,21 @@ function App() {
   return (
     <Router>
       <MyWalletWrapper autoConnect>
-        {isLoading && <Loading />}
-        {/* <UmiProvider endpoint={endpoint}> */}
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
-        <Routes>
+        <WalletWrapper>
+          {isLoading && <Loading />}
+          {/* <UmiProvider endpoint={endpoint}> */}
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
+          <Routes>
           {/* Public routes with main Layout */}
           <Route
             path="/"
@@ -187,8 +189,9 @@ function App() {
               }
             />
           </Route>
-        </Routes>
-        {/* </UmiProvider> */}
+          </Routes>
+          {/* </UmiProvider> */}
+        </WalletWrapper>
       </MyWalletWrapper>
     </Router>
   );

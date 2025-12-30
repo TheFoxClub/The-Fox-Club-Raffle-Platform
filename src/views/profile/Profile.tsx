@@ -26,6 +26,7 @@ import type { RootState, AppDispatch } from "../../redux/store";
 import { setUser, setLoading } from "../../redux/userSlice";
 import { Link } from "react-router-dom";
 import ClaimReward from "../claim/ClaimReward";
+import ClaimPayout from "../payout/ClaimPayout";
 
 type HostedRaffle = {
   id: number;
@@ -36,6 +37,20 @@ type HostedRaffle = {
   revenue: number;
   token: string;
   endDate: string;
+  payoutInfo?: {
+    totalRevenue: number;
+    totalCommission: number;
+    claimableAmount: number;
+    claimedAmount: number;
+    unclaimedAmount: number;
+    canClaim: boolean;
+    hasEnded: boolean;
+    hasClaimed: boolean;
+    claimStatus: string;
+    claimTransactionId?: number;
+    claimSignature?: string;
+    message: string;
+  };
 };
 
 type ExtendedUser = {
@@ -153,24 +168,11 @@ const Profile = () => {
         );
 
         if (userData.id) {
-          // Fetch hosted raffles
-          const resRaffles = await server.get(`/raffle/user/${userData.id}`);
-          const raffles = resRaffles.data.data.raffles || [];
+          // Fetch hosted raffles with payout information
+          const resRaffles = await server.get("/raffle/user/hosted");
+          const rafflesData = resRaffles.data.data.raffles || [];
 
-          setHostedRafflesData(
-            raffles.map(
-              (r: any): HostedRaffle => ({
-                id: r.id,
-                title: r.title,
-                status: r.status,
-                token: r.token ?? "SOL",
-                ticketsSold: r.ticketsSold ?? 0,
-                totalTickets: r.totalTickets ?? 0,
-                revenue: (r.ticketsSold ?? 0) * (r.ticketPrice ?? 0),
-                endDate: r.endDate.split("T")[0],
-              })
-            )
-          );
+          setHostedRafflesData(rafflesData);
 
           // Fetch wins
           await fetchWins(userData.id);
@@ -282,6 +284,26 @@ const Profile = () => {
         isAuthenticated: true,
         isLoading: false,
       })
+    );
+  };
+
+  const handlePayoutClaimed = (raffleId: number) => {
+    // Update the hosted raffles data to reflect the claimed payout
+    setHostedRafflesData((prev) =>
+      prev.map((raffle) =>
+        raffle.id === raffleId && raffle.payoutInfo
+          ? {
+              ...raffle,
+              payoutInfo: {
+                ...raffle.payoutInfo,
+                hasClaimed: true,
+                canClaim: false,
+                claimStatus: "confirmed", // Set as confirmed since transaction was successful
+                message: "Payout completed successfully",
+              },
+            }
+          : raffle
+      )
     );
   };
 
@@ -401,11 +423,41 @@ const Profile = () => {
               <Button
                 variant="outline"
                 className="cursor-pointer"
-                onClick={() =>
-                  document.querySelector('[data-tab="won"]')?.click()
-                }
+                onClick={() => {
+                  const element = document.querySelector('[data-tab="won"]') as HTMLElement;
+                  element?.click();
+                }}
               >
                 View Rewards
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Payout notification */}
+        {hostedRafflesData.some(raffle => raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0) && (
+          <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Coins className="h-6 w-6 text-green-400" />
+                <div>
+                  <h3 className="font-bold">
+                    You have unclaimed raffle payouts!
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Go to "Hosted Raffles" tab to claim your earnings
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="cursor-pointer border-green-500/30 hover:bg-green-500/10"
+                onClick={() => {
+                  const element = document.querySelector('[data-tab="hosted"]') as HTMLElement;
+                  element?.click();
+                }}
+              >
+                View Payouts
               </Button>
             </div>
           </Card>
@@ -420,8 +472,17 @@ const Profile = () => {
             >
               My Tickets
             </TabsTrigger>
-            <TabsTrigger value="hostedRaffles" className="flex-1 md:flex-none">
+            <TabsTrigger
+              value="hostedRaffles"
+              className="flex-1 md:flex-none"
+              data-tab="hosted"
+            >
               Hosted Raffles
+              {hostedRafflesData.some(raffle => raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0) && (
+                <span className="ml-2 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {hostedRafflesData.filter(raffle => raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0).length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger
               value="won"
@@ -526,55 +587,184 @@ const Profile = () => {
                   key={raffle.id}
                   className="bg-card/50 backdrop-blur-xl border border-border/50 p-6"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-bold">{raffle.title}</h3>
-                        {raffle.status === 2 && (
-                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-500 text-white w-fit">
-                            Active
+                  <div className="space-y-4">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-bold">{raffle.title}</h3>
+                          {raffle.status === 2 && (
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-500 text-white">
+                              Active
+                            </div>
+                          )}
+                          {raffle.status === 3 && (
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white">
+                              Completed
+                            </div>
+                          )}
+                          {raffle.status === 1 && (
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white">
+                              Upcoming
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center text-sm text-muted-foreground gap-4">
+                          <div className="flex items-center gap-1">
+                            <Ticket className="h-4 w-4" />
+                            <span>
+                              {raffle.ticketsSold} / {raffle.totalTickets} sold
+                            </span>
                           </div>
-                        )}
-                        {raffle.status === 3 && (
-                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-primary text-white w-fit">
-                            Completed
+
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{formatDate(raffle.endDate)}</span>
                           </div>
-                        )}
-                        {raffle.status === 1 && (
-                          <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-secondary text-white w-fit">
-                            Upcoming
-                          </div>
-                        )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center text-sm text-muted-foreground gap-4">
-                        <div className="flex items-center gap-1">
-                          <Ticket className="h-4 w-4" />
-                          <span>
-                            {raffle.ticketsSold} / {raffle.totalTickets} sold
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <Coins className="h-4 w-4 text-accent" />
-                          <span>
-                            {(raffle.revenue ?? 0).toFixed(4)} {raffle.token}{" "}
-                            revenue
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{raffle.endDate}</span>
-                        </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline">Manage</Button>
+                        <Link to={`/raffle/${raffle.id}`}>
+                          <Button variant="outline">View</Button>
+                        </Link>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      <Button variant="outline">Manage</Button>
-                      <Link to={`/raffle/${raffle.id}`}>
-                        <Button variant="outline">View</Button>
-                      </Link>
-                    </div>
+                    {/* Payout Information */}
+                    {raffle.payoutInfo && (
+                      <div className="border-t border-border/50 pt-4">
+                        <h4 className="text-sm font-semibold mb-3 text-muted-foreground">
+                          Revenue & Payout Information
+                        </h4>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Total Revenue</p>
+                            <p className="text-sm font-semibold">
+                              {raffle.payoutInfo.totalRevenue.toFixed(4)} SOL
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Platform Commission</p>
+                            <p className="text-sm font-semibold text-orange-400">
+                              -{raffle.payoutInfo.totalCommission.toFixed(4)} SOL
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Your Revenue</p>
+                            <p className="text-sm font-semibold text-green-400">
+                              {raffle.payoutInfo.claimableAmount.toFixed(4)} SOL
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">
+                              {raffle.payoutInfo.unclaimedAmount > 0 ? "Unclaimed" : "Claimed"}
+                            </p>
+                            <p className={`text-sm font-semibold ${
+                              raffle.payoutInfo.unclaimedAmount > 0 
+                                ? "text-primary" 
+                                : "text-green-400"
+                            }`}>
+                              {raffle.payoutInfo.unclaimedAmount > 0 
+                                ? `${raffle.payoutInfo.unclaimedAmount.toFixed(4)} SOL`
+                                : "All claimed"
+                              }
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Claim Button */}
+                        {raffle.payoutInfo.canClaim && raffle.payoutInfo.unclaimedAmount > 0 && (
+                          <div className="flex items-center justify-between bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-lg p-3">
+                            <div className="flex items-center gap-2">
+                              <Coins className="h-5 w-5 text-primary" />
+                              <div>
+                                <p className="text-sm font-semibold">
+                                  Ready to claim {raffle.payoutInfo.unclaimedAmount.toFixed(4)} SOL
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Your share from this completed raffle
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <ClaimPayout
+                              raffleId={raffle.id}
+                              payoutAmount={raffle.payoutInfo.unclaimedAmount}
+                              onClaimed={() => handlePayoutClaimed(raffle.id)}
+                            />
+                          </div>
+                        )}
+
+                        {/* Status Messages */}
+                        {!raffle.payoutInfo.hasEnded && (
+                          <div className="flex items-center gap-2 text-orange-600 bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                            <AlertCircle className="h-5 w-5" />
+                            <div>
+                              <p className="text-sm font-semibold">Raffle Still Active</p>
+                              <p className="text-xs text-muted-foreground">
+                                {raffle.payoutInfo.message}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Already claimed or processing indicator */}
+                        {raffle.payoutInfo.hasClaimed && (
+                          <div className={`flex items-center justify-between rounded-lg p-3 ${
+                            raffle.payoutInfo.claimStatus === 'confirmed' 
+                              ? 'text-green-600 bg-green-500/10 border border-green-500/20'
+                              : raffle.payoutInfo.claimStatus === 'failed'
+                              ? 'text-red-600 bg-red-500/10 border border-red-500/20'
+                              : 'text-blue-600 bg-blue-500/10 border border-blue-500/20'
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              {raffle.payoutInfo.claimStatus === 'confirmed' ? (
+                                <CheckCircle className="h-5 w-5" />
+                              ) : raffle.payoutInfo.claimStatus === 'failed' ? (
+                                <AlertCircle className="h-5 w-5" />
+                              ) : (
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                              )}
+                              <div>
+                                <p className="text-sm font-semibold">
+                                  {raffle.payoutInfo.claimStatus === 'confirmed' 
+                                    ? `Payout completed: ${raffle.payoutInfo.claimableAmount.toFixed(4)} SOL`
+                                    : raffle.payoutInfo.claimStatus === 'failed'
+                                    ? 'Payout failed - please try again'
+                                    : `Payout ${raffle.payoutInfo.claimStatus} - processing...`
+                                  }
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {raffle.payoutInfo.message}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* View Transaction Button */}
+                            {raffle.payoutInfo?.claimSignature && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(`https://solscan.io/tx/${raffle.payoutInfo?.claimSignature}`, '_blank')}
+                                className="flex items-center gap-1 text-xs text-white bg-primary"
+                              >
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                View Transaction
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </Card>
               ))
@@ -633,6 +823,10 @@ const Profile = () => {
                             </div>
                           )}
                         </div>
+
+                        <p className="text-sm text-muted-foreground font-medium">
+                          From: {win.raffleTitle}
+                        </p>
 
                         <div className="flex items-center text-sm text-muted-foreground gap-4">
                           <div className="flex items-center gap-1">

@@ -525,6 +525,77 @@ const createClaimTransaction = async ({
 };
 
 /**
+ * Create a payout transaction that's pre-signed by platform wallet
+ * User only needs to sign for fee payment
+ */
+const createPayoutTransaction = async ({
+  amount,
+  toAccount,
+  fromAccount,
+  feePayer,
+}) => {
+  try {
+    const { Wallet } = require("./wallet.js");
+
+    let transaction = new Transaction();
+
+    // Set compute budget for optimal performance
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 300_000,
+      })
+    );
+
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: 300_000,
+      })
+    );
+
+    // SOL transfer from platform to user
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(fromAccount), // Platform wallet
+        toPubkey: new PublicKey(toAccount), // User wallet
+        lamports: amount * LAMPORTS_PER_SOL,
+      })
+    );
+
+    const latestBlockhash = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.feePayer = new PublicKey(feePayer); // User pays fees
+
+    // Platform wallet partially signs the transaction
+    const signedTransaction = Wallet.partialSign(transaction);
+
+    // Serialize the partially signed transaction
+    const serializedTx = signedTransaction
+      .serialize({
+        requireAllSignatures: false, // Allow partial signatures
+        verifySignatures: false,
+      })
+      .toString("base64");
+
+    return {
+      success: true,
+      data: {
+        serializedTx,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      },
+      message: "Created pre-signed payout transaction",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      data: null,
+      message: error?.message || "Failed to create payout transaction",
+      error: error.stack,
+    };
+  }
+};
+
+/**
  * Submit a signed transaction to the Solana blockchain
  */
 const submitTransactionToBlockchain = async (signedTransactionBase64) => {
@@ -566,5 +637,6 @@ module.exports = {
   sendMultipleSplTokenTx,
   sendSingleRewardTx,
   createClaimTransaction,
+  createPayoutTransaction,
   submitTransactionToBlockchain,
 };

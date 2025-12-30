@@ -33,7 +33,12 @@ class WinnerSelectionService {
         throw new Error("Raffle not found");
       }
 
-      if (raffle.status !== RAFFLE_STATUS.ENDED) {
+      // Check if raffle has ended (manually ended OR naturally ended by reaching endDate)
+      const hasEnded = raffle.status === RAFFLE_STATUS.ENDED || 
+                      raffle.endedAt || 
+                      (raffle.endDate && new Date() > new Date(raffle.endDate));
+
+      if (!hasEnded) {
         throw new Error("Raffle must be ended before selecting winners");
       }
 

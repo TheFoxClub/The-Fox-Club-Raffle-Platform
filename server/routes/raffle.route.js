@@ -1,6 +1,7 @@
 const express = require("express");
 const RaffleController = require("../controllers/raffle.controller");
 const auth = require("../config/auth");
+const { payoutRateLimiter } = require("../middlewares/rateLimiter");
 const router = express.Router();
 
 // Create a raffle
@@ -52,6 +53,15 @@ router.get("/featured", RaffleController.getFeaturedRaffles);
 
 // Filter Raffles with search term, status, token-type, price, collection, page, limit
 router.get("/filter", RaffleController.filterRaffles);
+
+// Get user's hosted raffles with payout information
+router.get("/user/hosted", auth.bearer, RaffleController.getUserHostedRaffles);
+
+// Claim raffle creator payout
+router.post("/payout/claim", payoutRateLimiter, auth.bearer, RaffleController.claimCreatorPayout);
+
+// Submit payout transaction signature
+router.post("/payout/submit", payoutRateLimiter, auth.bearer, RaffleController.submitPayoutTransaction);
 
 // Get user's wins across all raffles
 router.get("/user/wins", auth.bearer, RaffleController.getUserWins);

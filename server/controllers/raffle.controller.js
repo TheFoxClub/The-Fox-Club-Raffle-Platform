@@ -25,11 +25,13 @@ const getFormattedDate = require("../util/getFormattedDate");
 const {
   sendMultipleSplTokenTx,
   createClaimTransaction,
+  createPayoutTransaction,
   submitTransactionToBlockchain,
 } = require("../helpers/solana/spl-token-send-tx");
 const logger = require("../util/logger");
 const WinnerSelectionService = require("../services/raffles/winner-selection");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
+const { MIN_PAYOUT_AMOUNT } = require("../config/constants");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -1079,7 +1081,13 @@ class RaffleController {
         );
       }
 
-      if (raffle.status !== RAFFLE_STATUS.ENDED) {
+      // Check if raffle has ended (manually ended OR naturally ended by reaching endDate)
+      const hasEnded =
+        raffle.status === RAFFLE_STATUS.ENDED ||
+        raffle.endedAt ||
+        (raffle.endDate && new Date() > new Date(raffle.endDate));
+
+      if (!hasEnded) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
@@ -1253,7 +1261,13 @@ class RaffleController {
         return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
       }
 
-      if (raffle.status !== RAFFLE_STATUS.ENDED) {
+      // Check if raffle has ended (manually ended OR naturally ended by reaching endDate)
+      const hasEnded =
+        raffle.status === RAFFLE_STATUS.ENDED ||
+        raffle.endedAt ||
+        (raffle.endDate && new Date() > new Date(raffle.endDate));
+
+      if (!hasEnded) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
@@ -1885,7 +1899,13 @@ class RaffleController {
         );
       }
 
-      if (raffle.status !== RAFFLE_STATUS.ENDED) {
+      // Check if raffle has ended (manually ended OR naturally ended by reaching endDate)
+      const hasEnded =
+        raffle.status === RAFFLE_STATUS.ENDED ||
+        raffle.endedAt ||
+        (raffle.endDate && new Date() > new Date(raffle.endDate));
+
+      if (!hasEnded) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
@@ -1972,7 +1992,7 @@ class RaffleController {
       const formattedWins = userWins.map((win) => ({
         id: win.id,
         raffleId: win.raffleId,
-        raffleTitle: win.Raffle?.title || "Unknown Raffle",
+        raffleTitle: win.raffle?.title || "Unknown Raffle",
         rewardId: win.id,
         rewardName: win.rewardName,
         rewardType: mapEnumValue(RAFFLE_REWARD_TYPES, win.rewardType),
@@ -1981,9 +2001,9 @@ class RaffleController {
         imageUrl: win.imageUrl,
         isClaimed: win.isClaimed,
         claimedAt: null, // Will be fetched from claimTransaction if needed
-        winDate: win.Raffle?.endedAt || win.createdAt,
+        winDate: win.raffle?.endedAt || win.createdAt,
         ticketNumber: win.winnerTicket?.ticketNumber,
-        raffleStatus: mapEnumValue(RAFFLE_STATUS, win.Raffle?.status),
+        raffleStatus: mapEnumValue(RAFFLE_STATUS, win.raffle?.status),
       }));
 
       return respond(res, httpStatus.OK, "User wins retrieved successfully", {
@@ -1996,6 +2016,487 @@ class RaffleController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  /**
+   * Get user's hosted raffles with payout information
+   */
+  static async getUserHostedRaffles(req, res) {
+    try {
+      const userId = req.payload?.id;
+
+      const hostedRaffles = await Raffle.findAll({
+        where: {
+          userId: userId,
+        },
+        include: [
+          {
+            model: RaffleDetail,
+            attributes: ["isFeatured", "requiresNftVerification"],
+          },
+          {
+            model: SplTokenSendTransaction,
+            as: "creatorClaimTransaction",
+            attributes: ["id", "txId", "status", "createdAt"],
+            required: false,
+          },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      // Format raffles with payout information
+      const formattedRaffles = hostedRaffles.map((raffle) => {
+        const data = raffle.get({ plain: true });
+
+        // Calculate payout information
+        const totalRevenue = parseFloat(data.totalRevenue || 0);
+        const totalCommission = parseFloat(data.totalCommission || 0);
+        const claimableAmount = parseFloat(data.claimableAmount || 0);
+        const claimedAmount = parseFloat(data.claimedAmount || 0);
+        const unclaimedAmount = claimableAmount - claimedAmount;
+
+        // Check if raffle has ended (manually ended OR naturally ended by reaching endDate)
+        const hasEnded =
+          data.status === RAFFLE_STATUS.ENDED ||
+          data.endedAt ||
+          (data.endDate && new Date() > new Date(data.endDate));
+
+        const hasClaimed = !!data.creatorClaimTxId;
+        const claimTransaction = data.creatorClaimTransaction;
+
+        let claimStatus = "not_claimed";
+        if (hasClaimed && claimTransaction) {
+          switch (claimTransaction.status) {
+            case SPL_TOKEN_SEND_TX_STATUS.PENDING:
+              claimStatus = "pending";
+              break;
+            case SPL_TOKEN_SEND_TX_STATUS.FAILED:
+              claimStatus = "failed";
+              break;
+            case SPL_TOKEN_SEND_TX_STATUS.SUCCESS:
+              claimStatus = "confirmed";
+              break;
+            case SPL_TOKEN_SEND_TX_STATUS.MISMATCHED:
+              claimStatus = "failed";
+              break;
+            default:
+              claimStatus = "unknown";
+          }
+        }
+
+        return {
+          ...data,
+          tokenType: mapEnumValue(TOKEN_TYPE, data.tokenType),
+          status: mapEnumValue(RAFFLE_STATUS, data.status),
+          payoutInfo: {
+            totalRevenue: totalRevenue,
+            totalCommission: totalCommission,
+            claimableAmount: claimableAmount,
+            claimedAmount: claimedAmount,
+            unclaimedAmount: Math.max(0, unclaimedAmount), // Ensure non-negative
+            canClaim: hasEnded && !hasClaimed && unclaimedAmount > 0,
+            hasEnded: hasEnded,
+            hasClaimed: hasClaimed,
+            claimStatus: claimStatus,
+            claimTransactionId: data.creatorClaimTxId,
+            claimSignature: claimTransaction?.txId || null,
+            message: !hasEnded
+              ? "You can claim the revenue generated from the raffle only after it ends"
+              : hasClaimed
+              ? `Payout ${
+                  claimStatus === "confirmed" ? "completed" : claimStatus
+                }`
+              : unclaimedAmount > 0
+              ? "Ready to claim"
+              : "No amount available to claim",
+          },
+        };
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Hosted raffles retrieved successfully",
+        {
+          raffles: formattedRaffles,
+          totalRaffles: formattedRaffles.length,
+        }
+      );
+    } catch (err) {
+      logger.error("Error getting user hosted raffles:", err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  /**
+   * Claim raffle creator payout with security measures
+   */
+  static async claimCreatorPayout(req, res) {
+    const transaction = await require("../models").sequelize.transaction();
+
+    try {
+      const userId = req.payload?.id;
+      const { raffleId } = req.body;
+
+      if (!raffleId) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(res, httpStatus.BAD_REQUEST, "Raffle ID is required");
+      }
+
+      // Validate raffleId is a number
+      const raffleIdNum = parseInt(raffleId);
+      if (isNaN(raffleIdNum) || raffleIdNum <= 0) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(res, httpStatus.BAD_REQUEST, "Invalid raffle ID");
+      }
+
+      const user = await User.findOne({
+        where: { id: userId },
+        attributes: ["pubkey"],
+      });
+
+      if (!user || !user.pubkey) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "User wallet not found. Please connect your wallet."
+        );
+      }
+
+      // Get raffle with row-level locking to prevent race conditions
+      const raffle = await Raffle.findOne({
+        where: {
+          id: raffleIdNum,
+          userId: userId, // Ensure user owns the raffle
+        },
+        lock: true, // Row-level lock to prevent concurrent modifications
+        transaction: transaction,
+      });
+
+      if (!raffle) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.NOT_FOUND,
+          "Raffle not found or you don't have permission to claim from this raffle"
+        );
+      }
+
+      // Security checks - Raffle must be ended (manually ended OR naturally ended by reaching endDate)
+      const hasEnded =
+        raffle.status === RAFFLE_STATUS.ENDED ||
+        raffle.endedAt ||
+        (raffle.endDate && new Date() > new Date(raffle.endDate));
+
+      if (!hasEnded) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "You can claim the revenue generated from the raffle only after it ends"
+        );
+      }
+
+      // Check if already claimed
+      if (raffle.creatorClaimTxId) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Payout has already been claimed for this raffle"
+        );
+      }
+
+      const claimableAmount = parseFloat(raffle.claimableAmount || 0);
+      const claimedAmount = parseFloat(raffle.claimedAmount || 0);
+      const unclaimedAmount = claimableAmount - claimedAmount;
+
+      if (unclaimedAmount <= 0) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "No unclaimed amount available for this raffle"
+        );
+      }
+
+      if (unclaimedAmount < MIN_PAYOUT_AMOUNT) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `Minimum payout amount is ${MIN_PAYOUT_AMOUNT} SOL`
+        );
+      }
+
+      // Check if platform wallet has sufficient balance (basic validation)
+      const platformWallet = process.env.BET_RECEIVER_WALLET;
+      if (!platformWallet) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.INTERNAL_SERVER_ERROR,
+          "Platform wallet not configured"
+        );
+      }
+
+      logger.info(
+        `Creating payout transaction for raffle ${raffleIdNum} to creator ${user.pubkey}, amount: ${unclaimedAmount}`
+      );
+
+      // Create pre-signed payout transaction (platform signs, user pays fees)
+      const payoutResponse = await createPayoutTransaction({
+        amount: unclaimedAmount,
+        toAccount: user.pubkey,
+        fromAccount: platformWallet,
+        feePayer: user.pubkey, // User pays transaction fees
+      });
+
+      if (!payoutResponse.success) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        logger.error(
+          `Failed to create payout transaction for raffle ${raffleIdNum}:`,
+          payoutResponse.message
+        );
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `Failed to create payout transaction: ${payoutResponse.message}`
+        );
+      }
+
+      // Create SplTokenSendTransaction record with PENDING status
+      const splTokenSendTxData = {
+        senderPubkey: platformWallet,
+        receiverPubkey: user.pubkey,
+        type: SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA,
+        txId: null,
+        tokenAddress: SPL_TOKEN_ADDRESS.SOLANA,
+        decimals: 9,
+        uiAmount: Math.round(unclaimedAmount * LAMPORTS_PER_SOL).toString(),
+        status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+        raffleId: raffleIdNum,
+        rewardTransferType: "creator_payout",
+        rewardName: `Payout for ${raffle.title}`,
+        rewardIndex: 0,
+        commissionRate: 0,
+        creatorAmount: 0,
+        commissionAmount: 0,
+        isNFTHolder: false,
+      };
+
+      const payoutTxRecord = await SplTokenSendTransaction.create(
+        splTokenSendTxData,
+        { transaction }
+      );
+
+      await Raffle.update(
+        {
+          creatorClaimTxId: payoutTxRecord.id,
+        },
+        {
+          where: { id: raffleIdNum },
+          transaction: transaction,
+        }
+      );
+
+      await transaction.commit();
+
+      logger.info(
+        `Payout transaction created for raffle ${raffleIdNum} to creator ${user.pubkey}, amount: ${unclaimedAmount}. Transaction ID: ${payoutTxRecord.id}`
+      );
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Payout transaction created, please sign and submit",
+        {
+          success: true,
+          requiresSubmission: true,
+          transaction: payoutResponse.data.serializedTx,
+          blockhash: payoutResponse.data.blockhash,
+          raffleId: raffleIdNum,
+          payoutAmount: unclaimedAmount,
+          transactionId: payoutTxRecord.id,
+          submitEndpoint: "/raffle/payout/submit",
+          rewardInfo: {
+            id: payoutTxRecord.id,
+            name: `Payout for ${raffle.title}`,
+            type: "SOLANA",
+            amount: unclaimedAmount,
+          },
+        }
+      );
+    } catch (err) {
+      // Only rollback if transaction is still active
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
+      logger.error("Error claiming creator payout:", err);
+
+      if (err.message.includes("insufficient funds")) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Insufficient funds in platform wallet to process payout"
+        );
+      }
+
+      if (err.message.includes("blockhash")) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Transaction expired. Please try again."
+        );
+      }
+
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "An error occurred while processing your payout. Please try again later."
+      );
+    }
+  }
+
+  /**
+   * Submit payout transaction signature
+   */
+  static async submitPayoutTransaction(req, res) {
+    try {
+      const userId = req.payload?.id;
+      const { signedTransaction, transactionId, raffleId } = req.body;
+
+      if (!signedTransaction || !transactionId || !raffleId) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Missing required data: signedTransaction, transactionId, and raffleId"
+        );
+      }
+
+      const user = await User.findOne({
+        where: { id: userId },
+        attributes: ["pubkey"],
+      });
+
+      if (!user || !user.pubkey) {
+        return respond(res, httpStatus.BAD_REQUEST, "User wallet not found");
+      }
+
+      const splTokenTx = await SplTokenSendTransaction.findOne({
+        where: {
+          id: transactionId,
+          receiverPubkey: user.pubkey,
+          rewardTransferType: "creator_payout",
+          status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+          txId: null, // Should be null initially
+        },
+      });
+
+      if (!splTokenTx) {
+        return respond(
+          res,
+          httpStatus.NOT_FOUND,
+          "Payout transaction not found or already processed"
+        );
+      }
+
+      // Verify the raffle is still valid for claiming
+      const raffle = await Raffle.findOne({
+        where: {
+          id: raffleId,
+          userId: userId,
+          creatorClaimTxId: transactionId,
+        },
+      });
+
+      if (!raffle) {
+        return respond(
+          res,
+          httpStatus.NOT_FOUND,
+          "Raffle not found or transaction mismatch"
+        );
+      }
+
+      const submissionResult = await submitTransactionToBlockchain(
+        signedTransaction
+      );
+
+      if (!submissionResult.success) {
+        logger.error(
+          `Payout transaction submission failed:`,
+          submissionResult.error
+        );
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `Transaction submission failed: ${submissionResult.error}`
+        );
+      }
+
+      const signature = submissionResult.signature;
+
+      await SplTokenSendTransaction.update(
+        {
+          txId: signature,
+          status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS, // Mark as SUCCESS, cron job will verify
+        },
+        {
+          where: { id: transactionId },
+        }
+      );
+
+      logger.info(
+        `Payout transaction signature submitted for transaction ${transactionId}, signature: ${signature}`
+      );
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Payout transaction submitted successfully",
+        {
+          success: true,
+          signature: signature,
+          transactionId: transactionId,
+          raffleId: raffleId,
+          explorerUrl: `https://solscan.io/tx/${signature}`,
+          message:
+            "Your payout is being processed and will be confirmed shortly.",
+        }
+      );
+    } catch (err) {
+      logger.error("Error submitting payout transaction:", err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to submit payout transaction"
       );
     }
   }

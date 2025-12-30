@@ -18,6 +18,7 @@ export type User = {
     email?: string;
     description?: string;
     photoUrl?: string;
+    rafflesWon?: number;
   };
 };
 
@@ -54,6 +55,23 @@ const user = createSlice({
         state.isAuthenticated = false;
         state.isLoading = false;
       }
+    },
+
+    // logout user
+    logout: (state) => {
+      sessionStorage.removeItem(LOGIN_TOKEN);
+      localStorage.removeItem(LOGIN_TOKEN); // Also clear localStorage if used
+      // Clear any other wallet-related storage
+      try {
+        localStorage.removeItem('walletName');
+        sessionStorage.removeItem('walletName');
+      } catch (e) {
+        // Ignore storage errors
+      }
+      return {
+        ...initialState,
+        isLoading: false,
+      };
     },
   },
 
@@ -101,5 +119,5 @@ const user = createSlice({
   },
 });
 
-export const { setUser, setLoading, hydrateUserState } = user.actions;
+export const { setUser, setLoading, hydrateUserState, logout } = user.actions;
 export default user.reducer;
