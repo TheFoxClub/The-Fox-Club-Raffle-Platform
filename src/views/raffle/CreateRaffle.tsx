@@ -18,13 +18,14 @@ import {
   DialogTrigger,
 } from "../../components/ui/Dialog";
 import { useState, useEffect } from "react";
-// import { mockWalletNFTs } from "../../dummydata/WalletNFTs";
 import { useNavigate } from "react-router-dom";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import { useRef } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Transaction, Connection } from "@solana/web3.js";
 
 // Constants for Token Program IDs
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -33,6 +34,7 @@ const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const CreateRaffle = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
+  const { publicKey, signTransaction, connected } = useWallet();
 
   const [selectedNFTs, setSelectedNFTs] = useState<any[]>([]);
   const [selectedTokens, setSelectedTokens] = useState<
@@ -427,6 +429,11 @@ const CreateRaffle = () => {
       return;
     }
 
+    if (!connected || !publicKey || !signTransaction) {
+      toast.error("Please connect your wallet first!");
+      return;
+    }
+
     if (!validateForm(status === "DRAFT")) return;
 
     try {
@@ -470,6 +477,7 @@ const CreateRaffle = () => {
         setLoading(false);
         return;
       }
+
       const finalStartDate = startNow ? new Date().toISOString() : startDate;
 
       const payload = {
@@ -517,23 +525,97 @@ const CreateRaffle = () => {
         console.log("Updating existing draft:", draftId);
         res = await server.put(`/raffle/draft/${draftId}`, payload);
       } else {
-        //CREATE A NEW DRAFT
+        //CREATE A NEW RAFFLE
         console.log("Creating new raffle/draft");
         res = await server.post("/raffle/create", payload);
       }
 
       if (res.data.success) {
-        toast.success(status === "DRAFT" ? "Draft saved!" : "Raffle created!");
+        // Check if reward transfer is required
+        if (res.data.data.requiresRewardTransfer) {
+          toast.info("Please sign the reward transfer transaction...");
 
-        if (status === "DRAFT") {
-          // Re-fetch to get the latest draft with its ID
-          await fetchDrafts();
+          try {
+            const { transaction, rewardTransferData, raffleData } =
+              res.data.data;
+
+            // Create transaction object from base64
+            const tx = Transaction.from(Buffer.from(transaction, "base64"));
+
+            const signedTx = await signTransaction(tx);
+
+            const completeRes = await server.post("/raffle/complete-creation", {
+              signedTransaction: signedTx.serialize().toString("base64"),
+              raffleData,
+              rewardTransferData,
+            });
+
+            if (completeRes.data.success) {
+              const {
+                raffle,
+                signedTransaction: txToSubmit,
+                submitEndpoint,
+                raffleId,
+              } = completeRes.data.data;
+
+              const connection = new Connection(
+                import.meta.env.VITE_SOLANA_RPC_HOST ||
+                  "https://api.devnet.solana.org"
+              );
+              
+              const txBuffer = Buffer.from(txToSubmit, "base64");
+              const signature = await connection.sendRawTransaction(txBuffer);
+
+              const storeRes = await server.post(submitEndpoint, {
+                signature,
+                raffleId,
+                rewardTransferData,
+              });
+
+              if (storeRes.data.success) {
+                toast.success(
+                  "Raffle created successfully with reward transfer!"
+                );
+                const createdId = storeRes.data.data.raffle.id;
+                navigate(`/raffle/raffle-${createdId}`);
+              } else {
+                throw new Error(
+                  storeRes.data.message ||
+                    "Failed to store reward transfer signature"
+                );
+              }
+            } else {
+              throw new Error(
+                completeRes.data.message || "Failed to complete raffle creation"
+              );
+            }
+          } catch (signError: any) {
+            console.error("Transaction signing failed:", signError);
+            if (signError.message?.includes("rejected")) {
+              toast.error("Transaction was rejected by wallet");
+            } else {
+              toast.error(
+                `Failed to sign reward transfer: ${signError.message}`
+              );
+            }
+          }
         } else {
-          const createdId = res.data.data.raffle.id;
-          navigate(`/raffle/raffle-${createdId}`);
+          // No reward transfer required (draft or no rewards)
+          toast.success(
+            status === "DRAFT" ? "Draft saved!" : "Raffle created!"
+          );
+
+          if (status === "DRAFT") {
+            // Re-fetch to get the latest draft with its ID
+            await fetchDrafts();
+          } else {
+            const createdId = res.data.data.raffle.id;
+            navigate(`/raffle/raffle-${createdId}`);
+          }
         }
       }
     } catch (e: any) {
+      console.error("Raffle creation error:", e);
       toast.error(e.response?.data?.message || "Failed to create raffle");
     } finally {
       setLoading(false);

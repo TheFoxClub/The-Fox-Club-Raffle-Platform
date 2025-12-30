@@ -32,6 +32,20 @@ export const RAFFLE_REWARD_TYPES = {
   SPL_TOKEN_2022: 2,
 };
 
+export interface Winner {
+  rewardId: number;
+  rewardName: string;
+  rewardType: string;
+  mintAddress: string;
+  amount: string;
+  imageUrl: string;
+  winnerId: number;
+  winnerPubkey: string;
+  ticketNumber: number;
+  isClaimed: boolean;
+  claimedAt: string | null;
+}
+
 export interface RaffleReward {
   id: number;
   raffleId: number;
@@ -64,7 +78,9 @@ export interface RaffleType {
   endDate?: string;
   endedAt?: string;
   rewards?: RaffleReward[];
-  winnersAddresses?: string[]; // list of winner pubkeys
+  winnersData?: Winner[];
+  hasWinners?: boolean;
+  winnersSelected?: boolean;
   participants?: string[]; // list of all participants pubkeys
 }
 
@@ -118,7 +134,7 @@ const RaffleDetail = () => {
   const [winnerModalVisible, setWinnerModalVisible] = useState(false);
   const [nonWinnerBannerVisible, setNonWinnerBannerVisible] = useState(false);
   const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
-  const winners = raffle?.winnersAddresses ?? [];
+  const winners = raffle?.winnersData ?? [];
 
   const TOKEN_MAP: Record<number, string> = {
     0: "SOL",
@@ -256,7 +272,9 @@ const RaffleDetail = () => {
           endTime: "",
           endedAt: data.endedAt,
           rewards: data.raffle_rewards || [],
-          winnersAddresses: data.winnersAddresses || [],
+          winnersData: res.data.data.winners || [],
+          hasWinners: res.data.data.hasWinners || false,
+          winnersSelected: res.data.data.winnersSelected || false,
           participants: data.participants || [],
         };
 
@@ -305,7 +323,12 @@ const RaffleDetail = () => {
     const user = publicKey.toBase58();
     if (!raffle.participants?.includes(user)) return;
 
-    if (raffle.winnersAddresses?.includes(user)) {
+    // Check if user is a winner
+    const isWinner = raffle.winnersData?.some(
+      (winner) => winner.winnerPubkey === user
+    );
+
+    if (isWinner) {
       setWinnerModalVisible(true);
     } else {
       setNonWinnerBannerVisible(true);
@@ -327,7 +350,7 @@ const RaffleDetail = () => {
     );
 
   const ticketsLeft = Math.max(raffle.total - raffle.sold, 0);
-  const totalCost = (raffle.price * ticketCount).toFixed(2);
+  const totalCost = raffle.price * ticketCount;
 
   const isEnded = countdown === "Ended" || !!raffle.endedAt;
   const isSoldOut = raffle.total - raffle.sold <= 0;
@@ -496,44 +519,64 @@ const RaffleDetail = () => {
           </Card>
 
           {/* 🏆 WINNERS SECTION */}
-          {/* Winners Section */}
-          {/* {raffle.endedAt && ( */}
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-accent" />
-              Winners
-            </h2>
+          {/* Winners Section - Show if raffle has ended (manually or naturally) and winners are selected */}
+          {(raffle.endedAt ||
+            (raffle.endDate && new Date() > new Date(raffle.endDate))) &&
+            raffle.winnersSelected &&
+            winners.length > 0 && (
+              <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-accent" />
+                  Winners
+                </h2>
 
-            {winners.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                Winners will be announced soon.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {winners.map((address, index) => (
-                  <div
-                    key={address}
-                    className="flex items-center justify-between bg-card/40 border border-border/40 rounded-lg p-4"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">
-                        Winner #{index + 1}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {address.slice(0, 4)}…{address.slice(-4)}
-                      </span>
+                <div className="space-y-3">
+                  {winners.map((winner, index) => (
+                    <div
+                      key={winner.rewardId}
+                      className="flex items-center justify-between bg-card/40 border border-border/40 rounded-lg p-4"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-sm">
+                            Winner #{index + 1}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {winner.winnerPubkey.slice(0, 4)}…
+                            {winner.winnerPubkey.slice(-4)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Ticket #{winner.ticketNumber}
+                          </span>
+                        </div>
+
+                        {winner.imageUrl && (
+                          <img
+                            src={winner.imageUrl}
+                            alt={winner.rewardName}
+                            className="w-10 h-10 rounded-md object-cover"
+                          />
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-sm font-medium block">
+                          {winner.rewardName}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Amount: {parseFloat(winner.amount)}
+                        </span>
+                        {winner.isClaimed && (
+                          <div className="text-xs text-green-500 mt-1">
+                            ✓ Claimed
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    {raffle.rewards?.[index] && (
-                      <span className="text-sm font-medium">
-                        {raffle.rewards[index].rewardName}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </Card>
             )}
-          </Card>
           {/* )} */}
 
           {/* Host Section */}

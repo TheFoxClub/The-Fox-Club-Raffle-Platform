@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { SplTokenSendTransaction, GameReward } = require("../models");
+const { SplTokenSendTransaction, GameReward, Raffle } = require("../models");
 const {
   SPL_TOKEN_SEND_TX_STATUS,
   SPL_TOKEN_SEND_TRANSACTION_TYPE,
@@ -12,8 +12,10 @@ const getSplTokenSendTransactions = async () => {
   const now = Date.now();
   const fiveMinutesAgo = now - 5 * 60 * 1000; // 5 minutes ago
   const oneMinuteAgo = now - 1 * 60 * 1000; // 1 minute ago
+  const thirtySecondsAgo = now - 30 * 1000; // 30 seconds ago
 
-  const rows = await SplTokenSendTransaction.findAll({
+  // Get regular transactions (1-5 minutes old)
+  const regularRows = await SplTokenSendTransaction.findAll({
     where: {
       txId: { [Op.not]: null },
       status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
@@ -25,7 +27,83 @@ const getSplTokenSendTransactions = async () => {
     order: [["createdAt", "DESC"]],
   });
 
-  return rows.map((row) => {
+  // Get recent payout transactions (30 seconds to 5 minutes old) to ensure they're processed
+  const payoutRows = await SplTokenSendTransaction.findAll({
+    where: {
+      txId: { [Op.not]: null },
+      status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+      rewardTransferType: "creator_payout",
+      createdAt: {
+        [Op.between]: [new Date(fiveMinutesAgo), new Date(thirtySecondsAgo)],
+      },
+    },
+    limit: 3,
+    order: [["createdAt", "DESC"]],
+  });
+
+  // get successful payout transactions that might need claimedAmount updates
+  const successfulPayoutTxIds = await SplTokenSendTransaction.findAll({
+    where: {
+      txId: { [Op.not]: null },
+      status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+      rewardTransferType: "creator_payout",
+      raffleId: { [Op.not]: null },
+      createdAt: {
+        [Op.gte]: new Date(now - 24 * 60 * 60 * 1000), // Last 24 hours
+      },
+    },
+    attributes: ["id", "raffleId"],
+    limit: 10,
+    order: [["createdAt", "DESC"]],
+  });
+
+  // Filter to only include transactions where the raffle's claimedAmount is still 0
+  const successfulPayoutRows = [];
+  for (const txRecord of successfulPayoutTxIds) {
+    const raffle = await Raffle.findOne({
+      where: {
+        id: txRecord.raffleId,
+        claimedAmount: 0, // Only get raffles where claimedAmount hasn't been updated
+      },
+      attributes: ["id"],
+    });
+
+    if (raffle) {
+      const fullTxRecord = await SplTokenSendTransaction.findOne({
+        where: { id: txRecord.id },
+      });
+      if (fullTxRecord) {
+        successfulPayoutRows.push(fullTxRecord);
+      }
+    }
+  }
+
+  // Combine and deduplicate
+  const allRows = [...regularRows];
+  payoutRows.forEach((payoutRow) => {
+    if (!allRows.find((row) => row.id === payoutRow.id)) {
+      allRows.push(payoutRow);
+    }
+  });
+  successfulPayoutRows.forEach((successfulRow) => {
+    if (!allRows.find((row) => row.id === successfulRow.id)) {
+      allRows.push(successfulRow);
+    }
+  });
+
+  logger.info(
+    `Found ${regularRows.length} regular pending transactions, ${payoutRows.length} pending payout transactions, and ${successfulPayoutRows.length} successful payout transactions needing claimedAmount updates`
+  );
+
+  if (allRows.length > 0) {
+    allRows.forEach((row) => {
+      logger.info(
+        `Transaction to process: ${row.txId}, type: ${row.type}, rewardTransferType: ${row.rewardTransferType}, raffleId: ${row.raffleId}, status: ${row.status}, created: ${row.createdAt}`
+      );
+    });
+  }
+
+  return allRows.map((row) => {
     return { txId: row.txId, txType: row.type };
   });
 };
@@ -41,6 +119,10 @@ const updateDbAndConfirmTransactions = async (op) => {
         logger.error("Successful transaction doesn't exist in the database");
         return;
       }
+
+      logger.info(
+        `Processing transaction ${tx.txId}: type=${existingTransaction.type}, rewardTransferType=${existingTransaction.rewardTransferType}, raffleId=${existingTransaction.raffleId}`
+      );
 
       if (tx.details.txType === SPL_TOKEN_SEND_TRANSACTION_TYPE.MULTIPLE) {
         existingTransaction.status = SPL_TOKEN_SEND_TX_STATUS.SUCCESS;
@@ -67,6 +149,96 @@ const updateDbAndConfirmTransactions = async (op) => {
         : SPL_TOKEN_SEND_TX_STATUS.MISMATCHED;
 
       await existingTransaction.save();
+
+      // Handle payout transactions - update claimedAmount in raffle table
+      if (
+        existingTransaction.rewardTransferType === "creator_payout" &&
+        existingTransaction.raffleId
+      ) {
+        logger.info(
+          `Processing payout transaction: ${existingTransaction.txId}, isValid: ${isValid}, status: ${existingTransaction.status}, raffleId: ${existingTransaction.raffleId}, uiAmount: ${existingTransaction.uiAmount}`
+        );
+
+        // Handle successful transactions (either newly validated or already successful)
+        const shouldUpdateClaimedAmount =
+          isValid ||
+          existingTransaction.status === SPL_TOKEN_SEND_TX_STATUS.SUCCESS;
+
+        if (shouldUpdateClaimedAmount) {
+          try {
+            const payoutAmountInSOL =
+              Number(existingTransaction.uiAmount) / LAMPORTS_PER_SOL;
+
+            logger.info(
+              `Attempting to update claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmountInSOL} SOL (uiAmount: ${existingTransaction.uiAmount} lamports)`
+            );
+
+            // Check if claimedAmount needs updating
+            const currentRaffle = await Raffle.findOne({
+              where: { id: existingTransaction.raffleId },
+              attributes: ["id", "claimedAmount", "claimableAmount"],
+            });
+
+            if (
+              currentRaffle &&
+              parseFloat(currentRaffle.claimedAmount) === 0
+            ) {
+              // Update the raffle's claimedAmount
+              const [affectedRows] = await Raffle.increment(
+                { claimedAmount: payoutAmountInSOL },
+                { where: { id: existingTransaction.raffleId } }
+              );
+
+              logger.info(
+                `Updated claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmountInSOL} SOL (Transaction: ${existingTransaction.txId}), affected rows: ${affectedRows}`
+              );
+
+              // Verify the update
+              const updatedRaffle = await Raffle.findOne({
+                where: { id: existingTransaction.raffleId },
+                attributes: ["id", "claimedAmount", "claimableAmount"],
+              });
+
+              if (updatedRaffle) {
+                logger.info(
+                  `Raffle ${existingTransaction.raffleId} after update - claimedAmount: ${updatedRaffle.claimedAmount}, claimableAmount: ${updatedRaffle.claimableAmount}`
+                );
+              }
+            } else {
+              logger.info(
+                `Skipping claimedAmount update for raffle ${existingTransaction.raffleId} - already updated (current: ${currentRaffle?.claimedAmount})`
+              );
+            }
+          } catch (payoutError) {
+            logger.error(
+              `Failed to update claimedAmount for raffle ${existingTransaction.raffleId}:`,
+              payoutError
+            );
+          }
+        } else {
+          // Handle mismatched payout transactions - reset creatorClaimTxId
+          try {
+            await Raffle.update(
+              { creatorClaimTxId: null },
+              {
+                where: {
+                  id: existingTransaction.raffleId,
+                  creatorClaimTxId: existingTransaction.id,
+                },
+              }
+            );
+
+            logger.info(
+              `Reset creatorClaimTxId for raffle ${existingTransaction.raffleId} due to mismatched payout transaction ${existingTransaction.txId}`
+            );
+          } catch (resetError) {
+            logger.error(
+              `Failed to reset creatorClaimTxId for raffle ${existingTransaction.raffleId}:`,
+              resetError
+            );
+          }
+        }
+      }
     });
 
     await Promise.all(successfulTransactionsToUpdate);
@@ -82,6 +254,38 @@ const updateDbAndConfirmTransactions = async (op) => {
           },
         }
       );
+
+      // Handle failed payout transactions - reset creatorClaimTxId in raffle table
+      const failedPayoutTxRecords = await SplTokenSendTransaction.findAll({
+        where: {
+          txId: { [Op.in]: failedTxIds },
+          rewardTransferType: "creator_payout",
+          raffleId: { [Op.not]: null },
+        },
+        attributes: ["id", "raffleId", "txId"],
+      });
+
+      if (failedPayoutTxRecords.length > 0) {
+        for (const failedTx of failedPayoutTxRecords) {
+          try {
+            await Raffle.update(
+              { creatorClaimTxId: null },
+              {
+                where: { id: failedTx.raffleId, creatorClaimTxId: failedTx.id },
+              }
+            );
+
+            logger.info(
+              `Reset creatorClaimTxId for raffle ${failedTx.raffleId} due to failed payout transaction ${failedTx.txId}`
+            );
+          } catch (resetError) {
+            logger.error(
+              `Failed to reset creatorClaimTxId for raffle ${failedTx.raffleId}:`,
+              resetError
+            );
+          }
+        }
+      }
 
       // Set rewardClaimTxId to null in game_rewards table for failed tx
       //   const failedTxRecords = await SplTokenSendTransaction.findAll({

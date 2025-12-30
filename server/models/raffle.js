@@ -25,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
         sourceKey: "id",
         foreignKey: "raffleId",
       });
+      this.belongsTo(models.SplTokenSendTransaction, {
+        foreignKey: "creatorClaimTxId",
+        targetKey: "id",
+        as: "creatorClaimTransaction",
+      });
     }
   }
   raffle.init(
@@ -47,6 +52,11 @@ module.exports = (sequelize, DataTypes) => {
       claimedAmount: DataTypes.DECIMAL(10, 9),
       platformRevenue: DataTypes.DECIMAL(10, 9),
       totalRevenue: DataTypes.DECIMAL(10, 9),
+      winnersSelected: DataTypes.BOOLEAN,
+      winnersSelectedAt: DataTypes.DATE,
+      winnerSelectionSeed: DataTypes.STRING,
+      platformWallet: DataTypes.STRING,
+      creatorClaimTxId: DataTypes.INTEGER,
     },
     {
       sequelize,
