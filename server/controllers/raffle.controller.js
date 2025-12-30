@@ -1325,7 +1325,7 @@ class RaffleController {
           tokenAddress: reward.mintAddress || "",
           decimals: tokenDecimals,
           uiAmount: uiAmountInSmallestUnits.toString(),
-          status: SPL_TOKEN_SEND_TX_STATUS.CONFIRMED,
+          status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
           raffleId: raffleId,
           rewardTransferType: "reward_claim",
           rewardName: reward.rewardName,
@@ -2466,7 +2466,7 @@ class RaffleController {
       await SplTokenSendTransaction.update(
         {
           txId: signature,
-          status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS, // Mark as SUCCESS, cron job will verify
+          status: SPL_TOKEN_SEND_TX_STATUS.PENDING, // Mark as PENDING, cron job will verify and set to SUCCESS
         },
         {
           where: { id: transactionId },
