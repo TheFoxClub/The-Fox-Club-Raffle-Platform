@@ -246,7 +246,7 @@ export default function AdminAnalytics() {
                 <th className="p-4 font-medium">Rank</th>
                 <th className="p-4 font-medium">Wallet</th>
                 <th className="p-4 font-medium">Total Spending</th>
-                <th className="p-4 font-medium">Raffles Entered</th>
+                <th className="p-4 font-medium">Tickets Bought</th>
               </tr>
             </thead>
             <tbody>
