@@ -1,6 +1,15 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
-import { Wallet, Trophy, PlusCircle, User, LogOut, Shield } from "lucide-react";
+import {
+  Wallet,
+  Trophy,
+  PlusCircle,
+  User,
+  LogOut,
+  Shield,
+  Menu,
+  X,
+} from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
 import logo from "../../../public/assets/foxclub_logo.png";
 import MyConnectWalletButton from "../../helpers/wallet-hooks/MyConnectWalletButton";
@@ -9,12 +18,14 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import SolanaSignIn from "../../helpers/solana-helpers/SolanaSignIn";
 import { handleLogout } from "../../config/api";
+import { useState } from "react";
 
 export const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { publicKey, connected } = useWallet();
   const user = useSelector((state: RootState) => state.user);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // console.log("Header user:", user);
 
@@ -26,6 +37,7 @@ export const Header = () => {
   const logout = async () => {
     await handleLogout();
     navigate("/");
+    setMobileMenuOpen(false);
   };
 
   return (
@@ -79,7 +91,7 @@ export const Header = () => {
                 }
                 className="gap-2 cursor-pointer"
               >
-                <Shield className="h-4 w-4" /> Admin
+                <Shield className="h-4 w-4" /> Dashboard
               </Button>
             </Link>
           )}
@@ -144,32 +156,50 @@ export const Header = () => {
             </Button>
           </Link>
 
-          {user.isAuthenticated && (
-            <Link to="/profile" className="flex-1">
-              <Button
-                variant={isActive("/profile") ? "default" : "ghost"}
-                className="w-full gap-2 cursor-pointer"
-                size="sm"
-              >
-                <User className="h-4 w-4" /> Profile
-              </Button>
-            </Link>
-          )}
-
-          {user.isAdmin && (
-            <Link to="/admin" className="flex-1">
-              <Button
-                variant={
-                  location.pathname.startsWith("/admin") ? "default" : "ghost"
-                }
-                className="w-full gap-2 cursor-pointer"
-                size="sm"
-              >
-                <Shield className="h-4 w-4" /> Admin
-              </Button>
-            </Link>
-          )}
+          {/* Hamburger Menu */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-md hover:bg-accent ml-auto"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
+          </button>
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden flex flex-col gap-2 mt-2 border-t border-border/50 pt-2">
+            {user.isAuthenticated && (
+              <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>
+                <Button
+                  variant={isActive("/profile") ? "default" : "ghost"}
+                  className="w-full gap-2 cursor-pointer justify-start border border-border rounded-md hover:bg-accent"
+                  size="sm"
+                >
+                  <User className="h-4 w-4" /> Profile
+                </Button>
+              </Link>
+            )}
+
+            {user.isAdmin && (
+              <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>
+                <Button
+                  variant={
+                    location.pathname.startsWith("/admin") ? "default" : "ghost"
+                  }
+                  className="w-full gap-2 cursor-pointer justify-start border border-border rounded-md hover:bg-accent"
+                  size="sm"
+                >
+                  <Shield className="h-4 w-4" /> Dashboard
+                </Button>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

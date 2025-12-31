@@ -11,6 +11,7 @@ import {
 import server from "../../config/server";
 import { useNavigate } from "react-router-dom";
 // import { featuredRaffles } from "../../dummydata/featuredRaffles";
+import { formatPrice } from "../../helpers/formatPrice";
 
 interface Raffle {
   id: number;
@@ -121,7 +122,9 @@ export default function RaffleCarousel() {
                 <Coins className="h-5 w-5 text-accent" />
                 <div>
                   <p className="text-muted-foreground">Ticket Price</p>
-                  <p className="font-bold">{data.price}</p>
+                  <p className="font-bold">
+                    {formatPrice(data.price)} {data.tokenType}
+                  </p>
                 </div>
               </div>
 
