@@ -2,6 +2,7 @@ import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
 import { CheckCircle, Clock, Users, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
+import { formatPrice } from "../../helpers/formatPrice";
 
 export interface RaffleCardProps {
   id: number;
@@ -57,10 +58,10 @@ export const RaffleCard = ({
               {title}
             </p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1 ">
+              <div className="flex items-center gap-1">
                 <Coins className="h-4 w-4" />
                 <span>
-                  {Number(price).toFixed(2)} {tokenType}
+                  {formatPrice(price)} {tokenType}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -78,8 +79,12 @@ export const RaffleCard = ({
                   {sold} / {total} tickets
                 </span>
               </div>
-              <span className="font-semibold text-accent">
-                {ticketsLeft} left
+              <span
+                className={`font-semibold ${
+                  ticketsLeft === 0 ? "text-destructive" : "text-accent"
+                }`}
+              >
+                {ticketsLeft === 0 ? "Sold Out" : `${ticketsLeft} left`}
               </span>
             </div>
             <Progress value={progress} className="h-3" />

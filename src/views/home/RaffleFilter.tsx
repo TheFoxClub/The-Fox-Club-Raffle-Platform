@@ -38,8 +38,6 @@ export default function RaffleFilter({
 
   const tokenOptions = [
     { value: "SOL", label: "SOL" },
-    { value: "USDC", label: "USDC" },
-    { value: "BONK", label: "BONK" },
     { value: "all", label: "All Tokens" },
   ];
 
@@ -115,7 +113,8 @@ export default function RaffleFilter({
     if (searchTerm) params.search = searchTerm;
     if (statusFilter) params.status = statusFilter;
     if (priceFilter && priceFilter !== "") params.price = priceFilter;
-    if (collectionFilter && collectionFilter !== "all") params.collection = collectionFilter;
+    if (collectionFilter && collectionFilter !== "all")
+      params.collection = collectionFilter;
 
     if (onApplyFilters) onApplyFilters(params);
   };

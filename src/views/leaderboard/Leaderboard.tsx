@@ -115,7 +115,7 @@ const Leaderboard = () => {
           </p>
         </div>
 
-        <Card className=" p-6 border bg-card border-accent/30 rounded-lg">
+        {/* <Card className=" p-6 border bg-card border-accent/30 rounded-lg">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Award className="h-10 w-10 text-accent" />
@@ -133,7 +133,7 @@ const Leaderboard = () => {
               className="bg-background-50 mr-6 cursor-pointer"
             />
           </div>
-        </Card>
+        </Card> */}
 
         <Tabs defaultValue="hosts" className="space-y-6 my-4">
           <TabsList className=" p-1 w-full sm:w-auto">

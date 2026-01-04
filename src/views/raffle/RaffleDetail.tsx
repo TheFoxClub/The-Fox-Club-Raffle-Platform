@@ -356,7 +356,7 @@ const RaffleDetail = () => {
   const isSoldOut = raffle.total - raffle.sold <= 0;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-4 sm:py-8 max-w-7xl">
       {/* Winner Modal */}
       {winnerModalVisible && publicKey && (
         <WinnerModal
@@ -371,8 +371,8 @@ const RaffleDetail = () => {
 
       {/* Non-winner Banner */}
       {nonWinnerBannerVisible && (
-        <div className="flex justify-between items-start bg-yellow-50 border border-yellow-300 text-yellow-900 p-4 rounded mb-4">
-          <p>
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 bg-yellow-50 border border-yellow-300 text-yellow-900 p-4 rounded mb-4">
+          <p className="text-sm sm:text-base">
             You didn’t win this time — thanks for participating. Better luck
             next time 🍀
           </p>
@@ -386,8 +386,8 @@ const RaffleDetail = () => {
           </button>
         </div>
       )}
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 overflow-hidden">
             <div className="relative aspect-video">
               <img
@@ -404,89 +404,102 @@ const RaffleDetail = () => {
           </Card>
 
           {/* Raffle Info */}
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-4 sm:p-6 space-y-3 sm:space-y-4">
             <div>
               <div className="top-3 left-3 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white mb-3">
                 Featured Raffle
               </div>
-              <h1 className="text-3xl font-bold mb-4 text-gradient">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 text-gradient break-words">
                 {raffle.title}
               </h1>
-              <p className="text-muted-foreground leading-relaxed">
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                 {raffle.description}
               </p>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border/50">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 sm:pt-4 border-t border-border/50">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Trophy className="h-4 w-4" />
-                  Prize Value
+                <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
+                  <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="truncate">Prize Value</span>
                 </div>
-                <p className="font-bold text-lg">~{raffle.prizeValue}</p>
+                <p className="font-bold text-base sm:text-lg truncate">
+                  ~{raffle.prizeValue}
+                </p>
               </div>
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Users className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                   Winners
                 </div>
-                <p className="font-bold text-lg">{raffle.winners}</p>
+                <p className="font-bold text-base sm:text-lg">
+                  {raffle.winners}
+                </p>
               </div>
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Calendar className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                   Created
                 </div>
-                <p className="font-bold text-lg">{raffle.created}</p>
+                <p className="font-bold text-base sm:text-lg">
+                  {raffle.created}
+                </p>
               </div>
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <User className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4" />
                   Reputation
                 </div>
-                <p className="font-bold text-lg">{raffle.hostReputation}%</p>
+                <p className="font-bold text-base sm:text-lg">
+                  {raffle.hostReputation}%
+                </p>
               </div>
             </div>
           </Card>
 
           {/* Reward Section */}
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
-            <h2 className="text-lg font-bold">Rewards</h2>
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-4 sm:p-6 space-y-3 sm:space-y-4">
+            <h2 className="text-base sm:text-lg font-bold">Rewards</h2>
 
             {raffle.rewards && raffle.rewards.length > 0 ? (
               <>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {(showAllRewards
                     ? raffle.rewards
                     : raffle.rewards.slice(0, 3)
                   ).map((reward) => (
                     <div
                       key={reward.id}
-                      className="flex items-center gap-6 bg-card/40 border border-border/40 rounded-lg p-4"
+                      className="flex items-center gap-3 sm:gap-6 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
                     >
                       <img
                         src={reward.imageUrl}
                         alt={reward.rewardName}
-                        className="w-14 h-14 rounded-md object-cover"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover shrink-0"
                       />
 
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">
+                        <p className="font-semibold text-sm sm:text-base truncate sm:whitespace-normal sm:break-words">
                           {reward.rewardName}
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           Amount: {parseFloat(reward.amount)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Mint: {reward.mintAddress.slice(0, 4)}…
-                          {reward.mintAddress.slice(-4)}
+                          <span className="sm:hidden">
+                            Mint: {reward.mintAddress.slice(0, 4)}…
+                            {reward.mintAddress.slice(-4)}
+                          </span>
+                          <span className="hidden sm:inline break-all">
+                            Mint: {reward.mintAddress}
+                          </span>
                         </p>
                         <a
                           href={`https://solscan.io/token/${reward.mintAddress}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline w-fit"
+                          className="text-xs text-primary hover:underline inline-block mt-0.5"
                         >
                           View on Solscan
                         </a>
@@ -515,78 +528,86 @@ const RaffleDetail = () => {
 
           {/* 🏆 WINNERS SECTION */}
           {/* Winners Section - Show if raffle has ended (manually or naturally) and winners are selected */}
-          {(raffle.endedAt || (raffle.endDate && new Date() > new Date(raffle.endDate))) && raffle.winnersSelected && winners.length > 0 && (
-            <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-accent" />
-                Winners
-              </h2>
+          {(raffle.endedAt ||
+            (raffle.endDate && new Date() > new Date(raffle.endDate))) &&
+            raffle.winnersSelected &&
+            winners.length > 0 && (
+              <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
+                  Winners
+                </h2>
 
-              <div className="space-y-3">
-                {winners.map((winner, index) => (
-                  <div
-                    key={winner.rewardId}
-                    className="flex items-center justify-between bg-card/40 border border-border/40 rounded-lg p-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-sm">
-                          Winner #{index + 1}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {winner.winnerPubkey.slice(0, 4)}…
-                          {winner.winnerPubkey.slice(-4)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Ticket #{winner.ticketNumber}
-                        </span>
+                <div className="space-y-2 sm:space-y-3">
+                  {winners.map((winner, index) => (
+                    <div
+                      key={winner.rewardId}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-xs sm:text-sm">
+                            Winner #{index + 1}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {winner.winnerPubkey.slice(0, 4)}…
+                            {winner.winnerPubkey.slice(-4)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Ticket #{winner.ticketNumber}
+                          </span>
+                        </div>
+
+                        {winner.imageUrl && (
+                          <img
+                            src={winner.imageUrl}
+                            alt={winner.rewardName}
+                            className="w-10 h-10 rounded-md object-cover shrink-0"
+                          />
+                        )}
                       </div>
 
-                      {winner.imageUrl && (
-                        <img
-                          src={winner.imageUrl}
-                          alt={winner.rewardName}
-                          className="w-10 h-10 rounded-md object-cover"
-                        />
-                      )}
+                      <div className="text-left sm:text-right">
+                        <span className="text-sm font-medium block">
+                          {winner.rewardName}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Amount: {parseFloat(winner.amount)}
+                        </span>
+                        {winner.isClaimed && (
+                          <div className="text-xs text-green-500 mt-1">
+                            ✓ Claimed
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="text-right">
-                      <span className="text-sm font-medium block">
-                        {winner.rewardName}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        Amount: {parseFloat(winner.amount)}
-                      </span>
-                      {winner.isClaimed && (
-                        <div className="text-xs text-green-500 mt-1">
-                          ✓ Claimed
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+                  ))}
+                </div>
+              </Card>
+            )}
           {/* )} */}
 
           {/* Host Section */}
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4">
-            <h2 className="text-lg font-bold mb-4">Hosted By</h2>
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0 flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center">
-                  <User className="h-6 w-6 text-white" />
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-4 sm:p-6 space-y-3 sm:space-y-4">
+            <h2 className="text-base sm:text-lg font-bold">Hosted By</h2>
+            <div className="flex items-center justify-between gap-3 sm:gap-4">
+              <div className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-primary rounded-full flex items-center justify-center shrink-0">
+                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
-                <div className="flex flex-col truncate">
-                  <p className="font-semibold break-words">{raffle.host}</p>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex flex-col min-w-0">
+                  <span className="sm:hidden">
+                    {raffle.host.slice(0, 4)}…{raffle.host.slice(-4)}
+                  </span>
+                  <span className="hidden sm:inline break-all">
+                    {raffle.host}
+                  </span>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     {raffle.hostReputation}% positive rating
                   </p>
                 </div>
               </div>
-              <div className="relative z-10">
+              <div className="relative z-10 shrink-0">
                 <HostProfilePopover hostId={raffle.hostId} />
               </div>
             </div>
@@ -595,65 +616,69 @@ const RaffleDetail = () => {
 
         {/* RIGHT SIDE (Sidebar) */}
         <div className="lg:col-span-1">
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 space-y-4 sticky top-24">
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-4 sm:p-6 space-y-3 sm:space-y-4 lg:sticky lg:top-24">
             <div>
-              <h3 className="text-xl font-bold mb-4">Enter Raffle</h3>
+              <h3 className="text-lg sm:text-xl font-bold">Enter Raffle</h3>
             </div>
             {/* Ticket Progress */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-muted foreground" />
-                  <span className="text-sm text-muted-foreground">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                  <span className="text-xs sm:text-sm text-muted-foreground truncate">
                     {raffle.sold} / {raffle.total} tickets sold
                   </span>
                 </div>
 
-                {!isSoldOut && (
-                  <span className="text-accent font-semibold">
+                {!isSoldOut && !isEnded && (
+                  <span className="text-accent font-semibold text-xs sm:text-sm shrink-0">
                     {ticketsLeft} left
                   </span>
                 )}
               </div>
               <Progress
                 value={(raffle.sold / raffle.total) * 100}
-                className="h-3"
+                className="h-2 sm:h-3"
               />
             </div>
 
             {/* Ticket Price */}
-            <div className="flex items-center justify-between bg-card/50 backdrop-blur-xl border border-border/50 p-4 rounded-lg mb-4">
-              <div className="flex items-center gap-3">
-                <Coins className="h-5 w-5 text-accent" />
-                <span className="text-muted-foreground">Ticket Price</span>
+            <div className="flex items-center justify-between bg-card/50 backdrop-blur-xl border border-border/50 p-3 sm:p-4 rounded-lg mb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Coins className="h-4 w-4 sm:h-5 sm:w-5 text-accent shrink-0" />
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  Ticket Price
+                </span>
               </div>
-              <span className="text-xl font-bold">
+              <span className="text-lg sm:text-xl font-bold">
                 {raffle.price} {raffle.tokenType}
               </span>
             </div>
 
             {/* remaining time */}
 
-            <div className="flex items-center justify-between bg-card/50 backdrop-blur-xl border border-border/50 p-4 rounded-lg mb-6">
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-primary" />
-                <span className="text-muted-foreground">Ends In</span>
+            <div className="flex items-center justify-between bg-card/50 backdrop-blur-xl border border-border/50 p-3 sm:p-4 rounded-lg mb-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  Ends In
+                </span>
               </div>
-              <span className="text-muted-foreground text-xl font-bold">
+              <span className="text-muted-foreground text-lg sm:text-xl font-bold">
                 {countdown}
               </span>
             </div>
 
             {/* Countdown */}
             {!isEnded && !isSoldOut && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">
+              <div className="space-y-2 sm:space-y-3">
+                <label className="text-xs sm:text-sm font-medium text-muted-foreground">
                   Number of Tickets
                 </label>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-2 sm:gap-3 mt-2">
                   <Button
                     variant="outline"
-                    className="bg-background-50"
+                    className="bg-background-50 h-9 w-9 sm:h-10 sm:w-10"
                     size="icon"
                     onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
                     disabled={!connected || ticketsLeft === 0}
@@ -666,12 +691,12 @@ const RaffleDetail = () => {
                     onChange={(e) =>
                       setTicketCount(Math.max(1, parseInt(e.target.value) || 1))
                     }
-                    className="flex h-10 w-full rounded-md text-center border border-border bg-background-50 rounded-md text-lg p-2 font-bold md:text-sm focus:ring-offset-2"
+                    className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold focus:ring-offset-2"
                     disabled={!connected || ticketsLeft === 0}
                   />
                   <Button
                     variant="outline"
-                    className="bg-background-50"
+                    className="bg-background-50 h-9 w-9 sm:h-10 sm:w-10"
                     size="icon"
                     onClick={() => setTicketCount(ticketCount + 1)}
                     disabled={!connected || ticketsLeft === 0}
@@ -682,39 +707,41 @@ const RaffleDetail = () => {
               </div>
             )}
             {/* Total Cost */}
-            <div className="flex items-center bg-card/50 backdrop-blur-xl border border-border/50 justify-between border-primary/30 p-4 rounded-lg bg-primary-10">
-              <span className="font-semibold text-muted-foreground">
-                Total Cost
-              </span>
-              <span className="text-2xl font-bold text-primary">
-                {totalCost} {raffle.tokenType}
-              </span>
-            </div>
+            {!isEnded && !isSoldOut && (
+              <div className="flex items-center bg-card/50 backdrop-blur-xl border border-border/50 justify-between p-3 sm:p-4 rounded-lg bg-primary-10 border-primary/30">
+                <span className="font-semibold text-xs sm:text-sm text-muted-foreground">
+                  Total Cost
+                </span>
+                <span className="text-xl sm:text-2xl font-bold text-primary">
+                  {totalCost} {raffle.tokenType}
+                </span>
+              </div>
+            )}
 
             {/* Buy Button */}
             {isEnded ? (
-              <div className="w-full mt-4 h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold">
+              <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
                 Raffle Ended
               </div>
             ) : isSoldOut ? (
-              <div className="w-full mt-4 h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold">
+              <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
                 Sold Out
               </div>
             ) : (
               <Button
-                className="w-full mt-4 gradient-primary glow-primary h-12 text-lg"
+                className="w-full gradient-primary glow-primary h-10 sm:h-12 text-base sm:text-lg mt-4"
                 onClick={handleBuyTickets}
                 disabled={!connected}
               >
-                <Ticket className="h-5 w-5 mr-2" />
+                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
               </Button>
             )}
 
             {/* Info */}
-            <div className="bg-card/50 backdrop-blur-xl border border-accent/30 rounded-lg flex gap-3 p-4">
-              <AlertCircle className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-              <div className="text-sm space-y-1">
+            <div className="bg-card/50 backdrop-blur-xl border border-accent/30 rounded-lg flex gap-2 sm:gap-3 p-3 sm:p-4">
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-accent shrink-0 mt-0.5" />
+              <div className="text-xs sm:text-sm space-y-1">
                 <p className="font-semibold">NFT Holder Discount</p>
                 <p className="text-muted-foreground">
                   Connect a wallet with verified NFTs to get 2.5% fees instead

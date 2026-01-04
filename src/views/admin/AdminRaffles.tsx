@@ -18,6 +18,7 @@ import {
 import { Switch } from "../../components/ui/Switch";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { formatPrice } from "../../helpers/formatPrice";
 
 interface RaffleDetail {
   id: number;
@@ -80,7 +81,6 @@ export default function AdminRaffles() {
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [isFeatured, setIsFeatured] = useState(false);
   const [open, setOpen] = useState(false);
-  //const [status, setStatus] = useState("live");
 
   useEffect(() => {
     const fetchRaffles = async () => {
@@ -296,7 +296,7 @@ export default function AdminRaffles() {
                       {raffle.token}
                     </span>
                   </td>
-                  <td className="p-4">{raffle.price}</td>
+                  <td className="p-4">{formatPrice(raffle.price)}</td>
                   <td className="p-4">
                     <span className="text-sm">
                       {raffle.sold}/{raffle.total}

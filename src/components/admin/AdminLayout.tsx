@@ -56,7 +56,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen h-screen bg-background flex overflow-hidden">
       {/* Backdrop Overlay - Mobile Only */}
       {sidebarOpen && (
         <div
@@ -69,7 +69,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <aside
         className={`${
           sidebarOpen ? "w-64" : "w-0"
-        } bg-black border-r border-border/50 transition-all duration-300 flex flex-col fixed h-screen z-50 overflow-hidden md:static md:z-0 md:w-64 md:h-screen`}
+        } bg-black border-r border-border/50 transition-all duration-300 flex flex-col fixed h-screen z-50 overflow-hidden md:relative md:z-0 md:w-64 md:h-screen`}
       >
         {/* Logo */}
         <div className="p-4 border-b border-border/50 flex items-center justify-between shrink-0">
@@ -126,13 +126,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <div
+      {/* <div
         className={`flex-1 ${
           sidebarOpen ? "md:ml-0" : "md:ml-0"
         } ml-0 transition-all duration-300`}
-      >
+      > */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Top Bar */}
-        <header className="bg-black border-b border-border/50 sticky top-0 z-40">
+        <header className="bg-black border-b border-border/50 shrink-0">
           <div className="flex items-center justify-between px-4 sm:px-6 py-4">
             <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               {/* Mobile Hamburger Menu */}
@@ -186,7 +187,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );
