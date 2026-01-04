@@ -127,8 +127,6 @@ export default function AdminAnalytics() {
       toast.error("Failed to copy wallet address");
     }
   };
-  const wrapLongNumber = (value: number) =>
-    value.toString().split("").join("\u200B");
 
   if (loading)
     return (
@@ -157,7 +155,7 @@ export default function AdminAnalytics() {
         />
         <StatCard
           title="Avg. Ticket Price"
-          value={`${wrapLongNumber(kpiData.avgTicketPrice)} SOL`}
+          value={`${kpiData.avgTicketPrice} SOL`}
           change={0}
           trend="up"
           icon={<Activity className="h-6 w-6 text-muted-foreground" />}
