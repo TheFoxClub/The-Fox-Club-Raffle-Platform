@@ -83,29 +83,29 @@ export default function AdminDashboard() {
         <StatCard
           title="Total Volume"
           value={`${stats.totalRevenue} SOL`}
-          change={0}
-          trend="up"
+          //change={0}
+          //trend="up"
           icon={<Wallet className="h-6 w-6" />}
         />
         <StatCard
           title="Live Raffles"
           value={stats.liveRaffleCount}
-          change={0}
-          trend="up"
+          // change={0}
+          //trend="up"
           icon={<Ticket className="h-6 w-6" />}
         />
         <StatCard
           title="Total Tickets Sold"
           value={stats.totalTicketsSold}
-          change={0}
-          trend="up"
+          // change={0}
+          // trend="up"
           icon={<Users className="h-6 w-6" />}
         />
         <StatCard
           title="Platform Fees Earned"
           value={`${stats.totalPlatformRevenue} SOL`}
-          change={0}
-          trend="up"
+          // change={0}
+          // trend="up"
           icon={<Coins className="h-6 w-6" />}
         />
       </div>

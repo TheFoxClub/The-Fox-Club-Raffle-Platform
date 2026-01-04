@@ -161,7 +161,7 @@ const Profile = () => {
 
         dispatch(
           setUser({
-            user_info: userData,
+            user_info: userData.user_info,
             isAuthenticated: true,
             isLoading: false,
           })

@@ -179,16 +179,25 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       className="space-y-2 z-20 mt-10"
     >
       <TabsList className="p-1 sm:w-auto">
-        <TabsTrigger value="live" className="gap-2 flex-1 sm:flex-none">
-          <Flame className="h-4 w-4" />
+        <TabsTrigger
+          value="live"
+          className="gap-2 px-2.5 py-1.5 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
+        >
+          <Flame className="h-3 w-3 sm:h-4 sm:w-4" />
           Live Raffles
         </TabsTrigger>
-        <TabsTrigger value="ended" className="gap-2 flex-1 sm:flex-none">
-          <Clock className="h-4 w-4" />
+        <TabsTrigger
+          value="ended"
+          className="gap-2 px-2.5 py-1.5 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
+        >
+          <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
           Ended Raffles
         </TabsTrigger>
-        <TabsTrigger value="upcoming" className="gap-2 flex-1 sm:flex-none">
-          <Calendar className="h-4 w-4" />
+        <TabsTrigger
+          value="upcoming"
+          className="gap-2 px-2.5 py-1.5 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
+        >
+          <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
           Upcoming Raffles
         </TabsTrigger>
       </TabsList>

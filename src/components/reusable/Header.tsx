@@ -172,12 +172,12 @@ export const Header = () => {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden flex flex-col gap-2 mt-2 border-t border-border/50 pt-2">
+          <div className="w-full md:hidden flex flex-col gap-2 mt-2 border-t border-border/50 pt-2">
             {user.isAuthenticated && (
               <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>
                 <Button
                   variant={isActive("/profile") ? "default" : "ghost"}
-                  className="w-full gap-2 cursor-pointer justify-start border border-border rounded-md hover:bg-accent"
+                  className="w-full gap-2 cursor-pointer justify-center border border-border rounded-md hover:bg-accent"
                   size="sm"
                 >
                   <User className="h-4 w-4" /> Profile
@@ -191,7 +191,7 @@ export const Header = () => {
                   variant={
                     location.pathname.startsWith("/admin") ? "default" : "ghost"
                   }
-                  className="w-full gap-2 cursor-pointer justify-start border border-border rounded-md hover:bg-accent"
+                  className="w-full gap-2 cursor-pointer justify-center border border-border rounded-md hover:bg-accent"
                   size="sm"
                 >
                   <Shield className="h-4 w-4" /> Dashboard
