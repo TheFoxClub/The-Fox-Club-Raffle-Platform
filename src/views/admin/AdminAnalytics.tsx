@@ -142,29 +142,29 @@ export default function AdminAnalytics() {
         <StatCard
           title="Total Users"
           value={kpiData.totalUsers.toLocaleString()}
-          change={0}
-          trend="up"
+          // change={0}
+          // trend="up"
           icon={<Users className="h-6 w-6 text-muted-foreground" />}
         />
         <StatCard
           title="Active Wallets"
           value={kpiData.activeWallets.toLocaleString()}
-          change={0}
-          trend="up"
+          // change={0}
+          // trend="up"
           icon={<Wallet className="h-6 w-6 text-muted-foreground" />}
         />
         <StatCard
           title="Avg. Ticket Price"
           value={`${kpiData.avgTicketPrice} SOL`}
-          change={0}
-          trend="up"
+          // change={0}
+          // trend="up"
           icon={<Activity className="h-6 w-6 text-muted-foreground" />}
         />
         <StatCard
           title="Growth Rate"
           value={`${kpiData.growthRate}%`}
-          change={0}
-          trend="up"
+          // change={0}
+          // trend="up"
           icon={<TrendingUp className="h-6 w-6 text-muted-foreground" />}
         />
       </div>

@@ -76,7 +76,7 @@ export default function AdminRewards() {
   };
 
   const handleAirdrop = () => {
-    toast.success("Airdrop triggered successfully");
+    toast.info("Airdrop feature is coming soon.");
   };
 
   const fetchEligibleWallets = async () => {
