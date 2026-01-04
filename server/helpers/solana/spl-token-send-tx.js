@@ -23,7 +23,6 @@ const { Wallet } = require("./wallet.js");
 const { addCommissionToTransaction } = require("../../services/commissions.js");
 const { SOLANA_TOKEN_ADDRESS } = require("../../config/constants.js");
 const { addNftSendTransaction } = require("./send-nft.js");
-const { PLATFORM_WALLET } = require("../../config/credentials.js");
 const { RAFFLE_REWARD_TYPES } = require("../../config/data.js");
 const {
   signerIdentity,

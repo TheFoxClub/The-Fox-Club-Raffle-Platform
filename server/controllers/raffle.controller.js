@@ -32,6 +32,7 @@ const logger = require("../util/logger");
 const WinnerSelectionService = require("../services/raffles/winner-selection");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const { MIN_PAYOUT_AMOUNT } = require("../config/constants");
+const { BET_RECEIVER_WALLET } = require("../config/credentials");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -470,7 +471,6 @@ class RaffleController {
         );
       }
 
-      const BET_RECEIVER_WALLET = process.env.BET_RECEIVER_WALLET;
       if (!BET_RECEIVER_WALLET) {
         return respond(
           res,
@@ -1314,8 +1314,7 @@ class RaffleController {
         );
 
         const splTokenSendTxData = {
-          senderPubkey:
-            raffle.platformWallet || process.env.BET_RECEIVER_WALLET,
+          senderPubkey: raffle.platformWallet || BET_RECEIVER_WALLET,
           receiverPubkey: user.pubkey,
           type:
             reward.rewardType === RAFFLE_REWARD_TYPES.SOLANA
@@ -2253,7 +2252,7 @@ class RaffleController {
       }
 
       // Check if platform wallet has sufficient balance (basic validation)
-      const platformWallet = process.env.BET_RECEIVER_WALLET;
+      const platformWallet = BET_RECEIVER_WALLET;
       if (!platformWallet) {
         if (transaction && !transaction.finished) {
           await transaction.rollback();
