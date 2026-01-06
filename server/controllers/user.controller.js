@@ -39,6 +39,15 @@ class UserController {
         ],
       });
 
+      const rafflesWon = await RaffleTicket.count({
+        where: {
+          userId: userId,
+          isWinner: 1,
+        },
+        distinct: true,
+        col: "raffleId",
+      });
+
       const solSpentData = await SplTokenSendTransaction.findAll({
         where: {
           senderPubkey: user.pubkey,
@@ -65,6 +74,7 @@ class UserController {
           user,
           ticketsBought: totalTickets,
           totalSolSpent,
+          rafflesWon,
         });
       } else {
         return respond(res, httpStatus.NOT_FOUND, "User not found");
