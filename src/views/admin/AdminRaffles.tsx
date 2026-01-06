@@ -148,7 +148,12 @@ export default function AdminRaffles() {
             : r
         )
       );
-      toast.success("Raffle updated successfully!");
+      if (isFeatured) {
+        toast.success("Raffle is now featured on homepage!");
+      } else {
+        toast.info("Raffle is no longer featured.");
+      }
+
       setOpen(false);
       setSelectedRaffle(null); // close dialog
     } catch (err) {

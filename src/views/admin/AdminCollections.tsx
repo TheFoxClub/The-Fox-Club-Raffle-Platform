@@ -149,7 +149,11 @@ export default function AdminCollections() {
           c.id === id ? { ...c, verified: updatedCollection.isVerified } : c
         )
       );
-      toast.success(res.data.message || "Verification status updated");
+      if (updatedCollection.isVerified) {
+        toast.success("Collection is now verified!");
+      } else {
+        toast.info("Collection is no longer verified.");
+      }
     } catch (error) {
       console.error("Toggle verify failed:", error);
       toast.error("Failed to update verification status");
@@ -161,7 +165,8 @@ export default function AdminCollections() {
     try {
       const res = await server.delete(`/admin/verified-collection/${id}`);
       if (res.data?.success) {
-        toast.error(res.data.message || "Collection deleted successfully");
+        toast.success(res.data.message || "Collection deleted successfully");
+
         setCollections((prev) => prev.filter((c) => c.id !== id));
       }
     } catch (error) {

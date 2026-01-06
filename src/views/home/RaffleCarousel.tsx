@@ -28,8 +28,9 @@ interface Raffle {
 export default function RaffleCarousel() {
   const navigate = useNavigate();
 
-  const [raffles, setRaffles] = useState<Raffle[] | null>(null);
+  const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [index, setIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     const fetchFeatured = async () => {
@@ -70,7 +71,15 @@ export default function RaffleCarousel() {
     fetchFeatured();
   }, []);
 
-  if (raffles === null) return null;
+  useEffect(() => {
+    if (raffles.length < 2 || isHovered) return;
+
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % raffles.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [raffles.length, isHovered]);
 
   //if no raffles loaded yet
   if (raffles.length === 0) return null;
@@ -82,7 +91,11 @@ export default function RaffleCarousel() {
     setIndex((prev) => (prev - 1 + raffles.length) % raffles.length);
 
   return (
-    <Card className=" overflow-hidden glow-primary border-primary/30">
+    <Card
+      className="overflow-hidden glow-primary border-primary/30"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className="relative">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
           {/* Image */}

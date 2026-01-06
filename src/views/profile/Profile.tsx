@@ -5,7 +5,7 @@ import {
   User,
   Trophy,
   Flame,
-  TrendingUp,
+  // TrendingUp,
   Award,
   Ticket,
   Calendar,
@@ -13,6 +13,7 @@ import {
   CheckCircle,
   Gift,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import {
   Tabs,
@@ -27,6 +28,7 @@ import { setUser, setLoading } from "../../redux/userSlice";
 import { Link } from "react-router-dom";
 import ClaimReward from "../claim/ClaimReward";
 import ClaimPayout from "../payout/ClaimPayout";
+import { toast } from "react-toastify";
 
 type HostedRaffle = {
   id: number;
@@ -62,7 +64,7 @@ type ExtendedUser = {
   totalSpent?: number;
   rafflesWon?: number;
   ticketsPurchased?: number;
-  reputation?: number;
+  // reputation?: number;
   xp?: number;
   xpGoal?: number;
 };
@@ -106,7 +108,7 @@ const Profile = () => {
 
   const {
     rafflesWon = 0,
-    reputation = 0,
+    // reputation = 0,
     xp = 0,
     xpGoal = 15000,
   } = (user_info ?? {}) as ExtendedUser;
@@ -307,6 +309,27 @@ const Profile = () => {
     );
   };
 
+  const handleDeleteRaffle = async (raffleId: number) => {
+    try {
+      const res = await server.delete(`/raffle/${raffleId}`);
+      if (res.data.success) {
+        toast.success("Raffle deleted successfully!");
+        setHostedRafflesData((prev) =>
+          prev.filter((raffle) => raffle.id !== raffleId)
+        );
+      } else {
+        toast.error(res.data.message || "Failed to delete raffle");
+      }
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to delete raffle"
+      );
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-300">
@@ -380,7 +403,7 @@ const Profile = () => {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 text-center p-6 space-y-2">
             <Coins className="h-8 w-8 mx-auto text-accent" />
             <p className="text-2xl font-bold">{totalSolSpent} SOL</p>
@@ -399,11 +422,11 @@ const Profile = () => {
             <p className="text-sm text-muted-foreground">Tickets Bought</p>
           </Card>
 
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 text-center p-6 space-y-2">
+          {/* <Card className="bg-card/50 backdrop-blur-xl border border-border/50 text-center p-6 space-y-2">
             <TrendingUp className="h-8 w-8 mx-auto text-green-500" />
             <p className="text-2xl font-bold">{reputation}%</p>
             <p className="text-sm text-muted-foreground">Reputation</p>
-          </Card>
+          </Card> */}
         </div>
 
         {claimableRewards.length > 0 && (
@@ -643,11 +666,34 @@ const Profile = () => {
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center">
                         {/* <Button variant="outline">Manage</Button> */}
                         <Link to={`/raffle/${raffle.id}`}>
                           <Button variant="outline">View</Button>
                         </Link>
+                        <div className="relative group">
+                          <Button
+                            variant="outline"
+                            disabled={raffle.ticketsSold > 0}
+                            onClick={() => handleDeleteRaffle(raffle.id)}
+                            className={`flex items-center gap-1 ${
+                              raffle.ticketsSold === 0
+                                ? "text-red-500 border-red-500 hover:bg-red-500"
+                                : "opacity-50 cursor-not-allowed"
+                            }`}
+                          >
+                            <Trash2 size={16} />
+                            Delete
+                          </Button>
+
+                          {/*Tooltip for disabled state */}
+                          {raffle.ticketsSold > 0 && (
+                            <div className="absolute right-0 top-full mt-2 w-56 text-xs bg-black/80 rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                              This raffle can't be deleted because tickets have
+                              already been sold.
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
