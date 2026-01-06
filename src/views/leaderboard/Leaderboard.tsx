@@ -57,7 +57,7 @@ const Leaderboard = () => {
             raffles: host.rafflesCount,
             tokenType: formatToken(host.tokenType),
             badge: host.rank === 1 ? "crown" : undefined,
-            reputation: 0,
+            //    reputation: 0,
           }));
           const mappedBuyers = json.data.topBuyers.map((buyer: any) => ({
             rank: buyer.rank,
@@ -179,11 +179,11 @@ const Leaderboard = () => {
                               <p className="font-bold text-lg truncate">
                                 {host.wallet}
                               </p>
-                              {host.reputation >= 97 && (
+                              {/* {host.reputation >= 97 && (
                                 <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
                                   {host.reputation}% rep
                                 </div>
-                              )}
+                              )} */}
                             </div>
 
                             <p className="text-sm text-muted-foreground">

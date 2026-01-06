@@ -311,3 +311,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
+@keyframes slideFade {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide {
+  animation: slideFade 0.5s ease-in-out;
+}

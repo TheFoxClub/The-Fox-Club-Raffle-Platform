@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import server from "../../config/server";
 import { Link } from "react-router-dom";
+import { formatPrice } from "../../helpers/formatPrice";
 
 const HostProfilePopover = ({ hostId }: { hostId: number }) => {
   const [showPopover, setShowPopover] = useState(false);
@@ -82,7 +83,7 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
       {showPopover && hostData && (
         <div
           ref={popoverRef}
-          className="absolute bottom-full right-0 mb-2 w-90 bg-black/90 backdrop-blur-xl p-6
+          className="absolute bottom-full right-0 mb-2  w-86 md:w-90 bg-black/90 backdrop-blur-xl p-6
            border border-border rounded-xl shadow-lg z-50 transition-opacity duration-200 ease-out"
         >
           {loading ? (
@@ -168,26 +169,47 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                                   </div>
                                 )}
                               </div>
-                              <div className="flex items-center text-muted-foreground gap-2">
-                                <div className="flex flex-col items-center gap-1">
-                                  <Ticket className="h-4 w-4" />
-                                  <span>
-                                    {r.ticketsSold} / {r.totalTickets} sold
-                                  </span>
+                              <div
+                                className="
+    grid grid-cols-2 gap-3 text-muted-foreground w-full
+    md:flex md:items-center md:justify-between md:gap-6
+  "
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Ticket className="h-4 w-4 shrink-0" />
+                                  <div className="text-xs leading-tight">
+                                    <div className="font-medium text-foreground">
+                                      {r.ticketsSold} / {r.totalTickets}
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      sold
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Coins className="h-4 w-4 text-accent shrink-0" />
+                                  <div className="text-xs leading-tight">
+                                    <div className="font-medium text-foreground">
+                                      {formatPrice(r.totalRevenue)}{" "}
+                                      {TOKEN_DISPLAY_NAMES[r.tokenType] ||
+                                        r.tokenType}
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      Revenue
+                                    </div>
+                                  </div>
                                 </div>
 
-                                <div className="flex flex-col items-center gap-1">
-                                  <Coins className="h-4 w-4 text-accent" />
-                                  <span>
-                                    {(Number(r.totalRevenue) || 0).toFixed(4)}{" "}
-                                    {TOKEN_DISPLAY_NAMES[r.tokenType] ||
-                                      r.tokenType}{" "}
-                                    revenue
-                                  </span>
-                                </div>
-                                <div className="flex flex-col items-center gap-1">
-                                  <Calendar className="h-4 w-4" />
-                                  <span>{r.endDate.split("T")[0]}</span>
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 shrink-0" />
+                                  <div className="text-xs leading-tight">
+                                    <div className="font-medium text-foreground whitespace-nowrap">
+                                      {r.endDate.split("T")[0]}
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      End date
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>

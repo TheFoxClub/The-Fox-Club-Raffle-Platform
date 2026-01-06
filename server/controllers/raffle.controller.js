@@ -1557,6 +1557,10 @@ class RaffleController {
         );
       }
 
+      await RaffleReward.destroy({
+        where: { raffleId: id },
+      });
+
       await RaffleDetail.destroy({
         where: { raffleId: id },
       });

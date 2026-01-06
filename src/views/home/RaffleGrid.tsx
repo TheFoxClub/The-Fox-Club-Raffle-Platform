@@ -85,32 +85,20 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
           });
         }
 
-        if (response.data.success) {
-          // Handle both old and new response structures
-          const data = Array.isArray(response.data.data?.formattedRaffles)
-            ? response.data.data.formattedRaffles
-            : Array.isArray(response.data.data?.raffles)
-            ? response.data.data.raffles
-            : [];
+        const data = Array.isArray(response.data.data?.formattedRaffles)
+          ? response.data.data.formattedRaffles
+          : Array.isArray(response.data.data?.raffles)
+          ? response.data.data.raffles
+          : [];
 
-          // Update the appropriate state based on tab
-          if (tabStatus === "live") {
-            SetRaffles(data);
-          } else if (tabStatus === "ended") {
-            setEndedRaffles(data);
-          } else if (tabStatus === "upcoming") {
-            setUpcomingRaffles(data);
-          }
-        } else {
-          // Set empty array for failed requests
-          if (tabStatus === "live") SetRaffles([]);
-          else if (tabStatus === "ended") setEndedRaffles([]);
-          else if (tabStatus === "upcoming") setUpcomingRaffles([]);
-        }
+        // Update the appropriate state based on tab
+        if (tabStatus === "live") SetRaffles(data);
+        else if (tabStatus === "ended") setEndedRaffles(data);
+        else if (tabStatus === "upcoming") setUpcomingRaffles(data);
       } catch (error: unknown) {
         console.error(`Error fetching ${tabStatus} raffles:`, error);
 
-        // Set empty array for errors
+        // Set empty array for failed requests
         if (tabStatus === "live") SetRaffles([]);
         else if (tabStatus === "ended") setEndedRaffles([]);
         else if (tabStatus === "upcoming") setUpcomingRaffles([]);
@@ -181,21 +169,21 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       <TabsList className="p-1 sm:w-auto">
         <TabsTrigger
           value="live"
-          className="gap-2 px-2.5 py-1.5 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
+          className="gap-2 px-2.5 py-2 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
         >
           <Flame className="h-3 w-3 sm:h-4 sm:w-4" />
           Live Raffles
         </TabsTrigger>
         <TabsTrigger
           value="ended"
-          className="gap-2 px-2.5 py-1.5 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
+          className="gap-2 px-2.5 py-2 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
         >
           <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
           Ended Raffles
         </TabsTrigger>
         <TabsTrigger
           value="upcoming"
-          className="gap-2 px-2.5 py-1.5 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
+          className="gap-2 px-2.5 py-2 text-xs sm:text-sm sm:px-3 sm:py-2 flex-1 sm:flex-none"
         >
           <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
           Upcoming Raffles
