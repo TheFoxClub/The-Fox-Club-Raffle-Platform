@@ -15,6 +15,7 @@ import {
   Trophy,
   Ticket,
   AlertCircle,
+  Copy,
 } from "lucide-react";
 // import { allRaffle } from "../../dummydata/mockRaffleDetail";
 // import type { RaffleType } from "../../dummydata/mockRaffleDetail";
@@ -71,7 +72,7 @@ export interface RaffleType {
   created: string;
   host: string;
   hostId: number;
-  hostReputation: number;
+  // hostReputation: number;
   isVerified: boolean;
   isFeatured: boolean;
   prizeValue: string;
@@ -263,7 +264,7 @@ const RaffleDetail = () => {
           created: formatDateOnly(data.createdAt),
           host: res.data.data.userData.pubkey,
           hostId: res.data.data.userData.id,
-          hostReputation: data.userReputation || 100,
+          // hostReputation: data.userReputation || 100,
           isVerified: data.raffle_detail?.requiresNftVerification || false,
           isFeatured: data.raffle_detail?.isFeatured || false,
           prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
@@ -355,6 +356,15 @@ const RaffleDetail = () => {
   const isEnded = countdown === "Ended" || !!raffle.endedAt;
   const isSoldOut = raffle.total - raffle.sold <= 0;
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied");
+    } catch {
+      toast.error("Failed to copy wallet address");
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-4 sm:py-8 max-w-7xl">
       {/* Winner Modal */}
@@ -418,7 +428,7 @@ const RaffleDetail = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 sm:pt-4 border-t border-border/50">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-3 sm:pt-4 border-t border-border/50">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                   <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -446,7 +456,7 @@ const RaffleDetail = () => {
                   {raffle.created}
                 </p>
               </div>
-              <div className="space-y-1">
+              {/* <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                   <User className="h-3 w-3 sm:h-4 sm:w-4" />
                   Reputation
@@ -454,7 +464,7 @@ const RaffleDetail = () => {
                 <p className="font-bold text-base sm:text-lg">
                   {raffle.hostReputation}%
                 </p>
-              </div>
+              </div> */}
             </div>
           </Card>
 
@@ -545,19 +555,6 @@ const RaffleDetail = () => {
                       className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-xs sm:text-sm">
-                            Winner #{index + 1}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {winner.winnerPubkey.slice(0, 4)}…
-                            {winner.winnerPubkey.slice(-4)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Ticket #{winner.ticketNumber}
-                          </span>
-                        </div>
-
                         {winner.imageUrl && (
                           <img
                             src={winner.imageUrl}
@@ -565,6 +562,33 @@ const RaffleDetail = () => {
                             className="w-10 h-10 rounded-md object-cover shrink-0"
                           />
                         )}
+
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-xs sm:text-sm">
+                            Winner #{index + 1}
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(winner.winnerPubkey)}
+                            className="flex items-center gap-1 text-left text-xs text-muted-foreground hover:text-primary transition group"
+                          >
+                            {/* Mobile (short) */}
+                            <span className="sm:hidden">
+                              {winner.winnerPubkey.slice(0, 4)}…
+                              {winner.winnerPubkey.slice(-4)}
+                            </span>
+
+                            {/* Desktop (full) */}
+                            <span className="hidden sm:block break-all">
+                              {winner.winnerPubkey}
+                            </span>
+
+                            <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                          </button>
+
+                          <span className="text-xs text-muted-foreground">
+                            Ticket #{winner.ticketNumber}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="text-left sm:text-right">
@@ -602,9 +626,9 @@ const RaffleDetail = () => {
                   <span className="hidden sm:inline break-all">
                     {raffle.host}
                   </span>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
+                  {/* <p className="text-xs sm:text-sm text-muted-foreground">
                     {raffle.hostReputation}% positive rating
-                  </p>
+                  </p> */}
                 </div>
               </div>
               <div className="relative z-10 shrink-0">
