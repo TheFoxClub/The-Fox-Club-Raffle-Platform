@@ -28,12 +28,6 @@ import { storeSignature } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
 
-export const RAFFLE_REWARD_TYPES = {
-  NFT: 0,
-  SPL_TOKEN: 1,
-  SPL_TOKEN_2022: 2,
-};
-
 export interface Winner {
   rewardId: number;
   rewardName: string;
@@ -348,25 +342,42 @@ const RaffleDetail = () => {
 
     // Set up event listeners
     const handleRaffleUpdate = (data: any) => {
-      console.log('Raffle update received:', data);
+      // console.log("Raffle update received:", data);
       if (data.raffleId === raffleIdNum) {
-        console.log('Processing raffle update for current raffle:', data);
-        setRaffle(prev => {
+        // console.log("Processing raffle update for current raffle:", data);
+        setRaffle((prev) => {
           if (!prev) return prev;
-          return {
+
+          const updatedRaffle = {
             ...prev,
             sold: data.ticketsSold || prev.sold,
             total: data.totalTickets || prev.total,
           };
+
+          // Handle reward claim updates
+          if (data.rewardClaimed && prev.winnersData) {
+            updatedRaffle.winnersData = prev.winnersData.map((winner) => {
+              if (winner.rewardId === data.rewardClaimed.rewardId) {
+                return {
+                  ...winner,
+                  isClaimed: data.rewardClaimed.isClaimed,
+                  claimedAt: data.rewardClaimed.claimedAt,
+                };
+              }
+              return winner;
+            });
+          }
+
+          return updatedRaffle;
         });
       }
     };
 
     const handleTicketPurchase = (data: any) => {
-      console.log('Ticket purchase received:', data);
+      // console.log("Ticket purchase received:", data);
       if (data.raffleId === raffleIdNum) {
-        console.log('Processing ticket purchase for current raffle:', data);
-        setRaffle(prev => {
+        // console.log("Processing ticket purchase for current raffle:", data);
+        setRaffle((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
@@ -374,19 +385,32 @@ const RaffleDetail = () => {
             total: data.totalTickets || prev.total,
           };
         });
-        
         // Show toast for other users (not the buyer)
         if (publicKey && data.buyerPubkey !== publicKey.toBase58()) {
-          toast.info(`${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`);
+          toast.info(
+            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`
+          );
         }
       }
     };
 
     const handleRaffleStatusChange = (data: any) => {
       if (data.raffleId === raffleIdNum) {
-        console.log('Raffle status changed:', data);
-        if (data.newStatus === 'ENDED') {
-          toast.info(`Raffle has ended! ${data.reason === 'sold_out' ? 'All tickets sold!' : 'Time expired!'}`);
+        // console.log("Raffle status changed:", data);
+        if (data.newStatus === "ENDED") {
+          // Only show toast to users who have tickets in this raffle
+          if (
+            publicKey &&
+            raffle?.participants?.includes(publicKey.toBase58())
+          ) {
+            toast.info(
+              `Raffle has ended! ${
+                data.reason === "sold_out"
+                  ? "All tickets sold!"
+                  : "Time expired!"
+              }`
+            );
+          }
           fetchRaffle(); // Refresh to get latest data
         }
       }
@@ -394,8 +418,13 @@ const RaffleDetail = () => {
 
     const handleWinnersSelected = (data: any) => {
       if (data.raffleId === raffleIdNum) {
-        console.log('Winners selected:', data);
-        toast.success(`Winners have been selected! ${data.numberOfWinners} winner(s)`);
+        // console.log("Winners selected:", data);
+        // Only show toast to users who have tickets in this raffle
+        if (publicKey && raffle?.participants?.includes(publicKey.toBase58())) {
+          toast.success(
+            `Winners have been selected! ${data.numberOfWinners} winner(s)`
+          );
+        }
         fetchRaffle(); // Refresh to show winners
       }
     };

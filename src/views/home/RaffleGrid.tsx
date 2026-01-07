@@ -163,18 +163,30 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     };
 
     const handleRaffleListUpdate = (data: any) => {
-      console.log("Raffle grid - raffle list update received:", data);
+      // console.log("Raffle grid - raffle list update received:", data);
 
       if (data.raffleId) {
-        // Update the raffle in all relevant lists
-        updateRaffleInList(data.raffleId, data, SetRaffles);
-        updateRaffleInList(data.raffleId, data, setEndedRaffles);
-        updateRaffleInList(data.raffleId, data, setUpcomingRaffles);
+        // Handle new raffle creation
+        if (data.action === "raffle_created") {
+          // console.log("New raffle created, refreshing lists");
+          // Refresh the appropriate list based on raffle status
+          if (data.status === "LIVE") {
+            fetchRafflesForTab("live");
+          } else if (data.status === "UPCOMING") {
+            fetchRafflesForTab("upcoming");
+          } else if (data.status === "ENDED") {
+            fetchRafflesForTab("ended");
+          }
+        } else {
+          updateRaffleInList(data.raffleId, data, SetRaffles);
+          updateRaffleInList(data.raffleId, data, setEndedRaffles);
+          updateRaffleInList(data.raffleId, data, setUpcomingRaffles);
+        }
       }
     };
 
     const handleTicketPurchase = (data: any) => {
-      console.log("Raffle grid - ticket purchase received:", data);
+      // console.log("Raffle grid - ticket purchase received:", data);
 
       if (data.raffleId) {
         // Update the raffle in all relevant lists
@@ -185,7 +197,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     };
 
     const handleRaffleStatusChange = (data: any) => {
-      console.log("Raffle grid - raffle status change received:", data);
+      // console.log("Raffle grid - raffle status change received:", data);
 
       if (data.raffleId) {
         // For now, just refresh the data to ensure consistency
@@ -287,8 +299,9 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
                   raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
-                isVerified: raffle.raffle_detail.requiresNftVerification,
-                isFeatured: raffle.raffle_detail.isFeatured,
+                isVerified:
+                  raffle.raffle_detail?.requiresNftVerification || false,
+                isFeatured: raffle.raffle_detail?.isFeatured || false,
               };
 
               return (
@@ -331,8 +344,9 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
                   raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
-                isVerified: raffle.raffle_detail.requiresNftVerification,
-                isFeatured: raffle.raffle_detail.isFeatured,
+                isVerified:
+                  raffle.raffle_detail?.requiresNftVerification || false,
+                isFeatured: raffle.raffle_detail?.isFeatured || false,
               };
 
               return (

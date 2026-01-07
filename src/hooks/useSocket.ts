@@ -7,16 +7,8 @@ export const useSocket = () => {
   const isInitialized = useRef(false);
 
   useEffect(() => {
-    console.log("🔌 useSocket effect - user state:", {
-      isAuthenticated: user.isAuthenticated,
-      id: user.id,
-      pubkey: user.pubkey,
-      isInitialized: isInitialized.current,
-    });
-
-    // Always try to connect, even if user is not logged in (for debugging)
+    // Always try to connect, even if user is not logged in
     if (!isInitialized.current) {
-      console.log("🔌 Initializing Socket.IO connection...");
       socketService.connect(user.id, user.pubkey);
 
       if (user.isAuthenticated && user.id) {
@@ -28,7 +20,6 @@ export const useSocket = () => {
 
     // Disconnect when user logs out
     if (!user.isAuthenticated && isInitialized.current && user.id) {
-      console.log("🔌 Disconnecting Socket.IO - user logged out");
       socketService.disconnect();
       isInitialized.current = false;
     }
@@ -36,7 +27,6 @@ export const useSocket = () => {
     // Cleanup on unmount
     return () => {
       // Don't disconnect on unmount in development for debugging
-      // if (process.env.NODE_ENV !== 'development') {
       if (import.meta.env.VITE_MODE !== "development") {
         if (isInitialized.current) {
           socketService.disconnect();

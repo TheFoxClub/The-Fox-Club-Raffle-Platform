@@ -686,6 +686,20 @@ class RaffleController {
         `Raffle created successfully: ${raffle.id} by user ${user.pubkey}`
       );
 
+      // Emit Socket.IO event for new raffle creation
+      SocketService.emitGlobalUpdate("raffle-list-updated", {
+        raffleId: raffle.id,
+        action: "raffle_created",
+        status: raffleData.status,
+        raffle: {
+          id: raffleData.id,
+          title: raffleData.title,
+          ticketsSold: raffleData.ticketsSold,
+          totalTickets: raffleData.totalTickets,
+          status: raffleData.status,
+        },
+      });
+
       return respond(res, httpStatus.OK, "Raffle created successfully", {
         raffle: raffleData,
         requiresRewardTransfer: false,
@@ -1347,6 +1361,18 @@ class RaffleController {
           }
         );
 
+        // Emit Socket.IO event for reward claim update
+        SocketService.emitRaffleUpdate(raffleId, {
+          rewardClaimed: {
+            rewardId: reward.id,
+            winnerId: userId,
+            winnerPubkey: user.pubkey,
+            isClaimed: true,
+            claimedAt: new Date().toISOString(),
+            signature: signature,
+          },
+        });
+
         logger.info(
           `Reward ${rewardId} successfully claimed by user ${user.pubkey} with signature ${signature}`
         );
@@ -1997,6 +2023,12 @@ class RaffleController {
             as: "winnerTicket",
             attributes: ["id", "ticketNumber"],
           },
+          {
+            model: SplTokenSendTransaction,
+            as: "claimTransaction",
+            attributes: ["id", "txId", "status", "createdAt"],
+            required: false,
+          },
         ],
         order: [["createdAt", "DESC"]],
       });
@@ -2013,7 +2045,8 @@ class RaffleController {
         amount: parseFloat(win.amount),
         imageUrl: win.imageUrl,
         isClaimed: win.isClaimed,
-        claimedAt: null, // Will be fetched from claimTransaction if needed
+        claimedAt: win.claimTransaction?.createdAt || null,
+        claimSignature: win.claimTransaction?.txId || null,
         winDate: win.raffle?.endedAt || win.createdAt,
         ticketNumber: win.winnerTicket?.ticketNumber,
         raffleStatus: mapEnumValue(RAFFLE_STATUS, win.raffle?.status),

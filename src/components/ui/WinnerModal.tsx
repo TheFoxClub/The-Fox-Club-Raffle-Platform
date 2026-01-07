@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Button from "./Button";
 import type { RaffleReward, RaffleType } from "../../views/raffle/RaffleDetail";
 import Confetti from "react-confetti";
-import { RAFFLE_REWARD_TYPES } from "../../views/raffle/RaffleDetail";
+import { RAFFLE_REWARD_TYPES } from "../../config/constants";
 
 interface WinnerModalProps {
   raffle: RaffleType;

@@ -98,6 +98,7 @@ type Win = {
   imageUrl?: string;
   isClaimed: boolean;
   claimedAt?: string | null;
+  claimSignature?: string | null;
   winDate: string;
 };
 
@@ -1028,11 +1029,28 @@ const Profile = () => {
                             <CheckCircle className="h-5 w-5" />
                             <span>Claimed</span>
                           </div>
-                          <Link to={`/raffle/${win.raffleId}`}>
-                            <Button variant="outline" size="sm">
-                              View Raffle
-                            </Button>
-                          </Link>
+                          <div className="flex gap-2">
+                            {win.claimSignature && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  window.open(
+                                    `https://solscan.io/tx/${win.claimSignature}`,
+                                    "_blank"
+                                  )
+                                }
+                                className="flex items-center gap-1 text-xs text-white bg-primary"
+                              >
+                                View Transaction
+                              </Button>
+                            )}
+                            <Link to={`/raffle/raffle-${win.raffleId}`}>
+                              <Button variant="outline" size="sm">
+                                View Raffle
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
                       )}
                     </div>

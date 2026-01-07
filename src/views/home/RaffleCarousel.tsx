@@ -37,7 +37,6 @@ export default function RaffleCarousel() {
     const fetchFeatured = async () => {
       try {
         const res = await server.get("/raffle/featured");
-        console.log("API response:", res.data);
 
         if (res.data?.success) {
           const raw = res.data.data.raffles;
@@ -77,28 +76,63 @@ export default function RaffleCarousel() {
     const handleRaffleListUpdate = (data: any) => {
       console.log("Featured raffles - raffle list update received:", data);
 
-      // Update the specific raffle in the list if it exists
       if (data.raffleId) {
-        setRaffles((prevRaffles) => {
-          if (!prevRaffles) return prevRaffles;
+        // Handle new raffle creation - refresh featured raffles if needed
+        if (data.action === "raffle_created") {
+          console.log("New raffle created, refreshing featured raffles");
+          // For featured raffles, refresh the entire list
+          // Re-fetch featured raffles
+          server
+            .get("/raffle/featured")
+            .then((res) => {
+              if (res.data?.success) {
+                const raw = res.data.data.raffles;
+                const mapped = raw.map((r: any) => ({
+                  id: r.id,
+                  title: r.title,
+                  description: r.description,
+                  price: r.ticketPrice,
+                  sold: Number(r.ticketsSold ?? 0),
+                  total: Number(r.totalTickets),
+                  image: r.imageUrl,
+                  tokenType:
+                    r.tokenType === 0
+                      ? "SOL"
+                      : r.tokenType === 1
+                      ? "USDT"
+                      : r.tokenType === 2
+                      ? "BONK"
+                      : "USDC",
+                  isVerified: r.raffle_detail?.requiresNftVerification ?? false,
+                }));
+                setRaffles(mapped);
+              }
+            })
+            .catch((error) => {
+              console.error("Failed to refresh featured raffles", error);
+            });
+        } else {
+          setRaffles((prevRaffles) => {
+            if (!prevRaffles) return prevRaffles;
 
-          return prevRaffles.map((raffle) => {
-            if (raffle.id === data.raffleId) {
-              return {
-                ...raffle,
-                sold:
-                  data.ticketsSold !== undefined
-                    ? data.ticketsSold
-                    : raffle.sold,
-                total:
-                  data.totalTickets !== undefined
-                    ? data.totalTickets
-                    : raffle.total,
-              };
-            }
-            return raffle;
+            return prevRaffles.map((raffle) => {
+              if (raffle.id === data.raffleId) {
+                return {
+                  ...raffle,
+                  sold:
+                    data.ticketsSold !== undefined
+                      ? data.ticketsSold
+                      : raffle.sold,
+                  total:
+                    data.totalTickets !== undefined
+                      ? data.totalTickets
+                      : raffle.total,
+                };
+              }
+              return raffle;
+            });
           });
-        });
+        }
       }
     };
 

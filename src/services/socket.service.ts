@@ -8,7 +8,6 @@ class SocketService {
 
   connect(userId?: number, userPubkey?: string) {
     if (this.socket?.connected) {
-      console.log("🔌 Socket already connected:", this.socket.id);
       return this.socket;
     }
 
@@ -16,15 +15,6 @@ class SocketService {
     const baseApiUrl =
       import.meta.env.VITE_BASE_API_URL || "http://localhost:8080/api";
     const serverUrl = baseApiUrl.replace("/api", "");
-
-    console.log("🔌 Connecting to Socket.IO server:", serverUrl);
-    console.log("🔌 Environment variables:", {
-      VITE_BASE_API_URL: import.meta.env.VITE_BASE_API_URL,
-      VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
-      calculated_serverUrl: serverUrl,
-      NODE_ENV: import.meta.env.NODE_ENV,
-      MODE: import.meta.env.MODE,
-    });
 
     try {
       this.socket = io(serverUrl, {
@@ -34,31 +24,16 @@ class SocketService {
         forceNew: true, // Force a new connection
       });
 
-      console.log("🔌 Socket.IO client created, setting up event listeners...");
       this.setupEventListeners();
 
       // Join with user info if provided
       if (userId && userPubkey) {
-        console.log("🔌 Will join with user info after connection:", {
-          userId,
-          userPubkey,
-        });
         // Wait a bit for connection to establish
         setTimeout(() => {
           if (this.socket?.connected) {
-            console.log("🔌 Emitting join event with user info:", {
-              userId,
-              userPubkey,
-            });
             this.socket.emit("join", { userId, userPubkey });
-          } else {
-            console.warn(
-              "🔌 Socket not connected after timeout, cannot join with user info"
-            );
           }
         }, 1000);
-      } else {
-        console.log("🔌 No user info provided, connecting without user data");
       }
 
       return this.socket;
@@ -72,13 +47,11 @@ class SocketService {
     if (!this.socket) return;
 
     this.socket.on("connect", () => {
-      console.log("🔌 Socket.IO connected:", this.socket?.id);
       this.isConnected = true;
       this.reconnectAttempts = 0;
     });
 
     this.socket.on("disconnect", (reason) => {
-      console.log("🔌 Socket.IO disconnected:", reason);
       this.isConnected = false;
 
       if (reason === "io server disconnect") {
@@ -93,111 +66,62 @@ class SocketService {
     });
 
     this.socket.on("joined", (data) => {
-      console.log("🔌 Joined Socket.IO:", data.message);
+      // console.log("🔌 Joined Socket.IO:", data.message);
     });
 
     this.socket.on("pong", (data) => {
-      console.log("🔌 Socket.IO pong:", data.timestamp);
+      // console.log("🔌 Socket.IO pong:", data.timestamp);
     });
   }
 
   private handleReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(
-        `🔌 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
-      );
 
       setTimeout(() => {
         this.socket?.connect();
       }, Math.pow(2, this.reconnectAttempts) * 1000); // Exponential backoff
-    } else {
-      console.error("🔌 Max reconnection attempts reached");
     }
   }
 
   // Room management
   joinRaffle(raffleId: number) {
-    console.log(`🔌 joinRaffle called for raffle ${raffleId}`);
-    console.log(`🔌 Socket state:`, {
-      socket: !!this.socket,
-      connected: this.socket?.connected,
-      socketId: this.socket?.id,
-    });
-
     if (this.socket?.connected) {
-      console.log(`🔌 Emitting join-raffle event for raffle ${raffleId}`);
       this.socket.emit("join-raffle", { raffleId });
-      console.log(`🔌 Joined raffle room: ${raffleId}`);
-    } else {
-      console.warn(
-        `🔌 Cannot join raffle room ${raffleId} - socket not connected`
-      );
-      console.warn(`🔌 Socket details:`, {
-        socketExists: !!this.socket,
-        socketConnected: this.socket?.connected,
-        isConnectedFlag: this.isConnected,
-      });
     }
   }
 
   leaveRaffle(raffleId: number) {
     if (this.socket?.connected) {
       this.socket.emit("leave-raffle", { raffleId });
-      console.log(`🔌 Left raffle room: ${raffleId}`);
     }
   }
 
   joinProfile(userId: number) {
     if (this.socket?.connected) {
       this.socket.emit("join-profile", { userId });
-      console.log(`🔌 Joined profile room: ${userId}`);
-    } else {
-      console.warn(
-        `🔌 Cannot join profile room ${userId} - socket not connected`
-      );
     }
   }
 
   // Event listeners
   onRaffleUpdate(callback: (data: any) => void) {
-    console.log("🔌 Registering raffle-updated event listener");
-    this.socket?.on("raffle-updated", (data) => {
-      console.log("🔌 Received raffle-updated event:", data);
-      callback(data);
-    });
+    this.socket?.on("raffle-updated", callback);
   }
 
   onTicketPurchase(callback: (data: any) => void) {
-    console.log("🔌 Registering ticket-purchased event listener");
-    this.socket?.on("ticket-purchased", (data) => {
-      console.log("🔌 Received ticket-purchased event:", data);
-      callback(data);
-    });
+    this.socket?.on("ticket-purchased", callback);
   }
 
   onRaffleEnded(callback: (data: any) => void) {
-    console.log("🔌 Registering raffle-ended event listener");
-    this.socket?.on("raffle-ended", (data) => {
-      console.log("🔌 Received raffle-ended event:", data);
-      callback(data);
-    });
+    this.socket?.on("raffle-ended", callback);
   }
 
   onWinnersSelected(callback: (data: any) => void) {
-    console.log("🔌 Registering winners-selected event listener");
-    this.socket?.on("winners-selected", (data) => {
-      console.log("🔌 Received winners-selected event:", data);
-      callback(data);
-    });
+    this.socket?.on("winners-selected", callback);
   }
 
   onRaffleStatusChanged(callback: (data: any) => void) {
-    console.log("🔌 Registering raffle-status-changed event listener");
-    this.socket?.on("raffle-status-changed", (data) => {
-      console.log("🔌 Received raffle-status-changed event:", data);
-      callback(data);
-    });
+    this.socket?.on("raffle-status-changed", callback);
   }
 
   onRaffleListUpdated(callback: (data: any) => void) {
