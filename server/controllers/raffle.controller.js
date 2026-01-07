@@ -33,6 +33,7 @@ const WinnerSelectionService = require("../services/raffles/winner-selection");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const { MIN_PAYOUT_AMOUNT } = require("../config/constants");
 const { BET_RECEIVER_WALLET } = require("../config/credentials");
+const SocketService = require("../services/socket.service");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -1917,6 +1918,15 @@ class RaffleController {
       }
 
       const result = await WinnerSelectionService.selectWinners(id);
+
+      // Emit Socket.IO event for manual winner selection
+      SocketService.emitWinnersSelected(id, {
+        numberOfWinners: result.numberOfWinners,
+        winners: result.winners,
+        selectionSeed: result.selectionSeed,
+        selectedAt: result.selectedAt,
+        selectionType: "manual",
+      });
 
       return respond(res, httpStatus.OK, "Winners selected successfully", {
         result,

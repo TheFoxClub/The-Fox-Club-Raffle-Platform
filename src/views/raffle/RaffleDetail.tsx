@@ -4,6 +4,7 @@ import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
 import Button from "../../components/ui/Button";
 import HostProfilePopover from "../../components/ui/HostProfilePopover";
+import socketService from "../../services/socket.service";
 
 import {
   Clock,
@@ -314,6 +315,86 @@ const RaffleDetail = () => {
   useEffect(() => {
     fetchRaffle();
   }, [fetchRaffle]);
+
+  // Socket.IO integration for real-time updates
+  useEffect(() => {
+    if (!raffleId) return;
+
+    const raffleIdNum = parseInt(raffleId);
+    if (isNaN(raffleIdNum)) return;
+
+    // Join raffle room for live updates
+    socketService.joinRaffle(raffleIdNum);
+
+    // Set up event listeners
+    const handleRaffleUpdate = (data: any) => {
+      console.log('Raffle update received:', data);
+      if (data.raffleId === raffleIdNum) {
+        console.log('Processing raffle update for current raffle:', data);
+        setRaffle(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            sold: data.ticketsSold || prev.sold,
+            total: data.totalTickets || prev.total,
+          };
+        });
+      }
+    };
+
+    const handleTicketPurchase = (data: any) => {
+      console.log('Ticket purchase received:', data);
+      if (data.raffleId === raffleIdNum) {
+        console.log('Processing ticket purchase for current raffle:', data);
+        setRaffle(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            sold: data.ticketsSold,
+            total: data.totalTickets || prev.total,
+          };
+        });
+        
+        // Show toast for other users (not the buyer)
+        if (publicKey && data.buyerPubkey !== publicKey.toBase58()) {
+          toast.info(`${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`);
+        }
+      }
+    };
+
+    const handleRaffleStatusChange = (data: any) => {
+      if (data.raffleId === raffleIdNum) {
+        console.log('Raffle status changed:', data);
+        if (data.newStatus === 'ENDED') {
+          toast.info(`Raffle has ended! ${data.reason === 'sold_out' ? 'All tickets sold!' : 'Time expired!'}`);
+          fetchRaffle(); // Refresh to get latest data
+        }
+      }
+    };
+
+    const handleWinnersSelected = (data: any) => {
+      if (data.raffleId === raffleIdNum) {
+        console.log('Winners selected:', data);
+        toast.success(`Winners have been selected! ${data.numberOfWinners} winner(s)`);
+        fetchRaffle(); // Refresh to show winners
+      }
+    };
+
+    // Register event listeners
+    socketService.onRaffleUpdate(handleRaffleUpdate);
+    socketService.onTicketPurchase(handleTicketPurchase);
+    socketService.onRaffleStatusChanged(handleRaffleStatusChange);
+    socketService.onWinnersSelected(handleWinnersSelected);
+
+    // Cleanup on unmount
+    return () => {
+      socketService.leaveRaffle(raffleIdNum);
+      socketService.offRaffleUpdate(handleRaffleUpdate);
+      socketService.offTicketPurchase(handleTicketPurchase);
+      socketService.offRaffleStatusChanged(handleRaffleStatusChange);
+      socketService.offWinnersSelected(handleWinnersSelected);
+    };
+  }, [raffleId, publicKey, fetchRaffle]);
 
   useEffect(() => {
     if (!raffle || !publicKey || !raffle.endedAt) return;

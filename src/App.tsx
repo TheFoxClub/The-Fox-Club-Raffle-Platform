@@ -18,6 +18,7 @@ import Loading from "./components/reusable/Loading";
 import "./index.css";
 import RaffleDetail from "./views/raffle/RaffleDetail";
 import EditProfile from "./views/profile/EditProfile";
+import { useSocket } from "./hooks/useSocket";
 
 // Admin imports
 import { AdminLayout } from "./components/admin/AdminLayout";
@@ -41,6 +42,9 @@ function App() {
   // }
 
   const dispatch = useAppDispatch();
+  
+  // Initialize Socket.IO connection
+  useSocket();
 
   useEffect(() => {
     dispatch(hydrateUserState());

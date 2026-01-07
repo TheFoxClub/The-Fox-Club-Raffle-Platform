@@ -28,6 +28,7 @@ import { setUser, setLoading } from "../../redux/userSlice";
 import { Link } from "react-router-dom";
 import ClaimReward from "../claim/ClaimReward";
 import ClaimPayout from "../payout/ClaimPayout";
+import socketService from "../../services/socket.service";
 import { toast } from "react-toastify";
 
 type HostedRaffle = {
@@ -218,6 +219,52 @@ const Profile = () => {
     if (user_info?.id) {
       fetchClaimableRewards();
     }
+  }, [user_info?.id]);
+
+  // Socket.IO integration for real-time payout updates
+  useEffect(() => {
+    if (!user_info?.id) return;
+
+    const handlePayoutUpdate = (data: any) => {
+      console.log("Payout update received:", data);
+
+      // Update hosted raffles data
+      setHostedRafflesData((prev) =>
+        prev.map((raffle) => {
+          if (raffle.id === data.raffleId) {
+            return {
+              ...raffle,
+              payoutInfo: {
+                ...raffle.payoutInfo,
+                claimedAmount: data.claimedAmount,
+                unclaimedAmount: Math.max(
+                  0,
+                  (raffle.payoutInfo?.claimableAmount || 0) - data.claimedAmount
+                ),
+                hasClaimed: true,
+                claimStatus: data.status,
+                claimSignature: data.signature,
+              },
+            };
+          }
+          return raffle;
+        })
+      );
+    };
+
+    const handleTransactionUpdate = (data: any) => {
+      console.log("Transaction update received:", data);
+    };
+
+    // Register event listeners
+    socketService.onPayoutUpdate(handlePayoutUpdate);
+    socketService.onTransactionUpdate(handleTransactionUpdate);
+
+    // Cleanup on unmount
+    return () => {
+      socketService.offPayoutUpdate(handlePayoutUpdate);
+      socketService.offTransactionUpdate(handleTransactionUpdate);
+    };
   }, [user_info?.id]);
 
   const fetchClaimableRewards = async () => {

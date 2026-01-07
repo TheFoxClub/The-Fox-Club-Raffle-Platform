@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import server from "../../config/server";
 import { useNavigate } from "react-router-dom";
+import socketService from "../../services/socket.service";
 // import { featuredRaffles } from "../../dummydata/featuredRaffles";
 import { formatPrice } from "../../helpers/formatPrice";
 
@@ -71,6 +72,75 @@ export default function RaffleCarousel() {
     fetchFeatured();
   }, []);
 
+  // Socket.IO integration for real-time updates (separate useEffect to avoid dependency issues)
+  useEffect(() => {
+    const handleRaffleListUpdate = (data: any) => {
+      console.log("Featured raffles - raffle list update received:", data);
+
+      // Update the specific raffle in the list if it exists
+      if (data.raffleId) {
+        setRaffles((prevRaffles) => {
+          if (!prevRaffles) return prevRaffles;
+
+          return prevRaffles.map((raffle) => {
+            if (raffle.id === data.raffleId) {
+              return {
+                ...raffle,
+                sold:
+                  data.ticketsSold !== undefined
+                    ? data.ticketsSold
+                    : raffle.sold,
+                total:
+                  data.totalTickets !== undefined
+                    ? data.totalTickets
+                    : raffle.total,
+              };
+            }
+            return raffle;
+          });
+        });
+      }
+    };
+
+    const handleTicketPurchase = (data: any) => {
+      console.log("Featured raffles - ticket purchase received:", data);
+
+      // Update the specific raffle's ticket count
+      if (data.raffleId) {
+        setRaffles((prevRaffles) => {
+          if (!prevRaffles) return prevRaffles;
+
+          return prevRaffles.map((raffle) => {
+            if (raffle.id === data.raffleId) {
+              return {
+                ...raffle,
+                sold:
+                  data.ticketsSold !== undefined
+                    ? data.ticketsSold
+                    : raffle.sold,
+                total:
+                  data.totalTickets !== undefined
+                    ? data.totalTickets
+                    : raffle.total,
+              };
+            }
+            return raffle;
+          });
+        });
+      }
+    };
+
+    // Register Socket.IO event listeners
+    socketService.onRaffleListUpdated(handleRaffleListUpdate);
+    socketService.onTicketPurchase(handleTicketPurchase);
+
+    // Cleanup event listeners
+    return () => {
+      socketService.offRaffleListUpdated(handleRaffleListUpdate);
+      socketService.offTicketPurchase(handleTicketPurchase);
+    };
+  }, []); // Empty dependency array to avoid re-registering listeners
+
   useEffect(() => {
     if (raffles.length < 2 || isHovered) return;
 
@@ -80,6 +150,8 @@ export default function RaffleCarousel() {
 
     return () => clearInterval(interval);
   }, [raffles.length, isHovered]);
+
+  if (raffles === null) return null;
 
   //if no raffles loaded yet
   if (raffles.length === 0) return null;

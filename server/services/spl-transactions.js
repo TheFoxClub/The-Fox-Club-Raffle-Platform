@@ -7,6 +7,7 @@ const {
 const { DEFAULT_COMMISSION } = require("../config/constants");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const logger = require("../util/logger");
+const SocketService = require("./socket.service");
 
 const getSplTokenSendTransactions = async () => {
   const now = Date.now();
@@ -203,6 +204,25 @@ const updateDbAndConfirmTransactions = async (op) => {
                 logger.info(
                   `Raffle ${existingTransaction.raffleId} after update - claimedAmount: ${updatedRaffle.claimedAmount}, claimableAmount: ${updatedRaffle.claimableAmount}`
                 );
+
+                // Get raffle owner for Socket.IO event
+                const raffleOwner = await Raffle.findOne({
+                  where: { id: existingTransaction.raffleId },
+                  attributes: ['userId']
+                });
+
+                if (raffleOwner) {
+                  // Emit Socket.IO event for payout update
+                  SocketService.emitPayoutUpdate(raffleOwner.userId, {
+                    raffleId: existingTransaction.raffleId,
+                    claimedAmount: updatedRaffle.claimedAmount,
+                    claimableAmount: updatedRaffle.claimableAmount,
+                    payoutAmount: payoutAmountInSOL,
+                    transactionId: existingTransaction.id,
+                    signature: existingTransaction.txId,
+                    status: 'confirmed',
+                  });
+                }
               }
             } else {
               logger.info(

@@ -1,7 +1,10 @@
 const express = require("express");
 const path = require("path");
+const { createServer } = require("http");
+const { Server } = require("socket.io");
 const { ALLOWED_ORIGINS, SERVER_PORT } = require("./config/credentials");
 const app = express();
+const httpServer = createServer(app);
 const port = SERVER_PORT;
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
@@ -75,12 +78,24 @@ if (process.env.NODE_ENV === "production") {
 
 require("./config/scheduler");
 
+// Initialize Socket.IO
+const io = new Server(httpServer, {
+  cors: {
+    origin: ALLOWED_ORIGINS,
+    credentials: true,
+  },
+});
+
+// Socket.IO connection handling
+require("./config/socket")(io);
+
 let server;
 
 if (port) {
-  server = app.listen(port, () => {
+  server = httpServer.listen(port, () => {
     console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+    console.log(`🔌[socket]: Socket.IO server is ready`);
   });
 } else {
-  server = app.listen();
+  server = httpServer.listen();
 }

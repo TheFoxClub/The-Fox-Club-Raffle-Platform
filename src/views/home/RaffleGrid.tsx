@@ -11,6 +11,7 @@ import {
 import { Link } from "react-router-dom";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import socketService from "../../services/socket.service";
 
 interface RaffleData {
   id: number;
@@ -133,6 +134,81 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
 
     fetchAllRaffles();
   }, [filters, fetchRafflesForTab]);
+
+  // Socket.IO integration for real-time updates (separate useEffect to avoid dependency issues)
+  useEffect(() => {
+    const updateRaffleInList = (
+      raffleId: number,
+      updateData: any,
+      setTargetList: React.Dispatch<React.SetStateAction<RaffleData[]>>
+    ) => {
+      setTargetList((prevRaffles) => {
+        return prevRaffles.map((raffle) => {
+          if (raffle.id === raffleId) {
+            return {
+              ...raffle,
+              ticketsSold:
+                updateData.ticketsSold !== undefined
+                  ? updateData.ticketsSold
+                  : raffle.ticketsSold,
+              totalTickets:
+                updateData.totalTickets !== undefined
+                  ? updateData.totalTickets
+                  : raffle.totalTickets,
+            };
+          }
+          return raffle;
+        });
+      });
+    };
+
+    const handleRaffleListUpdate = (data: any) => {
+      console.log("Raffle grid - raffle list update received:", data);
+
+      if (data.raffleId) {
+        // Update the raffle in all relevant lists
+        updateRaffleInList(data.raffleId, data, SetRaffles);
+        updateRaffleInList(data.raffleId, data, setEndedRaffles);
+        updateRaffleInList(data.raffleId, data, setUpcomingRaffles);
+      }
+    };
+
+    const handleTicketPurchase = (data: any) => {
+      console.log("Raffle grid - ticket purchase received:", data);
+
+      if (data.raffleId) {
+        // Update the raffle in all relevant lists
+        updateRaffleInList(data.raffleId, data, SetRaffles);
+        updateRaffleInList(data.raffleId, data, setEndedRaffles);
+        updateRaffleInList(data.raffleId, data, setUpcomingRaffles);
+      }
+    };
+
+    const handleRaffleStatusChange = (data: any) => {
+      console.log("Raffle grid - raffle status change received:", data);
+
+      if (data.raffleId) {
+        // For now, just refresh the data to ensure consistency
+        if (data.newStatus === "ENDED") {
+          // Raffle moved from live to ended
+          fetchRafflesForTab("live");
+          fetchRafflesForTab("ended");
+        }
+      }
+    };
+
+    // Register Socket.IO event listeners
+    socketService.onRaffleListUpdated(handleRaffleListUpdate);
+    socketService.onTicketPurchase(handleTicketPurchase);
+    socketService.onRaffleStatusChanged(handleRaffleStatusChange);
+
+    // Cleanup event listeners
+    return () => {
+      socketService.offRaffleListUpdated(handleRaffleListUpdate);
+      socketService.offTicketPurchase(handleTicketPurchase);
+      socketService.offRaffleStatusChanged(handleRaffleStatusChange);
+    };
+  }, [fetchRafflesForTab]); // Only depend on fetchRafflesForTab
 
   // Handle tab changes - fetch data only for the new tab if not already loaded with current filters
   const handleTabChange = async (newTab: string) => {

@@ -30,6 +30,7 @@ const {
 
 const { addCommissionToTransaction } = require("../services/commissions");
 const NFTService = require("../services/nft.service");
+const SocketService = require("../services/socket.service");
 
 const dotenv = require("dotenv");
 dotenv.config();
@@ -259,6 +260,44 @@ class TicketController {
                 isNFTHolder: isNFTHolder,
               },
             };
+
+            // Emit Socket.IO events for real-time updates
+            SocketService.emitTicketPurchase(raffleId, {
+              ticketCount: ticketCount,
+              ticketsSold: updatedRaffle.ticketsSold,
+              ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+              totalTickets: updatedRaffle.totalTickets,
+              buyerPubkey: pubkey,
+              ticketNumbers: tickets.map((t) => t.ticketNumber),
+              signature: signatureToStore,
+            });
+
+            // Emit raffle update for live data
+            SocketService.emitRaffleUpdate(raffleId, {
+              ticketsSold: updatedRaffle.ticketsSold,
+              ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+              totalRevenue: updatedRaffle.totalRevenue,
+              progressPercentage: ((updatedRaffle.ticketsSold / updatedRaffle.totalTickets) * 100).toFixed(2),
+            });
+
+            // Emit global raffle list update for home page
+            SocketService.emitGlobalUpdate("raffle-list-updated", {
+              raffleId: raffleId,
+              ticketsSold: updatedRaffle.ticketsSold,
+              totalTickets: updatedRaffle.totalTickets,
+              ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+              progressPercentage: ((updatedRaffle.ticketsSold / updatedRaffle.totalTickets) * 100).toFixed(2),
+              updateType: "ticket_purchase",
+            });
+
+            // Check if raffle is sold out and emit event
+            if (updatedRaffle.ticketsSold >= updatedRaffle.totalTickets) {
+              SocketService.emitRaffleStatusChange(raffleId, "LIVE", "ENDED", {
+                reason: "sold_out",
+                finalTicketsSold: updatedRaffle.ticketsSold,
+                totalTickets: updatedRaffle.totalTickets,
+              });
+            }
 
             return respond(
               res,
