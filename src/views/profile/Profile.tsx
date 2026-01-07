@@ -107,7 +107,6 @@ const Profile = () => {
   );
 
   const {
-    rafflesWon = 0,
     // reputation = 0,
     xp = 0,
     xpGoal = 15000,
@@ -115,6 +114,7 @@ const Profile = () => {
 
   const [ticketsBought, setTicketsBought] = useState(0);
   const [totalSolSpent, setTotalSolSpent] = useState(0);
+  const [rafflesWon, setRafflesWon] = useState(0);
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
     []
   );
@@ -160,6 +160,7 @@ const Profile = () => {
 
         setTicketsBought(resUser.data.data.ticketsBought || 0);
         setTotalSolSpent(resUser.data.data.totalSolSpent || 0);
+        setRafflesWon(resUser.data.data.rafflesWon || 0);
 
         dispatch(
           setUser({
