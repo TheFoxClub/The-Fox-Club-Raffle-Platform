@@ -6,6 +6,7 @@ import {
   TrendingUp,
   Users,
   Copy,
+  RefreshCw,
 } from "lucide-react";
 import { StatCard } from "../../components/admin/StatCard";
 import Button from "../../components/ui/Button";
@@ -50,34 +51,74 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        // Fetch top creators
-        const creatorsRes = await server.get("/admin/top-creators");
-        const creatorsData = creatorsRes.data.data;
-        setTopCreators(creatorsData);
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
 
-        // Fetch top raffles
-        const rafflesRes = await server.get("/admin/top-raffles");
-        const rafflesData = rafflesRes.data.data;
-        setTopRaffles(rafflesData);
-
-        // Fetch dashboard stats
-        const statsRes = await server.get("/admin/dashboard-stats");
-        setStats(statsRes.data.data);
-      } catch (error) {
-        console.error("Error fetching top creators:", error);
-      } finally {
-        setLoading(false);
-      }
+      const [creatorsRes, rafflesRes, statsRes] = await Promise.all([
+        server.get("admin/top-creators"),
+        server.get("/admin/top-raffles"),
+        server.get("/admin/dashboard-stats"),
+      ]);
+      setTopCreators(creatorsRes.data.data);
+      setTopRaffles(rafflesRes.data.data);
+      setStats(statsRes.data.data);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      toast.error("Failed to refresh dashboard data");
+    } finally {
+      setLoading(false);
     }
-    fetchData();
+  };
+
+  // useEffect(() => {
+  //   async function fetchData() {
+  //     try {
+  //       // Fetch top creators
+  //       const creatorsRes = await server.get("/admin/top-creators");
+  //       const creatorsData = creatorsRes.data.data;
+  //       setTopCreators(creatorsData);
+
+  //       // Fetch top raffles
+  //       const rafflesRes = await server.get("/admin/top-raffles");
+  //       const rafflesData = rafflesRes.data.data;
+  //       setTopRaffles(rafflesData);
+
+  //       // Fetch dashboard stats
+  //       const statsRes = await server.get("/admin/dashboard-stats");
+  //       setStats(statsRes.data.data);
+  //     } catch (error) {
+  //       console.error("Error fetching top creators:", error);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   }
+  //   fetchData();
+  // }, []);
+  useEffect(() => {
+    fetchDashboardData();
   }, []);
 
   if (loading) return <p>Loading dashboard...</p>;
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <p className="text-2xl font-bold">Dashboard Overview</p>
+        <Button
+          variant="default"
+          size="icon"
+          onClick={fetchDashboardData}
+          disabled={loading}
+          title="Refresh dashboard"
+          className="hover:bg-accent"
+        >
+          <RefreshCw
+            className={`h-5 w-5 ${
+              loading ? "animate-spin text-muted-foreground" : ""
+            }`}
+          />
+        </Button>
+      </div>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatCard

@@ -136,6 +136,7 @@ const RaffleDetail = () => {
   const [winnerModalVisible, setWinnerModalVisible] = useState(false);
   const [nonWinnerBannerVisible, setNonWinnerBannerVisible] = useState(false);
   const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
+  const [hostPhotoUrl, setHostPhotoUrl] = useState<string | null>(null);
   const winners = raffle?.winnersData ?? [];
 
   const TOKEN_MAP: Record<number, string> = {
@@ -281,6 +282,25 @@ const RaffleDetail = () => {
         };
 
         setRaffle(mappedRaffle);
+
+        if (mappedRaffle.hostId) {
+          try {
+            const hostRes = await server.get(
+              `/user/info/${mappedRaffle.hostId}`
+            );
+            if (
+              hostRes.data.success &&
+              hostRes.data.data.user?.user_info?.photoUrl
+            ) {
+              setHostPhotoUrl(
+                // `${server.defaults.baseURL}${hostRes.data.data.user.user_info.photoUrl}`
+                hostRes.data.data.user.user_info.photoUrl
+              );
+            }
+          } catch (err) {
+            console.error("Failed to fetch host photo:", err);
+          }
+        }
       } else {
         toast.error(res.data.message || "Failed to fetch raffle");
       }
@@ -697,9 +717,17 @@ const RaffleDetail = () => {
             <h2 className="text-base sm:text-lg font-bold">Hosted By</h2>
             <div className="flex items-center justify-between gap-3 sm:gap-4">
               <div className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-primary rounded-full flex items-center justify-center shrink-0">
-                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                </div>
+                {hostPhotoUrl ? (
+                  <img
+                    src={hostPhotoUrl}
+                    alt="Host"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-primary rounded-full flex items-center justify-center shrink-0">
+                    <User className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                )}
                 <div className="flex flex-col min-w-0">
                   <span className="sm:hidden">
                     {raffle.host.slice(0, 4)}…{raffle.host.slice(-4)}

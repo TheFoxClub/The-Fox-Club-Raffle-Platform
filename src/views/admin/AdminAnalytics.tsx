@@ -1,4 +1,11 @@
-import { TrendingUp, Users, Wallet, Activity, Copy } from "lucide-react";
+import {
+  TrendingUp,
+  Users,
+  Wallet,
+  Activity,
+  Copy,
+  RefreshCw,
+} from "lucide-react";
 import { StatCard } from "../../components/admin/StatCard";
 import {
   LineChart,
@@ -15,6 +22,7 @@ import {
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import Button from "../../components/ui/Button";
 
 interface VolumeData {
   date: string;
@@ -51,71 +59,69 @@ export default function AdminAnalytics() {
   const shortWallet = (wallet: string) =>
     wallet.slice(0, 4) + "..." + wallet.slice(-4);
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const { data: res } = await server.get("/analytics");
-        if (res.success) {
-          const data = res.data;
-          // KPIs
-          setKpiData({
-            totalUsers: data.totalUsers,
-            activeWallets: data.activeUsers,
-            avgTicketPrice: data.averageTicketPrice.average,
-            growthRate: data.growthRate.percentage,
-          });
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
 
-          const mappedVolume = data.volumeOverTime.map((v: any) => ({
+      const { data: res } = await server.get("/analytics");
+      if (res.success) {
+        const data = res.data;
+
+        setKpiData({
+          totalUsers: data.totalUsers,
+          activeWallets: data.activeUsers,
+          avgTicketPrice: data.averageTicketPrice.average,
+          growthRate: data.growthRate.percentage,
+        });
+
+        setVolumeData(
+          data.volumeOverTime.map((v: any) => ({
             date: v.date,
             volume: v.totalVolume,
-          }));
-          setVolumeData(mappedVolume);
+          }))
+        );
 
-          const colors = [
-            "hsl(10 85% 58%)",
-            "hsl(25 90% 55%)",
-            "hsl(38 95% 52%)",
-            "hsl(240 5% 26%)",
-          ];
+        const colors = [
+          "hsl(10 85% 58%)",
+          "hsl(25 90% 55%)",
+          "hsl(38 95% 52%)",
+          "hsl(240 5% 26%)",
+        ];
 
-          // Token type mapping
-          const TOKEN_LABELS: Record<string, string> = {
-            SOLANA: "SOL",
-            USDC: "USDC",
-          };
+        const TOKEN_LABELS: Record<string, string> = {
+          SOLANA: "SOL",
+          USDC: "USDC",
+        };
 
-          const mappedTokens = data.volumeByTokenType.map(
-            (t: any, index: number) => ({
-              name: TOKEN_LABELS[t.tokenType] || t.tokenType, // fallback to original
-              value: t.percentage,
-              color: colors[index % colors.length],
-            })
-          );
-
-          setTokenData(mappedTokens);
-
-          const { data: leaderboardRes } = await server.get(
-            "/admin/leaderboard"
-          );
-          if (leaderboardRes.success) {
-            const topBuyers = leaderboardRes.data.topBuyers.map((b: any) => ({
-              wallet: b.walletAddress,
-              spending: `${b.totalSpent} ${
-                b.tokenType === "SOLANA" ? "SOL" : b.tokenType
-              }`,
-              raffles: b.ticketsBought,
-            }));
-            setTopWallets(topBuyers);
-          }
-
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Failed to fetch analytics:", error);
-        setLoading(false);
+        setTokenData(
+          data.volumeByTokenType.map((t: any, index: number) => ({
+            name: TOKEN_LABELS[t.tokenType] || t.tokenType,
+            value: t.percentage,
+            color: colors[index % colors.length],
+          }))
+        );
       }
-    };
 
+      const { data: leaderboardRes } = await server.get("/admin/leaderboard");
+      if (leaderboardRes.success) {
+        setTopWallets(
+          leaderboardRes.data.topBuyers.map((b: any) => ({
+            wallet: b.walletAddress,
+            spending: `${b.totalSpent} ${
+              b.tokenType === "SOLANA" ? "SOL" : b.tokenType
+            }`,
+            raffles: b.ticketsBought,
+          }))
+        );
+      }
+    } catch (error) {
+      toast.error("Failed to refresh analytics");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAnalytics();
   }, []);
 
@@ -137,6 +143,23 @@ export default function AdminAnalytics() {
 
   return (
     <div className="space-y-6">
+      {/* Page-level refresh */}
+      <div className="flex justify-end">
+        <Button
+          variant="default"
+          onClick={fetchAnalytics}
+          disabled={loading}
+          title="Refresh analytics"
+          className="bg-accent"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${
+              loading ? "animate-spin text-muted-foreground" : ""
+            }`}
+          />
+        </Button>
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
