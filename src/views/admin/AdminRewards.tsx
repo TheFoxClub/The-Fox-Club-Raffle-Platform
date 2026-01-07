@@ -6,6 +6,7 @@ import {
   Trash2,
   Plus,
   Copy,
+  RefreshCw,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Progress } from "../../components/ui/Progress";
@@ -165,25 +166,25 @@ export default function AdminRewards() {
     }
   };
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [leaderboardRes, walletRes] = await Promise.all([
-          server.get("/admin/leaderboard"),
-          server.get("/pool"),
-        ]);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [leaderboardRes, walletRes] = await Promise.all([
+        server.get("/admin/leaderboard"),
+        server.get("/pool"),
+      ]);
 
-        setTopHosts(leaderboardRes.data.data.topHosts);
-        setTopBuyers(leaderboardRes.data.data.topBuyers);
-        setEligibleWallets(walletRes.data.data.rows);
-      } catch (error) {
-        console.error("Failed to load admin data", error);
-        toast.error("Failed to load admin data");
-      } finally {
-        setLoading(false);
-      }
+      setTopHosts(leaderboardRes.data.data.topHosts);
+      setTopBuyers(leaderboardRes.data.data.topBuyers);
+      setEligibleWallets(walletRes.data.data.rows);
+    } catch (error) {
+      toast.error("Failed to refresh dashboard");
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -206,6 +207,24 @@ export default function AdminRewards() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Page-level actions */}
+      <div className="flex justify-end">
+        <Button
+          variant="default"
+          size="icon"
+          onClick={fetchData}
+          disabled={loading}
+          title="Refresh Rewards Data"
+          className="hover:bg-accent"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${
+              loading ? "animate-spin text-muted-foreground" : ""
+            }`}
+          />
+        </Button>
+      </div>
+
       {/* Reward Pool Status */}
       <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">

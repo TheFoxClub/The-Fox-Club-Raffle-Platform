@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trophy, Download, RotateCcw, Copy } from "lucide-react";
+import { Trophy, Download, RotateCcw, Copy, RefreshCw } from "lucide-react";
 import Button from "../../components/ui/Button";
 import {
   Tabs,
@@ -32,40 +32,43 @@ export default function AdminLeaderboards() {
     return `${amount} ${TOKEN_LABELS[tokenType] ?? tokenType}`;
   };
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await server.get("/admin/leaderboard");
-        const { topHosts, topBuyers } = res.data.data;
+  const fetchLeaderboards = async () => {
+    try {
+      setLoading(true);
+      const res = await server.get("/admin/leaderboard");
+      const { topHosts, topBuyers } = res.data.data;
 
-        setTopHosts(
-          topHosts.map((host: any) => ({
-            walletAddress: host.walletAddress,
-            totalRevenue: host.totalRevenue,
-            tokenType: host.tokenType,
-            rafflesCount: host.rafflesCount,
-            xp: 0,
-            streak: 0,
-          }))
-        );
+      setTopHosts(
+        topHosts.map((host: any) => ({
+          walletAddress: host.walletAddress,
+          totalRevenue: host.totalRevenue,
+          tokenType: host.tokenType,
+          rafflesCount: host.rafflesCount,
+          xp: 0,
+          streak: 0,
+        }))
+      );
 
-        setTopBuyers(
-          topBuyers.map((buyer: any) => ({
-            walletAddress: buyer.walletAddress,
-            spending: buyer.totalSpent,
-            tokenType: buyer.tokenType,
-            tickets: buyer.ticketsBought,
-            xp: 0,
-            streak: 0,
-          }))
-        );
-      } catch (error) {
-        console.error("Error fetching top hosts:", error);
-      } finally {
-        setLoading(false);
-      }
+      setTopBuyers(
+        topBuyers.map((buyer: any) => ({
+          walletAddress: buyer.walletAddress,
+          spending: buyer.totalSpent,
+          tokenType: buyer.tokenType,
+          tickets: buyer.ticketsBought,
+          xp: 0,
+          streak: 0,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching leaderboards:", error);
+      toast.error("Failed to refresh leaderboards");
+    } finally {
+      setLoading(false);
     }
-    fetchData();
+  };
+
+  useEffect(() => {
+    fetchLeaderboards();
   }, []);
 
   if (loading) return <p>Loading leaderboards...</p>;
@@ -101,6 +104,20 @@ export default function AdminLeaderboards() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="default"
+            size="icon"
+            onClick={fetchLeaderboards}
+            disabled={loading}
+            title="Refresh leaderboards"
+            className="hover:bg-accent"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading ? "animate-spin text-muted-foreground" : ""
+              }`}
+            />
+          </Button>
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Copy } from "lucide-react";
+import { Plus, Trash2, Copy, RefreshCw } from "lucide-react";
 import Button from "../../components/ui/Button";
 // import { Input } from "../../components/ui/Input";
 // import { Label } from "../../components/ui/Label";
@@ -84,18 +84,21 @@ export default function AdminTokens() {
   }, [open, user.isAuthenticated, user.pubkey]);
 
   // Fetch verified tokens from API
-  useEffect(() => {
-    const fetchVerifiedTokens = async () => {
-      try {
-        const res = await server.get("/admin/verified-token");
-        const tokens = res.data?.data?.tokens || [];
-        setVerifiedTokens(tokens);
-      } catch (err) {
-        console.error("Failed to fetch verified tokens", err);
-        setVerifiedTokens([]);
-      }
-    };
+  const fetchVerifiedTokens = async () => {
+    try {
+      setLoading(true);
+      const res = await server.get("/admin/verified-token");
+      setVerifiedTokens(res.data?.data?.tokens || []);
+    } catch (err) {
+      console.error("Failed to fetch verified tokens", err);
+      toast.error("Failed to refresh tokens");
+      setVerifiedTokens([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchVerifiedTokens();
   }, []);
 
@@ -188,82 +191,114 @@ export default function AdminTokens() {
   return (
     <div className="w-84 md:w-full">
       {/* Header */}
-      <div className="flex flex-col mb-4 md:items-center md:flex-row justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Token Management</h2>
-          <p className="text-muted-foreground">
-            Configure supported tokens and their fees
-          </p>
+      <div className="flex flex-col mb-4 sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-start justify-between sm:items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Token Management</h2>
+            <p className="text-muted-foreground">
+              Configure supported tokens and their fees
+            </p>
+          </div>
+          <Button
+            variant="default"
+            size="icon"
+            onClick={fetchVerifiedTokens}
+            disabled={loading}
+            title="Refresh tokens"
+            className="sm:hidden hover:bg-accent"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading ? "animate-spin text-muted-foreground" : ""
+              }`}
+            />
+          </Button>
         </div>
+        <div className="flex flex-col mb-4 gap-3 sm:items-center sm:flex-row justify-between sm:justify-end">
+          <Button
+            variant="default"
+            size="icon"
+            onClick={fetchVerifiedTokens}
+            disabled={loading}
+            title="Refresh tokens"
+            className="hidden sm:flex hover:bg-accent"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading ? "animate-spin text-muted-foreground" : ""
+              }`}
+            />
+          </Button>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Token
-            </Button>
-          </DialogTrigger>
-
-          <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Select Token from Your Wallet</DialogTitle>
-            </DialogHeader>
-
-            {loading ? (
-              <p className="text-center py-6 text-muted-foreground">
-                Loading tokens...
-              </p>
-            ) : tokenCandidates.length === 0 ? (
-              <p className="text-center py-6 text-muted-foreground">
-                No tokens found in your wallet.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {tokenCandidates.map((token) => {
-                  const isSelected = selectedToken?.mint === token.mint;
-
-                  return (
-                    <button
-                      key={token.mint}
-                      type="button"
-                      onClick={() => handleSelectToken(token)}
-                      disabled={isSelected}
-                      className={`group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2 ${
-                        isSelected
-                          ? "border-green-500 opacity-50 cursor-not-allowed"
-                          : "border-border hover:border-primary hover:scale-105"
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">
-                          {token.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          Mint: {token.mint}
-                        </p>
-                      </div>
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                          Selected
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="flex justify-end mt-4">
-              <Button
-                className="gradient-primary"
-                disabled={!selectedToken}
-                onClick={handleAddVerifiedToken}
-              >
-                Add
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Token
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+
+            <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Select Token from Your Wallet</DialogTitle>
+              </DialogHeader>
+
+              {loading ? (
+                <p className="text-center py-6 text-muted-foreground">
+                  Loading tokens...
+                </p>
+              ) : tokenCandidates.length === 0 ? (
+                <p className="text-center py-6 text-muted-foreground">
+                  No tokens found in your wallet.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {tokenCandidates.map((token) => {
+                    const isSelected = selectedToken?.mint === token.mint;
+
+                    return (
+                      <button
+                        key={token.mint}
+                        type="button"
+                        onClick={() => handleSelectToken(token)}
+                        disabled={isSelected}
+                        className={`group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2 ${
+                          isSelected
+                            ? "border-green-500 opacity-50 cursor-not-allowed"
+                            : "border-border hover:border-primary hover:scale-105"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">
+                            {token.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            Mint: {token.mint}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                            Selected
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-end mt-4">
+                <Button
+                  className="gradient-primary"
+                  disabled={!selectedToken}
+                  onClick={handleAddVerifiedToken}
+                >
+                  Add
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Tokens Table */}

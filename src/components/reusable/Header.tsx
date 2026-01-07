@@ -98,7 +98,7 @@ export const Header = () => {
         </div>
         {/* Wallet & Create Button */}
         <div className="flex items-center gap-2  relative">
-          {connected && (
+          {user.isAuthenticated && connected && (
             <Link to="/create">
               <Button
                 variant="outline"
@@ -157,33 +157,42 @@ export const Header = () => {
           </Link>
 
           {/* Hamburger Menu */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-md hover:bg-accent ml-auto"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </button>
+          {user.isAuthenticated && (
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-md hover:bg-accent ml-auto"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Mobile Dropdown Menu */}
-        {mobileMenuOpen && (
+        {mobileMenuOpen && user.isAuthenticated && (
           <div className="w-full md:hidden flex flex-col gap-2 mt-2 border-t border-border/50 pt-2">
-            {user.isAuthenticated && (
-              <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>
-                <Button
-                  variant={isActive("/profile") ? "default" : "ghost"}
-                  className="w-full gap-2 cursor-pointer justify-center border border-border rounded-md hover:bg-accent"
-                  size="sm"
-                >
-                  <User className="h-4 w-4" /> Profile
-                </Button>
-              </Link>
-            )}
+            <Link to="/create" onClick={() => setMobileMenuOpen(false)}>
+              <Button
+                variant="outline"
+                className="w-full gap-2 justify-center hover:bg-accent"
+                size="sm"
+              >
+                <PlusCircle className="h-4 w-4" /> Create Raffle
+              </Button>
+            </Link>
+            <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>
+              <Button
+                variant={isActive("/profile") ? "default" : "ghost"}
+                className="w-full gap-2 cursor-pointer justify-center border border-border rounded-md hover:bg-accent"
+                size="sm"
+              >
+                <User className="h-4 w-4" /> Profile
+              </Button>
+            </Link>
 
             {user.isAdmin && (
               <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>

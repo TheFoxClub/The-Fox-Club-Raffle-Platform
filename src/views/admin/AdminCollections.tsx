@@ -7,6 +7,7 @@ import {
   Upload,
   FileSpreadsheet,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -52,8 +53,8 @@ export default function AdminCollections() {
 
   // FETCH VERIFIED COLLECTIONS
   const fetchCollections = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const res = await server.get("/admin/verified-collection");
       setCollections(
         Array.isArray(res.data?.data?.collections)
@@ -67,6 +68,7 @@ export default function AdminCollections() {
       );
     } catch (err) {
       console.error("Error fetching collections:", err);
+      toast.error("Failed to refresh collections");
     } finally {
       setLoading(false);
     }
@@ -252,13 +254,44 @@ export default function AdminCollections() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Verified Collections</h2>
-          <p className="text-muted-foreground">
-            Manage NFT collections that can host raffles
-          </p>
+        <div className="flex items-start justify-between sm:items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Verified Collections</h2>
+            <p className="text-muted-foreground">
+              Manage NFT collections that can host raffles
+            </p>
+          </div>
+          {/* Refresh Button */}
+          <Button
+            variant="default"
+            size="icon"
+            onClick={fetchCollections}
+            disabled={loading}
+            title="Refresh collections"
+            className="hover:bg-accent sm:hidden"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading ? "animate-spin text-muted-foreground" : ""
+              }`}
+            />
+          </Button>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 sm:items-center sm:justify-end">
+          <Button
+            variant="default"
+            size="icon"
+            onClick={fetchCollections}
+            disabled={loading}
+            title="Refresh collections"
+            className="hidden sm:flex hover:bg-accent"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading ? "animate-spin text-muted-foreground" : ""
+              }`}
+            />
+          </Button>
           <Button variant="outline" onClick={toggleBulkMode}>
             {bulkMode ? "Cancel Selection" : "Select Collections"}
           </Button>

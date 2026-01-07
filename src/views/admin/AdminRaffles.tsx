@@ -1,5 +1,14 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Edit, Ban, Star, Copy, Unlock } from "lucide-react";
+import {
+  Search,
+  Filter,
+  Edit,
+  Ban,
+  Star,
+  Copy,
+  Unlock,
+  RefreshCw,
+} from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import {
@@ -81,17 +90,23 @@ export default function AdminRaffles() {
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [isFeatured, setIsFeatured] = useState(false);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const fetchRaffles = async () => {
+    try {
+      setLoading(true);
+      const res = await server.get("/admin/raffles");
+      const mapped = res.data.data.raffles.map(mapRaffle);
+      setRaffles(mapped);
+    } catch (err) {
+      console.error("Error fetching raffles", err);
+      toast.error("Failed to refresh raffles");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchRaffles = async () => {
-      try {
-        const res = await server.get("/admin/raffles");
-        const mapped = res.data.data.raffles.map(mapRaffle);
-        setRaffles(mapped);
-      } catch (err) {
-        console.error("Error fetching raffles", err);
-      }
-    };
     fetchRaffles();
   }, []);
 
@@ -228,6 +243,25 @@ export default function AdminRaffles() {
 
   return (
     <div className="w-84 md:w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-2xl font-bold">Raffles Management</p>
+
+        <Button
+          variant="default"
+          size="icon"
+          onClick={fetchRaffles}
+          disabled={loading}
+          title="Refresh raffles"
+          className="hover:bg-accent"
+        >
+          <RefreshCw
+            className={`h-5 w-5 ${
+              loading ? "animate-spin text-muted-foreground" : ""
+            }`}
+          />
+        </Button>
+      </div>
       {/* Search and Filters */}
       <div className="glass-card p-4 sm:p-6 rounded-xl mb-4 border border-border/50">
         <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
