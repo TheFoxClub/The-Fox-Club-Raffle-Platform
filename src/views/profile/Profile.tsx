@@ -233,7 +233,7 @@ const Profile = () => {
       // Update hosted raffles data
       setHostedRafflesData((prev) =>
         prev.map((raffle) => {
-          if (raffle.id === data.raffleId) {
+          if (raffle.id === data.raffleId && raffle.payoutInfo) {
             return {
               ...raffle,
               payoutInfo: {

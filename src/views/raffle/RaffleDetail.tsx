@@ -446,22 +446,66 @@ const RaffleDetail = () => {
   }, [raffleId, publicKey, fetchRaffle]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // useEffect(() => {
+  //   if (!raffle || !publicKey || !raffle.endedAt) return;
+
+  //   const key = `raffle-${raffle.id}-result-seen`;
+  //   if (localStorage.getItem(key)) return;
+
+  //   const user = publicKey.toBase58();
+  //   const participated =
+  //     raffle.participants?.includes(user) ||
+  //     raffle.winnersData?.some((w) => w.winnerPubkey === user);
+
+  //   if (!participated) return;
+
+  //   // Filter rewards the user won
+  //   const userRewards = raffle.winnersData?.filter(
+  //     (winner) => winner.winnerPubkey === user
+  //   );
+
+  //   // If userRewards is empty or undefined, they are not a winner
+  //   const isWinner = (userRewards?.length ?? 0) > 0;
+
+  //   // allClaimed only matters if user is a winner
+  //   const allClaimed = isWinner
+  //     ? userRewards!.every((reward) => reward.isClaimed)
+  //     : false;
+
+  //   if (isWinner && !allClaimed) {
+  //     setWinnerModalVisible(true);
+  //   } else if (!isWinner) {
+  //     setNonWinnerBannerVisible(true);
+  //   }
+  // }, [raffle, publicKey]);
+
+  useEffect(() => {
     if (!raffle || !publicKey || !raffle.endedAt) return;
 
     const key = `raffle-${raffle.id}-result-seen`;
     if (localStorage.getItem(key)) return;
 
     const user = publicKey.toBase58();
-    if (!raffle.participants?.includes(user)) return;
 
-    // Check if user is a winner
-    const isWinner = raffle.winnersData?.some(
-      (winner) => winner.winnerPubkey === user
+    // Check if user participated
+    const participated = raffle.participants?.includes(user) || raffle.sold > 0;
+
+    if (!participated) return;
+
+    // Check if user won
+    const userRewards = raffle.winnersData?.filter(
+      (w) => w.winnerPubkey === user
     );
+    const isWinner = (userRewards?.length ?? 0) > 0;
 
     if (isWinner) {
-      setWinnerModalVisible(true);
+      const allClaimed = userRewards!.every((r) => r.isClaimed);
+      if (!allClaimed) setWinnerModalVisible(true);
     } else {
+      // Not a winner → show banner
       setNonWinnerBannerVisible(true);
     }
   }, [raffle, publicKey]);
