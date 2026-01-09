@@ -29,6 +29,32 @@ function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
+function TokenTableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <tr key={i} className="border-b border-border/30">
+          <td className="p-4">
+            <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-4 w-10 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-5 w-10 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-5 w-5 rounded bg-muted animate-pulse" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function AdminTokens() {
   const user = useSelector((state: RootState) => state.user);
   const [open, setOpen] = useState(false);
@@ -45,6 +71,8 @@ export default function AdminTokens() {
     }[]
   >([]);
   const [loading, setLoading] = useState(false);
+  const [loadingVerified, setLoadingVerified] = useState(false);
+
   const [selectedToken, setSelectedToken] = useState<{
     mint: string;
     name: string;
@@ -86,7 +114,7 @@ export default function AdminTokens() {
   // Fetch verified tokens from API
   const fetchVerifiedTokens = async () => {
     try {
-      setLoading(true);
+      setLoadingVerified(true);
       const res = await server.get("/admin/verified-token");
       setVerifiedTokens(res.data?.data?.tokens || []);
     } catch (err) {
@@ -94,7 +122,7 @@ export default function AdminTokens() {
       toast.error("Failed to refresh tokens");
       setVerifiedTokens([]);
     } finally {
-      setLoading(false);
+      setLoadingVerified(false);
     }
   };
 
@@ -203,7 +231,7 @@ export default function AdminTokens() {
             variant="default"
             size="icon"
             onClick={fetchVerifiedTokens}
-            disabled={loading}
+            disabled={loadingVerified}
             title="Refresh tokens"
             className="sm:hidden hover:bg-accent"
           >
@@ -219,7 +247,7 @@ export default function AdminTokens() {
             variant="default"
             size="icon"
             onClick={fetchVerifiedTokens}
-            disabled={loading}
+            disabled={loadingVerified}
             title="Refresh tokens"
             className="hidden sm:flex hover:bg-accent"
           >
@@ -317,22 +345,26 @@ export default function AdminTokens() {
             </thead>
 
             <tbody>
-              {/* Solana token first */}
-              <tr className="border-b border-border/30 hover:bg-muted/20 transition-colors">
-                <td className="p-4 font-medium">{solanaToken.name}</td>
-                <td className="p-4">
-                  <button
-                    className="flex items-center gap-1 hover:text-primary transition"
-                    onClick={() => copyToClipboard(solanaToken.mint)}
-                  >
-                    {truncateAddress(solanaToken.mint)}
-                    <Copy className="h-3 w-3 opacity-50 ml-1" />
-                  </button>
-                </td>
-                <td className="p-4 text-muted-foreground">
-                  {solanaToken.decimals}
-                </td>
-                {/* <td className="p-4">
+              {loadingVerified ? (
+                <TokenTableSkeleton />
+              ) : (
+                <>
+                  {/* Solana token first */}
+                  <tr className="border-b border-border/30 hover:bg-muted/20 transition-colors">
+                    <td className="p-4 font-medium">{solanaToken.name}</td>
+                    <td className="p-4">
+                      <button
+                        className="flex items-center gap-1 hover:text-primary transition"
+                        onClick={() => copyToClipboard(solanaToken.mint)}
+                      >
+                        {truncateAddress(solanaToken.mint)}
+                        <Copy className="h-3 w-3 opacity-50 ml-1" />
+                      </button>
+                    </td>
+                    <td className="p-4 text-muted-foreground">
+                      {solanaToken.decimals}
+                    </td>
+                    {/* <td className="p-4">
                   <Switch
                     checked={solanaVerified}
                     onCheckedChange={(val) => {
@@ -345,27 +377,27 @@ export default function AdminTokens() {
                     }}
                   />
                 </td> */}
-              </tr>
+                  </tr>
 
-              {verifiedTokens.map((token) => (
-                <tr
-                  key={token.id}
-                  className="border-b border-border/30 hover:bg-muted/20 transition-colors"
-                >
-                  <td className="p-4 font-medium">{token.name}</td>
-                  <td className="p-4">
-                    <button
-                      className="flex items-center gap-1 hover:text-primary transition"
-                      onClick={() => copyToClipboard(token.address)}
+                  {verifiedTokens.map((token) => (
+                    <tr
+                      key={token.id}
+                      className="border-b border-border/30 hover:bg-muted/20 transition-colors"
                     >
-                      {truncateAddress(token.address)}
-                      <Copy className="h-3 w-3 opacity-50 ml-1" />
-                    </button>
-                  </td>
-                  <td className="p-4 text-muted-foreground">
-                    {token.decimals}
-                  </td>
-                  {/* <td className="p-4">
+                      <td className="p-4 font-medium">{token.name}</td>
+                      <td className="p-4">
+                        <button
+                          className="flex items-center gap-1 hover:text-primary transition"
+                          onClick={() => copyToClipboard(token.address)}
+                        >
+                          {truncateAddress(token.address)}
+                          <Copy className="h-3 w-3 opacity-50 ml-1" />
+                        </button>
+                      </td>
+                      <td className="p-4 text-muted-foreground">
+                        {token.decimals}
+                      </td>
+                      {/* <td className="p-4">
                     <span className="text-accent font-medium">
                       {token.fee}%
                     </span>
@@ -377,35 +409,37 @@ export default function AdminTokens() {
                     </span>
                   </td> */}
 
-                  <td className="p-4 whitespace-nowrap">
-                    <Switch
-                      checked={token.isVerified}
-                      onCheckedChange={() => handleToggleVerify(token.id)}
-                      title={
-                        token.isVerified
-                          ? "Click to unverify this token"
-                          : "Click to verify this token"
-                      }
-                    />
-                  </td>
+                      <td className="p-4 whitespace-nowrap">
+                        <Switch
+                          checked={token.isVerified}
+                          onCheckedChange={() => handleToggleVerify(token.id)}
+                          title={
+                            token.isVerified
+                              ? "Click to unverify this token"
+                              : "Click to verify this token"
+                          }
+                        />
+                      </td>
 
-                  <td className="p-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {/* <Button variant="ghost" size="icon">
+                      <td className="p-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {/* <Button variant="ghost" size="icon">
                         <Edit className="h-4 w-4" />
                       </Button> */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        onClick={() => handleDeleteVerifiedToken(token.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => handleDeleteVerifiedToken(token.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
             </tbody>
           </table>
         </div>

@@ -120,11 +120,19 @@ const Profile = () => {
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
     []
   );
+
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
   const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>(
     []
   );
   const [wins, setWins] = useState<Win[]>([]);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [raffleToDelete, setRaffleToDelete] = useState<HostedRaffle | null>(
+    null
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [loadingRewards, setLoadingRewards] = useState(false);
 
   const formatEndDate = (dateString: string) => {
@@ -724,7 +732,10 @@ const Profile = () => {
                           <Button
                             variant="outline"
                             disabled={raffle.ticketsSold > 0}
-                            onClick={() => handleDeleteRaffle(raffle.id)}
+                            onClick={() => {
+                              setRaffleToDelete(raffle);
+                              setDeleteModalOpen(true);
+                            }}
                             className={`flex items-center gap-1 ${
                               raffle.ticketsSold === 0
                                 ? "text-red-500 border-red-500 hover:bg-red-500"
@@ -1060,6 +1071,56 @@ const Profile = () => {
             )}
           </TabsContent>
         </Tabs>
+        {deleteModalOpen && raffleToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <Card className="w-full max-w-md bg-card border border-border p-6">
+              <h3 className="text-lg font-bold mb-2">Delete Raffle</h3>
+
+              <p className="text-sm text-muted-foreground mb-4">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold text-foreground">
+                  {raffleToDelete.title}
+                </span>
+                ?
+                <br />
+                This action{" "}
+                <span className="text-foreground font-semibold">
+                  cannot be undone
+                </span>
+                .
+              </p>
+
+              <div className="flex justify-between gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setDeleteModalOpen(false);
+                    setRaffleToDelete(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  disabled={isDeleting}
+                  className="hover:bg-red-500 hover:text-white flex-1"
+                  onClick={async () => {
+                    if (!raffleToDelete) return;
+                    setIsDeleting(true);
+                    await handleDeleteRaffle(raffleToDelete.id);
+                    setIsDeleting(false);
+                    setDeleteModalOpen(false);
+                    setRaffleToDelete(null);
+                  }}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

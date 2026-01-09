@@ -83,6 +83,41 @@ const shortPubkey = (key: string) => {
   return key.slice(0, 4) + "..." + key.slice(-4);
 };
 
+function RafflesTableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <tr key={i} className="border-b border-border/30">
+          <td className="p-4">
+            <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-4 w-28 bg-muted rounded animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-5 w-14 bg-muted rounded animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-5 w-20 bg-muted rounded animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-6 w-16 bg-muted rounded animate-pulse" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function AdminRaffles() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -306,102 +341,115 @@ export default function AdminRaffles() {
               </tr>
             </thead>
             <tbody>
-              {filteredRaffles.map((raffle) => (
-                <tr
-                  key={raffle.id}
-                  className="border-b border-border/30 hover:bg-muted/20 transition-colors"
-                >
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      {raffle.featured && (
-                        <Star className="h-4 w-4 fill-accent text-accent" />
-                      )}
-                      <span className="font-medium">
-                        {highlightText(raffle.name, searchTerm)}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-muted-foreground">
-                    <button
-                      className="flex items-center gap-1 hover:text-primary transition"
-                      onClick={() => copyToClipboard(raffle.creator)}
-                    >
-                      {shortPubkey(raffle.creator)}
-                      <Copy className="h-3 w-3 opacity-50 ml-1" />
-                    </button>
-                  </td>
-                  <td className="p-4">
-                    <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
-                      {raffle.token}
-                    </span>
-                  </td>
-                  <td className="p-4">{formatPrice(raffle.price)}</td>
-                  <td className="p-4">
-                    <span className="text-sm">
-                      {raffle.sold}/{raffle.total}
-                    </span>
-                  </td>
-                  <td className="p-4 font-semibold text-primary">
-                    {raffle.totalRevenue.toFixed(2)} {raffle.token}
-                  </td>
-
-                  <td className="p-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        raffle.status === "Suspended"
-                          ? "bg-primary/20 text-primary"
-                          : raffle.status === "Live"
-                          ? "bg-green-500/20 text-green-500"
-                          : raffle.status === "Ended"
-                          ? "bg-muted text-muted-foreground"
-                          : "bg-secondary/20 text-secondary"
-                      }`}
-                    >
-                      {raffle.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedRaffle(raffle);
-                          setOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={
-                          raffle.status === "Suspended"
-                            ? "text-green-500 hover:text-green-600"
-                            : "text-destructive"
-                        }
-                        onClick={() =>
-                          handleToggleSuspend(
-                            raffle.id,
-                            raffle.status === "Suspended"
-                          )
-                        }
-                        title={
-                          raffle.status === "Suspended"
-                            ? "Unsuspend"
-                            : "Suspend"
-                        }
-                      >
-                        {raffle.status === "Suspended" ? (
-                          <Unlock className="h-4 w-4 " />
-                        ) : (
-                          <Ban className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
+              {loading ? (
+                <RafflesTableSkeleton />
+              ) : filteredRaffles.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="py-10 text-center text-muted-foreground"
+                  >
+                    No raffles found
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredRaffles.map((raffle) => (
+                  <tr
+                    key={raffle.id}
+                    className="border-b border-border/30 hover:bg-muted/20 transition-colors"
+                  >
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        {raffle.featured && (
+                          <Star className="h-4 w-4 fill-accent text-accent" />
+                        )}
+                        <span className="font-medium">
+                          {highlightText(raffle.name, searchTerm)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-muted-foreground">
+                      <button
+                        className="flex items-center gap-1 hover:text-primary transition"
+                        onClick={() => copyToClipboard(raffle.creator)}
+                      >
+                        {shortPubkey(raffle.creator)}
+                        <Copy className="h-3 w-3 opacity-50 ml-1" />
+                      </button>
+                    </td>
+                    <td className="p-4">
+                      <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                        {raffle.token}
+                      </span>
+                    </td>
+                    <td className="p-4">{formatPrice(raffle.price)}</td>
+                    <td className="p-4">
+                      <span className="text-sm">
+                        {raffle.sold}/{raffle.total}
+                      </span>
+                    </td>
+                    <td className="p-4 font-semibold text-primary">
+                      {raffle.totalRevenue.toFixed(2)} {raffle.token}
+                    </td>
+
+                    <td className="p-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          raffle.status === "Suspended"
+                            ? "bg-primary/20 text-primary"
+                            : raffle.status === "Live"
+                            ? "bg-green-500/20 text-green-500"
+                            : raffle.status === "Ended"
+                            ? "bg-muted text-muted-foreground"
+                            : "bg-secondary/20 text-secondary"
+                        }`}
+                      >
+                        {raffle.status}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedRaffle(raffle);
+                            setOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={
+                            raffle.status === "Suspended"
+                              ? "text-green-500 hover:text-green-600"
+                              : "text-destructive"
+                          }
+                          onClick={() =>
+                            handleToggleSuspend(
+                              raffle.id,
+                              raffle.status === "Suspended"
+                            )
+                          }
+                          title={
+                            raffle.status === "Suspended"
+                              ? "Unsuspend"
+                              : "Suspend"
+                          }
+                        >
+                          {raffle.status === "Suspended" ? (
+                            <Unlock className="h-4 w-4 " />
+                          ) : (
+                            <Ban className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
           <Dialog open={open} onOpenChange={setOpen}>
