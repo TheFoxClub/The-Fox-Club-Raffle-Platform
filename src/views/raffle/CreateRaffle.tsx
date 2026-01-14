@@ -25,7 +25,7 @@ import { useRef } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Transaction, Connection } from "@solana/web3.js";
+import { Transaction, Connection, VersionedTransaction } from "@solana/web3.js";
 
 // Constants for Token Program IDs
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -524,95 +524,185 @@ const CreateRaffle = () => {
         //UPDATE EXISTING DRAFT
         console.log("Updating existing draft:", draftId);
         res = await server.put(`/raffle/draft/${draftId}`, payload);
-      } else {
-        //CREATE A NEW RAFFLE
-        console.log("Creating new raffle/draft");
-        res = await server.post("/raffle/create", payload);
-      }
 
-      if (res.data.success) {
-        // Check if reward transfer is required
-        if (res.data.data.requiresRewardTransfer) {
+        // Drafts don't require reward transfer, so we can finish here
+        if (res.data.success) {
+          toast.success("Draft saved!");
+          await fetchDrafts();
+        }
+        return;
+      } else {
+        const hasRewards = selectedNFTs.length > 0 || selectedTokens.length > 0;
+
+        if (hasRewards) {
+          // Get reward transfer transaction WITHOUT creating raffle
+          const transferRes = await server.post(
+            "/raffle/prepare-reward-transfer",
+            {
+              rewards: payload.rewards,
+              fromAddress: publicKey.toString(),
+            }
+          );
+
+          if (!transferRes.data.success) {
+            throw new Error(
+              transferRes.data.message || "Failed to prepare reward transfer"
+            );
+          }
+
+          const { transaction, rewardTransferData } = transferRes.data.data;
+
           toast.info("Please sign the reward transfer transaction...");
 
           try {
-            const { transaction, rewardTransferData, raffleData } =
-              res.data.data;
-
-            // Create transaction object from base64
-            const tx = Transaction.from(Buffer.from(transaction, "base64"));
+            let tx;
+            let isVersioned = false;
+            try {
+              // Try legacy transaction first (for standard NFTs)
+              const txBytes = Uint8Array.from(atob(transaction), (c) =>
+                c.charCodeAt(0)
+              );
+              tx = Transaction.from(txBytes);
+              isVersioned = false;
+            } catch (error) {
+              try {
+                // Fallback to versioned transaction (for MPL Core NFTs)
+                const txBytes = Uint8Array.from(atob(transaction), (c) =>
+                  c.charCodeAt(0)
+                );
+                tx = VersionedTransaction.deserialize(txBytes);
+                isVersioned = true;
+              } catch (versionedError) {
+                console.error(
+                  "Failed to deserialize transaction:",
+                  error,
+                  versionedError
+                );
+                throw new Error("Failed to deserialize transaction");
+              }
+            }
 
             const signedTx = await signTransaction(tx);
 
-            const completeRes = await server.post("/raffle/complete-creation", {
-              signedTransaction: signedTx.serialize().toString("base64"),
-              raffleData,
-              rewardTransferData,
-            });
+            let serializedTransaction;
+            if (isVersioned) {
+              serializedTransaction = Buffer.from(
+                signedTx.serialize()
+              ).toString("base64");
+            } else {
+              serializedTransaction = Buffer.from(
+                signedTx.serialize()
+              ).toString("base64");
+            }
 
-            if (completeRes.data.success) {
-              const {
-                raffle,
-                signedTransaction: txToSubmit,
-                submitEndpoint,
-                raffleId,
-              } = completeRes.data.data;
+            const connection = new Connection(
+              import.meta.env.VITE_SOLANA_RPC_HOST ||
+                "https://api.devnet.solana.org"
+            );
 
-              const connection = new Connection(
-                import.meta.env.VITE_SOLANA_RPC_HOST ||
-                  "https://api.devnet.solana.org"
-              );
-              
-              const txBuffer = Buffer.from(txToSubmit, "base64");
-              const signature = await connection.sendRawTransaction(txBuffer);
-
-              const storeRes = await server.post(submitEndpoint, {
-                signature,
-                raffleId,
-                rewardTransferData,
+            let signature;
+            try {
+              const txBytes = Buffer.from(serializedTransaction, "base64");
+              signature = await connection.sendRawTransaction(txBytes, {
+                skipPreflight: true, // Skip preflight to avoid signature verification issues
+                maxRetries: 3, // Allow retries
+                preflightCommitment: "processed",
               });
 
-              if (storeRes.data.success) {
-                toast.success(
-                  "Raffle created successfully with reward transfer!"
-                );
-                const createdId = storeRes.data.data.raffle.id;
-                navigate(`/raffle/raffle-${createdId}`);
-              } else {
+              const confirmation = await connection.confirmTransaction(
+                {
+                  signature,
+                  blockhash: (await connection.getLatestBlockhash()).blockhash,
+                  lastValidBlockHeight: (
+                    await connection.getLatestBlockhash()
+                  ).lastValidBlockHeight,
+                },
+                "confirmed"
+              );
+
+              if (confirmation.value.err) {
                 throw new Error(
-                  storeRes.data.message ||
-                    "Failed to store reward transfer signature"
+                  `Transaction failed: ${JSON.stringify(
+                    confirmation.value.err
+                  )}`
                 );
               }
-            } else {
-              throw new Error(
-                completeRes.data.message || "Failed to complete raffle creation"
-              );
+            } catch (submitError: any) {
+              if (submitError.getLogs) {
+                try {
+                  const logs = await submitError.getLogs();
+                  console.error("DEBUG: Transaction logs:", logs);
+                } catch (logError) {
+                  console.error("DEBUG: Failed to get logs:", logError);
+                }
+              }
+
+              try {
+                const simulation = await connection.simulateTransaction(
+                  signedTx
+                );
+                console.error(
+                  "DEBUG: Simulation accounts:",
+                  simulation.value.accounts
+                );
+              } catch (simError) {
+                console.error("DEBUG: Simulation failed:", simError);
+              }
+
+              throw submitError;
             }
+
+            // Only NOW create the raffle with proof of successful reward transfer
+            res = await server.post("/raffle/create", {
+              ...payload,
+              rewardTransferSignature: signature,
+              rewardTransferData,
+            });
           } catch (signError: any) {
-            console.error("Transaction signing failed:", signError);
+            console.error("Reward transfer failed:", signError);
             if (signError.message?.includes("rejected")) {
-              toast.error("Transaction was rejected by wallet");
-            } else {
+              toast.error("Reward transfer was rejected by wallet");
+            } else if (
+              signError.message?.includes(
+                "Programmable NFTs (pNFTs) are not currently supported"
+              )
+            ) {
               toast.error(
-                `Failed to sign reward transfer: ${signError.message}`
+                "Programmable NFTs (pNFTs) are not supported yet. Please use Legacy NFTs instead."
               );
+            } else if (
+              signError.message?.includes(
+                "MPL Core NFTs are not currently supported"
+              )
+            ) {
+              toast.error(
+                "MPL Core NFTs are not supported yet. Please use Legacy NFTs instead."
+              );
+            } else if (
+              signError.message?.includes(
+                "Mixed reward types (NFT + SPL tokens) are not currently supported"
+              )
+            ) {
+              toast.error(
+                "Mixed rewards (NFT + SPL tokens) are not supported yet. Please use either NFTs only or SPL tokens only."
+              );
+            } else {
+              toast.error(`Reward transfer failed: ${signError.message}`);
             }
+            return; // Don't create raffle if reward transfer failed
           }
         } else {
-          // No reward transfer required (draft or no rewards)
-          toast.success(
-            status === "DRAFT" ? "Draft saved!" : "Raffle created!"
-          );
-
-          if (status === "DRAFT") {
-            // Re-fetch to get the latest draft with its ID
-            await fetchDrafts();
-          } else {
-            const createdId = res.data.data.raffle.id;
-            navigate(`/raffle/raffle-${createdId}`);
-          }
+          // No rewards, create raffle directly
+          res = await server.post("/raffle/create", payload);
         }
+      }
+
+      if (res.data.success) {
+        toast.success("Raffle created successfully!");
+        const createdId = res.data.data.raffle.id;
+        navigate(`/raffle/raffle-${createdId}`);
+      } else {
+        throw new Error(res.data.message || "Failed to create raffle");
       }
     } catch (e: any) {
       console.error("Raffle creation error:", e);

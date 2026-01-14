@@ -95,14 +95,19 @@ const sendMultipleSplTokenTx = async ({
           break;
 
         case RAFFLE_REWARD_TYPES.NFT:
-          // NFT transfer
+          // NFT transfers cannot be combined with other transfers in the same transaction
+          // If there are multiple rewards including NFTs, we need to handle them separately
+          if (splTokenSendSummary.length > 1) {
+            throw new Error("Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only.");
+          }
+
+          // Single NFT transfer
           try {
             const serializedTx = await addNftSendTransaction({
               transaction,
               mintAddresses: [
                 {
                   address: tokenAddress,
-                  authorityAddress: fromAccount,
                   nftType: "auto", // Auto-detect NFT type
                 },
               ],

@@ -7,8 +7,8 @@ const {
   SOLANA_RPC_POOL_DAS_API,
 } = require("../config/credentials");
 const redisClient = require("../util/redisClient");
+const { getUmi } = require("../config/solana");
 
-const umi = createUmi(SOLANA_RPC_POOL_DAS_API).use(dasApi());
 const CACHE_TTL = process.env.REDIS_TTL || 300;
 
 class NFTService {
@@ -47,7 +47,7 @@ class NFTService {
         searchParams.grouping = ["collection", collection];
       }
 
-      const result = await umi.rpc.searchAssets(searchParams);
+      const result = await getUmi().rpc.searchAssets(searchParams);
 
       const nfts = result.items.map((item) => ({
         mint: item.id,

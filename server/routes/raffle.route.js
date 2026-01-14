@@ -7,6 +7,9 @@ const router = express.Router();
 // Create a raffle
 router.post("/create", auth.bearer, RaffleController.createRaffle);
 
+// Prepare reward transfer transaction (without(before) creating raffle)
+router.post("/prepare-reward-transfer", auth.bearer, RaffleController.prepareRewardTransfer);
+
 // Complete raffle creation after reward transfer
 router.post("/complete-creation", auth.bearer, RaffleController.completeRaffleCreation);
 

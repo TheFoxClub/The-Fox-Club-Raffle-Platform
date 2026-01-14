@@ -393,6 +393,147 @@ class RaffleController {
     }
   }
 
+  static async prepareRewardTransfer(req, res) {
+    try {
+      const userId = req.payload?.id;
+      const { rewards, fromAddress } = req.body;
+
+      if (!Array.isArray(rewards) || rewards.length === 0) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "At least one reward is required"
+        );
+      }
+
+      if (!fromAddress) {
+        return respond(res, httpStatus.BAD_REQUEST, "fromAddress is required");
+      }
+
+      if (!BET_RECEIVER_WALLET) {
+        return respond(
+          res,
+          httpStatus.INTERNAL_SERVER_ERROR,
+          "Bet Receiver wallet not configured"
+        );
+      }
+
+      // Check for mixed reward types (NFT + SPL tokens) which are not supported
+      const hasNFT = rewards.some(
+        (reward) => reward.rewardType?.toUpperCase() === "NFT"
+      );
+      const hasSPLToken = rewards.some((reward) =>
+        ["SPL_TOKEN", "SPL_TOKEN_2022", "SOLANA"].includes(
+          reward.rewardType?.toUpperCase()
+        )
+      );
+
+      if (hasNFT && hasSPLToken) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only."
+        );
+      }
+
+      const splTokenSendSummary = rewards.map((reward, index) => {
+        let type;
+        let tokenAddress;
+        let amount = reward.amount || 1;
+
+        switch (reward.rewardType?.toUpperCase()) {
+          case "NFT":
+            type = RAFFLE_REWARD_TYPES.NFT;
+            tokenAddress = reward.mintAddress;
+            break;
+
+          case "SPL_TOKEN":
+            type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            tokenAddress = reward.mintAddress;
+            break;
+
+          case "SPL_TOKEN_2022":
+            type = RAFFLE_REWARD_TYPES.SPL_TOKEN_2022;
+            tokenAddress = reward.mintAddress;
+            break;
+
+          case "SOLANA":
+            type = RAFFLE_REWARD_TYPES.SOLANA;
+            tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+            break;
+
+          default:
+            // Default to SPL_TOKEN
+            type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            tokenAddress = reward.mintAddress;
+        }
+
+        return {
+          tokenAddress,
+          toAccount: BET_RECEIVER_WALLET,
+          amount,
+          type,
+          metadata: {
+            rewardName: reward.rewardName,
+            rewardType: reward.rewardType,
+            rewardIndex: index,
+          },
+        };
+      });
+
+      logger.info(
+        `Preparing reward transfer transaction for ${splTokenSendSummary.length} rewards from user ${fromAddress}`
+      );
+
+      // Create transaction for user to sign (but don't execute it yet)
+      const transferResponse = await sendMultipleSplTokenTx({
+        splTokenSendSummary,
+        solCommission: 0,
+        feePayer: fromAddress,
+        fromAccount: fromAddress,
+        isUserToPlatform: true,
+      });
+
+      if (!transferResponse.success) {
+        logger.error(
+          `Failed to create reward transfer transaction for user ${fromAddress}:`,
+          transferResponse.message
+        );
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `Failed to create reward transfer transaction: ${transferResponse.message}`
+        );
+      }
+
+      // Return transaction for user to sign
+      return respond(
+        res,
+        httpStatus.OK,
+        "Reward transfer transaction prepared",
+        {
+          transaction: transferResponse.data.serializedTx,
+          blockhash: transferResponse.data.blockhash,
+          rewardTransferData: {
+            rewards: rewards.map((reward, index) => ({
+              ...reward,
+              transferIndex: index,
+            })),
+            platformWallet: BET_RECEIVER_WALLET,
+            totalRewards: rewards.length,
+          },
+        }
+      );
+    } catch (err) {
+      logger.error("Error in prepareRewardTransfer:", err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
   static async createRaffle(req, res) {
     try {
       const userId = req.payload?.id;
@@ -427,6 +568,8 @@ class RaffleController {
         verifiedCollectionRequired,
         additionalJson,
         rewards,
+        rewardTransferSignature, // for proof of reward transfer
+        rewardTransferData, // for reward transfer metadata
       } = req.body;
 
       const raffleStatus = req.body.status || RAFFLE_STATUS.UPCOMING;
@@ -494,122 +637,19 @@ class RaffleController {
         );
       }
 
-      // For non-draft raffles, create reward transfer transaction
+      // For non-draft raffles, check reward transfer
       if (statusEnum !== RAFFLE_STATUS.DRAFT && rewards && rewards.length > 0) {
-        try {
-          const splTokenSendSummary = rewards.map((reward, index) => {
-            let type;
-            let tokenAddress;
-            let amount = reward.amount || 1;
-
-            switch (reward.rewardType?.toUpperCase()) {
-              case "NFT":
-                type = RAFFLE_REWARD_TYPES.NFT;
-                tokenAddress = reward.mintAddress;
-                break;
-
-              case "SPL_TOKEN":
-                type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
-                tokenAddress = reward.mintAddress;
-                break;
-
-              case "SPL_TOKEN_2022":
-                type = RAFFLE_REWARD_TYPES.SPL_TOKEN_2022;
-                tokenAddress = reward.mintAddress;
-                break;
-
-              case "SOLANA":
-                type = RAFFLE_REWARD_TYPES.SOLANA;
-                tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
-                break;
-
-              default:
-                // Default to SPL_TOKEN
-                type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
-                tokenAddress = reward.mintAddress;
-            }
-
-            return {
-              tokenAddress,
-              toAccount: BET_RECEIVER_WALLET,
-              amount,
-              type,
-              metadata: {
-                rewardName: reward.rewardName,
-                rewardType: reward.rewardType,
-                rewardIndex: index,
-              },
-            };
-          });
-
+        // If rewardTransferSignature is provided, rewards were already transferred
+        if (rewardTransferSignature) {
           logger.info(
-            `Creating reward transfer transaction for ${splTokenSendSummary.length} rewards from user ${user.pubkey}`
+            `Reward transfer already completed with signature: ${rewardTransferSignature}`
           );
-
-          // Create transaction for user to sign (but don't execute it yet)
-          const transferResponse = await sendMultipleSplTokenTx({
-            splTokenSendSummary,
-            solCommission: 0,
-            feePayer: user.pubkey,
-            fromAccount: user.pubkey,
-            isUserToPlatform: true,
-          });
-
-          if (!transferResponse.success) {
-            logger.error(
-              `Failed to create reward transfer transaction for user ${user.pubkey}:`,
-              transferResponse.message
-            );
-            return respond(
-              res,
-              httpStatus.BAD_REQUEST,
-              `Failed to create reward transfer transaction: ${transferResponse.message}`
-            );
-          }
-
-          // Return transaction for user to sign
-          return respond(
-            res,
-            httpStatus.OK,
-            "Reward transfer transaction created",
-            {
-              requiresRewardTransfer: true,
-              transaction: transferResponse.data.serializedTx,
-              blockhash: transferResponse.data.blockhash,
-              rewardTransferData: {
-                rewards: rewards.map((reward, index) => ({
-                  ...reward,
-                  transferIndex: index,
-                })),
-                platformWallet: BET_RECEIVER_WALLET,
-                totalRewards: rewards.length,
-              },
-              raffleData: {
-                title,
-                description,
-                imageUrl,
-                totalTickets,
-                ticketPrice,
-                tokenType,
-                startDate,
-                endDate,
-                numberOfWinners: totalWinners,
-                requiresNftVerification,
-                verifiedCollectionRequired,
-                additionalJson,
-                status: raffleStatus,
-              },
-            }
-          );
-        } catch (transferError) {
-          logger.error(
-            "Failed to create reward transfer transaction:",
-            transferError
-          );
+          // Proceed to create raffle since rewards are confirmed transferred
+        } else {
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            `Failed to create reward transfer transaction: ${transferError.message}`
+            "Reward transfer signature is required for raffles with rewards"
           );
         }
       }
