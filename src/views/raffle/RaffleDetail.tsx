@@ -80,6 +80,19 @@ export interface RaffleType {
   participants?: string[]; // list of all participants pubkeys
 }
 
+// Reward types mapping
+const RAFFLE_REWARD_TYPES = {
+  NFT: 0,
+  SPL_TOKEN: 1,
+  SPL_TOKEN_2022: 2,
+};
+
+// Default fallback images
+const DEFAULT_IMAGES = {
+  NFT: "/images/default-nft.png",
+  TOKEN: "/images/default-token.png",
+};
+
 const formatDateOnly = (dateStr: string) =>
   new Date(dateStr).toISOString().split("T")[0];
 
@@ -132,12 +145,54 @@ const RaffleDetail = () => {
   const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
   const [hostPhotoUrl, setHostPhotoUrl] = useState<string | null>(null);
   const winners = raffle?.winnersData ?? [];
+  const [nftImages, setNftImages] = useState<Record<string, string>>({});
 
   const TOKEN_MAP: Record<number, string> = {
     0: "SOL",
     1: "USDT",
     2: "BONK",
     3: "USDC",
+  };
+
+  const isNFTReward = (rewardType: number) =>
+    rewardType === RAFFLE_REWARD_TYPES.NFT;
+
+  const fetchNFTMetadata = useCallback(async (wallet: string) => {
+    try {
+      const res = await server.get(`/api/nfts/${wallet}`);
+      if (!res.data.success) return;
+
+      const nfts: any[] = res.data.data.nfts;
+      const images: Record<string, string> = {};
+
+      for (const nft of nfts) {
+        try {
+          if (!nft.uri) continue;
+          const metadataRes = await fetch(nft.uri);
+          if (!metadataRes.ok) continue;
+          const metadata = await metadataRes.json();
+          images[nft.mint] = metadata.image;
+        } catch (err) {
+          console.error("Failed to fetch NFT metadata for", nft.mint, err);
+        }
+      }
+      setNftImages(images);
+    } catch (err) {
+      console.error("Failed to fetch NFTs:", err);
+    }
+  }, []);
+
+  const getRewardImage = (reward: RaffleReward) => {
+    if (isNFTReward(reward.rewardType) && reward.mintAddress) {
+      return nftImages[reward.mintAddress] || DEFAULT_IMAGES.NFT;
+    }
+    if (
+      reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN ||
+      reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
+    ) {
+      return reward.imageUrl || DEFAULT_IMAGES.TOKEN;
+    }
+    return DEFAULT_IMAGES.TOKEN;
   };
 
   const handleBuyTickets = useCallback(async () => {
@@ -295,6 +350,15 @@ const RaffleDetail = () => {
             console.error("Failed to fetch host photo:", err);
           }
         }
+        // Fetch NFT metadata images if user won NFT
+        if (publicKey) {
+          const userWonNFT = mappedRaffle.winnersData?.some(
+            (w) =>
+              w.winnerPubkey === publicKey.toBase58() &&
+              isNFTReward(Number(w.rewardType))
+          );
+          if (userWonNFT) fetchNFTMetadata(publicKey.toBase58());
+        }
       } else {
         toast.error(res.data.message || "Failed to fetch raffle");
       }
@@ -304,7 +368,7 @@ const RaffleDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [raffleId]);
+  }, [raffleId, fetchNFTMetadata, publicKey]);
 
   useEffect(() => {
     if (!raffle?.endDate) return;
@@ -448,39 +512,6 @@ const RaffleDetail = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-
-  // useEffect(() => {
-  //   if (!raffle || !publicKey || !raffle.endedAt) return;
-
-  //   const key = `raffle-${raffle.id}-result-seen`;
-  //   if (localStorage.getItem(key)) return;
-
-  //   const user = publicKey.toBase58();
-  //   const participated =
-  //     raffle.participants?.includes(user) ||
-  //     raffle.winnersData?.some((w) => w.winnerPubkey === user);
-
-  //   if (!participated) return;
-
-  //   // Filter rewards the user won
-  //   const userRewards = raffle.winnersData?.filter(
-  //     (winner) => winner.winnerPubkey === user
-  //   );
-
-  //   // If userRewards is empty or undefined, they are not a winner
-  //   const isWinner = (userRewards?.length ?? 0) > 0;
-
-  //   // allClaimed only matters if user is a winner
-  //   const allClaimed = isWinner
-  //     ? userRewards!.every((reward) => reward.isClaimed)
-  //     : false;
-
-  //   if (isWinner && !allClaimed) {
-  //     setWinnerModalVisible(true);
-  //   } else if (!isWinner) {
-  //     setNonWinnerBannerVisible(true);
-  //   }
-  // }, [raffle, publicKey]);
 
   useEffect(() => {
     if (!raffle || !publicKey || !raffle.endedAt) return;
@@ -658,7 +689,7 @@ const RaffleDetail = () => {
                       className="flex items-center gap-3 sm:gap-6 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
                     >
                       <img
-                        src={reward.imageUrl}
+                        src={getRewardImage(reward)}
                         alt={reward.rewardName}
                         className="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover shrink-0"
                       />

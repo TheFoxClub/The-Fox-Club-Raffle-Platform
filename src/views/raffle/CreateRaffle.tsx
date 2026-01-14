@@ -562,7 +562,7 @@ const CreateRaffle = () => {
                 import.meta.env.VITE_SOLANA_RPC_HOST ||
                   "https://api.devnet.solana.org"
               );
-              
+
               const txBuffer = Buffer.from(txToSubmit, "base64");
               const signature = await connection.sendRawTransaction(txBuffer);
 
