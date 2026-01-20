@@ -389,8 +389,9 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
                   raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
-                isVerified: raffle.raffle_detail.requiresNftVerification,
-                isFeatured: raffle.raffle_detail.isFeatured,
+                 isVerified:
+                  raffle.raffle_detail?.requiresNftVerification || false,
+                isFeatured: raffle.raffle_detail?.isFeatured || false,
               };
 
               return (
