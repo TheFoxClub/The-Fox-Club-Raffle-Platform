@@ -71,13 +71,15 @@ export interface RaffleType {
   isVerified: boolean;
   isFeatured: boolean;
   prizeValue: string;
+  startDate?: string;
   endDate?: string;
   endedAt?: string;
   rewards?: RaffleReward[];
   winnersData?: Winner[];
   hasWinners?: boolean;
   winnersSelected?: boolean;
-  participants?: string[]; // list of all participants pubkeys
+  participants?: string[];
+  status?: number;
 }
 
 // Reward types mapping
@@ -85,6 +87,12 @@ const RAFFLE_REWARD_TYPES = {
   NFT: 0,
   SPL_TOKEN: 1,
   SPL_TOKEN_2022: 2,
+};
+
+const RAFFLE_STATUS = {
+  UPCOMING: 1,
+  LIVE: 2,
+  ENDED: 3,
 };
 
 // Default fallback images
@@ -96,10 +104,12 @@ const DEFAULT_IMAGES = {
 const formatDateOnly = (dateStr: string) =>
   new Date(dateStr).toISOString().split("T")[0];
 
-function formatCountdown(endDateStr: string) {
-  const end = new Date(endDateStr).getTime();
+function formatCountdown(targetDateStr: string) {
+  // const end = new Date(endDateStr).getTime();
+  const target = new Date(targetDateStr).getTime();
   const now = Date.now();
-  let diff = end - now;
+  let diff = target - now;
+  // let diff = end - now;
 
   if (diff <= 0) return "Ended";
 
@@ -142,7 +152,7 @@ const RaffleDetail = () => {
   const [showAllRewards, setShowAllRewards] = useState(false);
   const [winnerModalVisible, setWinnerModalVisible] = useState(false);
   const [nonWinnerBannerVisible, setNonWinnerBannerVisible] = useState(false);
-  const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
+  //const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
   const [hostPhotoUrl, setHostPhotoUrl] = useState<string | null>(null);
   const winners = raffle?.winnersData ?? [];
   const [nftImages, setNftImages] = useState<Record<string, string>>({});
@@ -235,14 +245,14 @@ const RaffleDetail = () => {
 
       if (!transactionResponse.data.success) {
         throw new Error(
-          transactionResponse.data.message || "Failed to create transaction"
+          transactionResponse.data.message || "Failed to create transaction",
         );
       }
 
       const { transaction } = transactionResponse.data.data;
 
       const solanaTransaction = Transaction.from(
-        Buffer.from(transaction, "base64")
+        Buffer.from(transaction, "base64"),
       );
 
       const signedTransaction = await signTransaction(solanaTransaction);
@@ -250,7 +260,7 @@ const RaffleDetail = () => {
       const connection = new Connection(SOLANA_RPC_HOST);
 
       const signature = await connection.sendRawTransaction(
-        signedTransaction.serialize()
+        signedTransaction.serialize(),
       );
 
       const confirmResponse = await storeSignature(
@@ -264,7 +274,7 @@ const RaffleDetail = () => {
         transactionResponse?.data?.data?.isNFTHolder,
         "sol",
         ticketCount,
-        raffle.id
+        raffle.id,
       );
 
       if (confirmResponse.success) {
@@ -273,7 +283,7 @@ const RaffleDetail = () => {
         await fetchRaffle();
       } else {
         throw new Error(
-          confirmResponse.data.message || "Failed to confirm purchase"
+          confirmResponse.data.message || "Failed to confirm purchase",
         );
       }
     } catch (error: any) {
@@ -320,6 +330,7 @@ const RaffleDetail = () => {
           isFeatured: data.raffle_detail?.isFeatured || false,
           prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
           // tokenMint: data.tokenMint,
+          startDate: data.startDate,
           endDate: data.endDate,
           endTime: "",
           endedAt: data.endedAt,
@@ -328,6 +339,7 @@ const RaffleDetail = () => {
           hasWinners: res.data.data.hasWinners || false,
           winnersSelected: res.data.data.winnersSelected || false,
           participants: data.participants || [],
+          status: data.status,
         };
 
         setRaffle(mappedRaffle);
@@ -335,7 +347,7 @@ const RaffleDetail = () => {
         if (mappedRaffle.hostId) {
           try {
             const hostRes = await server.get(
-              `/user/info/${mappedRaffle.hostId}`
+              `/user/info/${mappedRaffle.hostId}`,
             );
             if (
               hostRes.data.success &&
@@ -343,7 +355,7 @@ const RaffleDetail = () => {
             ) {
               setHostPhotoUrl(
                 // `${server.defaults.baseURL}${hostRes.data.data.user.user_info.photoUrl}`
-                hostRes.data.data.user.user_info.photoUrl
+                hostRes.data.data.user.user_info.photoUrl,
               );
             }
           } catch (err) {
@@ -355,7 +367,7 @@ const RaffleDetail = () => {
           const userWonNFT = mappedRaffle.winnersData?.some(
             (w) =>
               w.winnerPubkey === publicKey.toBase58() &&
-              isNFTReward(Number(w.rewardType))
+              isNFTReward(Number(w.rewardType)),
           );
           if (userWonNFT) fetchNFTMetadata(publicKey.toBase58());
         }
@@ -371,28 +383,51 @@ const RaffleDetail = () => {
   }, [raffleId, fetchNFTMetadata, publicKey]);
 
   useEffect(() => {
-    if (!raffle?.endDate) return;
-    const updateCountdown = () => {
-      const timeStr = formatCountdown(
-        raffle.endedAt ? raffle.endedAt : raffle.endDate!
-      );
-      setCountdown(timeStr);
-
-      // Live update: raffle ended
-      if (timeStr === "Ended" && !raffleEndedFetched) {
-        fetchRaffle();
-        setRaffleEndedFetched(true);
-      }
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, [raffle?.endDate, fetchRaffle, raffleEndedFetched]);
-
-  useEffect(() => {
     fetchRaffle();
   }, [fetchRaffle]);
+
+  // Countdown logic
+  useEffect(() => {
+    if (!raffle) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+
+      // Determine the target date based on status
+      let targetDateStr: string | null = null;
+
+      if (raffle.status === RAFFLE_STATUS.UPCOMING) {
+        targetDateStr = raffle.startDate!;
+      } else if (raffle.status === RAFFLE_STATUS.LIVE) {
+        targetDateStr = raffle.endDate!;
+      }
+
+      if (!targetDateStr) return;
+
+      const targetTime = new Date(targetDateStr).getTime();
+      const remaining = targetTime - now;
+
+      if (remaining <= 0) {
+        if (raffle.status === RAFFLE_STATUS.UPCOMING) {
+          // Automatically move to LIVE when start date is reached
+          setRaffle((prev) =>
+            prev ? { ...prev, status: RAFFLE_STATUS.LIVE } : prev,
+          );
+          setCountdown(formatCountdown(raffle.endDate!));
+        } else if (raffle.status === RAFFLE_STATUS.LIVE) {
+          // Automatically move to ENDED when end date is reached
+          setRaffle((prev) =>
+            prev ? { ...prev, status: RAFFLE_STATUS.ENDED } : prev,
+          );
+          setCountdown("Ended");
+        }
+      } else {
+        setCountdown(formatCountdown(targetDateStr));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [raffle]);
 
   // Socket.IO integration for real-time updates
   useEffect(() => {
@@ -452,7 +487,7 @@ const RaffleDetail = () => {
         // Show toast for other users (not the buyer)
         if (publicKey && data.buyerPubkey !== publicKey.toBase58()) {
           toast.info(
-            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`
+            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`,
           );
         }
       }
@@ -472,7 +507,7 @@ const RaffleDetail = () => {
                 data.reason === "sold_out"
                   ? "All tickets sold!"
                   : "Time expired!"
-              }`
+              }`,
             );
           }
           fetchRaffle(); // Refresh to get latest data
@@ -486,7 +521,7 @@ const RaffleDetail = () => {
         // Only show toast to users who have tickets in this raffle
         if (publicKey && raffle?.participants?.includes(publicKey.toBase58())) {
           toast.success(
-            `Winners have been selected! ${data.numberOfWinners} winner(s)`
+            `Winners have been selected! ${data.numberOfWinners} winner(s)`,
           );
         }
         fetchRaffle(); // Refresh to show winners
@@ -528,7 +563,7 @@ const RaffleDetail = () => {
 
     // Check if user won
     const userRewards = raffle.winnersData?.filter(
-      (w) => w.winnerPubkey === user
+      (w) => w.winnerPubkey === user,
     );
     const isWinner = (userRewards?.length ?? 0) > 0;
 
@@ -556,10 +591,20 @@ const RaffleDetail = () => {
     );
 
   const ticketsLeft = Math.max(raffle.total - raffle.sold, 0);
-  const totalCost = raffle.price * ticketCount;
+  // const totalCost = raffle.price * ticketCount;
+  const totalCost = Number((raffle.price * ticketCount).toPrecision(12));
 
-  const isEnded = countdown === "Ended" || !!raffle.endedAt;
+  const isUpcoming = raffle.status === RAFFLE_STATUS.UPCOMING;
+  const isLive = raffle.status === RAFFLE_STATUS.LIVE;
+  const isEnded = raffle.status === RAFFLE_STATUS.ENDED || !!raffle.endedAt;
+  //const isEnded = countdown === "Ended" || !!raffle.endedAt;
   const isSoldOut = raffle.total - raffle.sold <= 0;
+
+  const countdownTarget = isUpcoming
+    ? raffle.startDate
+    : isLive
+      ? raffle.endDate
+      : null;
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -867,7 +912,7 @@ const RaffleDetail = () => {
                   </span>
                 </div>
 
-                {!isSoldOut && !isEnded && (
+                {isLive && !isSoldOut && (
                   <span className="text-accent font-semibold text-xs sm:text-sm shrink-0">
                     {ticketsLeft} left
                   </span>
@@ -898,16 +943,16 @@ const RaffleDetail = () => {
               <div className="flex items-center gap-2 sm:gap-3">
                 <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
                 <span className="text-xs sm:text-sm text-muted-foreground">
-                  Ends In
+                  {isUpcoming ? "Starts In" : "Ends In"}
                 </span>
               </div>
               <span className="text-muted-foreground text-lg sm:text-xl font-bold">
-                {countdown}
+                {raffle.status === RAFFLE_STATUS.ENDED ? "Ended" : countdown}
               </span>
             </div>
 
             {/* Countdown */}
-            {!isEnded && !isSoldOut && (
+            {isLive && !isSoldOut && (
               <div className="space-y-2 sm:space-y-3">
                 <label className="text-xs sm:text-sm font-medium text-muted-foreground">
                   Number of Tickets
@@ -917,7 +962,9 @@ const RaffleDetail = () => {
                     variant="outline"
                     className="bg-background-50 h-9 w-9 sm:h-10 sm:w-10"
                     size="icon"
-                    onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
+                    onClick={() =>
+                      setTicketCount((prev) => Math.max(1, prev - 1))
+                    }
                     disabled={!connected || ticketsLeft === 0}
                   >
                     -
@@ -925,9 +972,15 @@ const RaffleDetail = () => {
                   <input
                     type="number"
                     value={ticketCount}
-                    onChange={(e) =>
-                      setTicketCount(Math.max(1, parseInt(e.target.value) || 1))
-                    }
+                    min={1}
+                    max={ticketsLeft}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+
+                      if (Number.isNaN(value)) return;
+
+                      setTicketCount(Math.min(Math.max(1, value), ticketsLeft));
+                    }}
                     className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold focus:ring-offset-2"
                     disabled={!connected || ticketsLeft === 0}
                   />
@@ -935,8 +988,14 @@ const RaffleDetail = () => {
                     variant="outline"
                     className="bg-background-50 h-9 w-9 sm:h-10 sm:w-10"
                     size="icon"
-                    onClick={() => setTicketCount(ticketCount + 1)}
-                    disabled={!connected || ticketsLeft === 0}
+                    onClick={() =>
+                      setTicketCount((prev) => Math.min(prev + 1, ticketsLeft))
+                    }
+                    disabled={
+                      ticketCount >= ticketsLeft ||
+                      !connected ||
+                      ticketsLeft === 0
+                    }
                   >
                     +
                   </Button>
@@ -944,7 +1003,7 @@ const RaffleDetail = () => {
               </div>
             )}
             {/* Total Cost */}
-            {!isEnded && !isSoldOut && (
+            {isLive && !isSoldOut && (
               <div className="flex items-center bg-card/50 backdrop-blur-xl border border-border/50 justify-between p-3 sm:p-4 rounded-lg bg-primary-10 border-primary/30">
                 <span className="font-semibold text-xs sm:text-sm text-muted-foreground">
                   Total Cost
@@ -956,7 +1015,33 @@ const RaffleDetail = () => {
             )}
 
             {/* Buy Button */}
-            {isEnded ? (
+            {/* {isEnded ? (
+              <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
+                Raffle Ended
+              </div>
+            ) : isSoldOut ? (
+              <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
+                Sold Out
+              </div>
+            ) : (
+              <Button
+                className="w-full gradient-primary glow-primary h-10 sm:h-12 text-base sm:text-lg mt-4"
+                onClick={handleBuyTickets}
+                disabled={!connected}
+              >
+                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
+              </Button>
+            )} */}
+            {isUpcoming ? (
+              // <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
+              //   Raffle has not started yet
+              // </div>
+              <div className="w-full h-10 sm:h-12 flex items-center justify-center gap-2 rounded-lg bg-yellow-50 border border-border/50 text-yellow-800 font-semibold text-sm sm:text-base mt-4">
+                <Clock className="h-4 w-4" />
+                Raffle starts soon
+              </div>
+            ) : isEnded ? (
               <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
                 Raffle Ended
               </div>

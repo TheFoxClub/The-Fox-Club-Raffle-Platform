@@ -76,6 +76,36 @@ const CreateRaffle = () => {
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [startNow, setStartNow] = useState(true);
+  // const [rewardDisclaimerShown, setRewardDisclaimerShown] = useState<{
+  //   nft: boolean;
+  //   token: boolean;
+  // }>({
+  //   nft: false,
+  //   token: false,
+  // });
+
+  // const showRewardDisclaimer = (type: "nft" | "token") => {
+  //   if (rewardDisclaimerShown[type]) return;
+
+  //   const label = type === "nft" ? "NFT" : "Token";
+
+  //   toast.warn(
+  //     `Once this raffle is created, the ${label} reward will be permanently locked and cannot be reclaimed.`,
+  //     {
+  //       autoClose: 7000,
+  //       closeOnClick: true,
+  //     }
+  //   );
+
+  //   setRewardDisclaimerShown((prev) => ({
+  //     ...prev,
+  //     [type]: true,
+  //   }));
+  // };
+
+  // ✅ DISCLAIMER MODAL STATE
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
   const [errors, setErrors] = useState<{
     [key: string]: string | undefined;
@@ -172,8 +202,8 @@ const CreateRaffle = () => {
       }
       try {
         setNftLoading(true);
-        // const res = await server.get(`/nfts/${user.pubkey}`);
-        const res = await server.get(`/nfts/onCollection`);
+        const res = await server.get(`/nfts/${user.pubkey}`);
+        // const res = await server.get(`/nfts/onCollection`);
         const nftsFromApi: any[] = res.data?.data?.nfts || [];
 
         const mapped = await Promise.all(
@@ -261,6 +291,7 @@ const CreateRaffle = () => {
   const handleSelectNFT = (nft: any) => {
     if (!selectedNFTs.some((item) => item.id === nft.id)) {
       setSelectedNFTs((prev) => [...prev, nft]);
+      //  showRewardDisclaimer("nft");
     }
     // setIsNFTDialogOpen(false);
     setErrors((prev) => ({
@@ -282,6 +313,7 @@ const CreateRaffle = () => {
   }) => {
     if (!selectedTokens.some((t) => t.mint === token.mint)) {
       setSelectedTokens((prev) => [...prev, { ...token, amountToUse: 0 }]);
+      //   showRewardDisclaimer("token");
     }
     setErrors((prev) => ({
       ...prev,
@@ -293,6 +325,44 @@ const CreateRaffle = () => {
 
   const removeToken = (mint: string) => {
     setSelectedTokens((prev) => prev.filter((t) => t.mint !== mint));
+  };
+
+  // ---------- TOGGLE NFT ----------
+  const toggleNFT = (nft: any) => {
+    setSelectedNFTs((prev) => {
+      const exists = prev.some((item) => item.id === nft.id);
+      return exists
+        ? prev.filter((item) => item.id !== nft.id)
+        : [...prev, nft];
+    });
+
+    setErrors((prev) => ({
+      ...prev,
+      selectedNFT: undefined,
+      prize: undefined,
+    }));
+  };
+
+  // ---------- TOGGLE TOKEN ----------
+  const toggleToken = (token: {
+    mint: string;
+    name: string;
+    amount: number;
+    programId: string;
+  }) => {
+    setSelectedTokens((prev) => {
+      const exists = prev.some((t) => t.mint === token.mint);
+      return exists
+        ? prev.filter((t) => t.mint !== token.mint)
+        : [...prev, { ...token, amountToUse: 0 }];
+    });
+
+    setErrors((prev) => ({
+      ...prev,
+      selectedToken: undefined,
+      prize: undefined,
+      [`token-${token.mint}`]: undefined,
+    }));
   };
 
   // 🔹 AUTO-SET START DATE WHEN startNow IS TRUE
@@ -420,6 +490,25 @@ const CreateRaffle = () => {
     }
 
     return Object.keys(newErrors).length === 0;
+  };
+
+  // ----------------- CREATE RAFFLE CLICK -----------------
+  const handleCreateRaffleClick = () => {
+    const isValid = validateForm();
+    if (!isValid) return; // Stop here if validation fails
+
+    // Open disclaimer modal if valid
+    setDisclaimerOpen(true);
+  };
+
+  // ----------------- FINAL SUBMIT AFTER DISCLAIMER -----------------
+  const handleDisclaimerConfirm = () => {
+    if (!disclaimerAccepted) {
+      toast.error("You must agree to the terms to proceed.");
+      return;
+    }
+    setDisclaimerOpen(false);
+    submitRaffle("UPCOMING");
   };
 
   const submitRaffle = async (status: "UPCOMING" | "DRAFT") => {
@@ -814,6 +903,7 @@ const CreateRaffle = () => {
         setRaffleImage(null);
         setRaffleImagePreview(null);
         setErrors({});
+        // setRewardDisclaimerShown({ nft: false, token: false });
 
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -1017,15 +1107,12 @@ const CreateRaffle = () => {
                             <button
                               key={nft.id}
                               type="button"
-                              onClick={() =>
-                                !isSelected && handleSelectNFT(nft)
-                              }
-                              disabled={isSelected}
+                              onClick={() => toggleNFT(nft)}
                               className={`
                 group relative overflow-hidden rounded-lg border-2 transition-all w-full h-40 flex
                 ${
                   isSelected
-                    ? "border-green-500 opacity-50 cursor-not-allowed"
+                    ? "border-green-500 ring-2 ring-green-500"
                     : "border-border hover:border-primary hover:scale-105"
                 }
               `}
@@ -1171,15 +1258,12 @@ const CreateRaffle = () => {
                             <button
                               key={token.mint}
                               type="button"
-                              onClick={() =>
-                                !isSelected && handleSelectToken(token)
-                              }
-                              disabled={isSelected}
+                              onClick={() => toggleToken(token)}
                               className={`
                                       group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2
                                       ${
                                         isSelected
-                                          ? "border-green-500 opacity-50 cursor-not-allowed"
+                                          ? "border-green-500 ring-2 ring-green-500"
                                           : "border-border hover:border-primary hover:scale-105"
                                       }
                                     `}
@@ -1519,7 +1603,7 @@ const CreateRaffle = () => {
           </Button>
 
           <Button
-            onClick={() => submitRaffle("UPCOMING")}
+            onClick={handleCreateRaffleClick}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
             disabled={loading}
@@ -1529,6 +1613,65 @@ const CreateRaffle = () => {
           </Button>
         </div>
       </div>
+
+      {/* ================= DISCLAIMER MODAL ================= */}
+      <Dialog open={disclaimerOpen} onOpenChange={setDisclaimerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              Important: Irreversible Action
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>By creating this raffle:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                Selected NFT(s) and/or token rewards will be immediately
+                transferred and permanently locked
+              </li>
+              <li>
+                Locked rewards will not be refunded, even if zero tickets are
+                purchased
+              </li>
+              <li>
+                Once any ticket is purchased, the raffle cannot be cancelled or
+                deleted
+              </li>
+              <li>
+                Raffle details cannot be changed after creation, including
+                dates, ticket price, ticket supply, or rewards
+              </li>
+            </ul>
+          </div>
+
+          <label className="flex items-start gap-2 mt-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={disclaimerAccepted}
+              onChange={(e) => setDisclaimerAccepted(e.target.checked)}
+              className="mt-1"
+            />
+            <span className="text-sm">
+              I understand and agree to the above terms
+            </span>
+          </label>
+
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="outline" onClick={() => setDisclaimerOpen(false)}>
+              Cancel
+            </Button>
+
+            <Button
+              className="gradient-primary"
+              onClick={handleDisclaimerConfirm}
+            >
+              Confirm & Lock Rewards
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* ===================================================== */}
     </div>
   );
 };

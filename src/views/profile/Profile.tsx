@@ -122,6 +122,8 @@ const Profile = () => {
   );
 
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
+  const reversedPurchasedTickets = [...purchasedTickets].reverse();
+
   const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>(
     []
   );
@@ -605,7 +607,7 @@ const Profile = () => {
                 </p>
               </Card>
             ) : (
-              purchasedTickets.map((ticket) => (
+              reversedPurchasedTickets.map((ticket) => (
                 <Card
                   key={ticket.id}
                   className="bg-card/50 backdrop-blur-xl p-6 border border-border/50"

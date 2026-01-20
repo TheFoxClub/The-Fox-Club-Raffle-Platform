@@ -195,8 +195,8 @@ export default function AdminRaffles() {
           r.id === selectedRaffle.id
             ? // ? { ...r, featured: isFeatured, status: status }
               { ...r, featured: isFeatured }
-            : r
-        )
+            : r,
+        ),
       );
       if (isFeatured) {
         toast.success("Raffle is now featured on homepage!");
@@ -214,7 +214,7 @@ export default function AdminRaffles() {
 
   const handleToggleSuspend = async (
     raffleId: number,
-    currentlySuspended: boolean
+    currentlySuspended: boolean,
   ) => {
     try {
       // send toggle state
@@ -234,8 +234,8 @@ export default function AdminRaffles() {
                   ? "Suspended"
                   : "Live", // or previous status
               }
-            : r
-        )
+            : r,
+        ),
       );
 
       // Show toast from backend message
@@ -258,7 +258,7 @@ export default function AdminRaffles() {
         </span>
       ) : (
         part
-      )
+      ),
     );
   };
 
@@ -389,7 +389,7 @@ export default function AdminRaffles() {
                       </span>
                     </td>
                     <td className="p-4 font-semibold text-primary">
-                      {raffle.totalRevenue.toFixed(2)} {raffle.token}
+                      {raffle.totalRevenue} {raffle.token}
                     </td>
 
                     <td className="p-4">
@@ -398,10 +398,10 @@ export default function AdminRaffles() {
                           raffle.status === "Suspended"
                             ? "bg-primary/20 text-primary"
                             : raffle.status === "Live"
-                            ? "bg-green-500/20 text-green-500"
-                            : raffle.status === "Ended"
-                            ? "bg-muted text-muted-foreground"
-                            : "bg-secondary/20 text-secondary"
+                              ? "bg-green-500/20 text-green-500"
+                              : raffle.status === "Ended"
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-secondary/20 text-secondary"
                         }`}
                       >
                         {raffle.status}
@@ -430,7 +430,7 @@ export default function AdminRaffles() {
                           onClick={() =>
                             handleToggleSuspend(
                               raffle.id,
-                              raffle.status === "Suspended"
+                              raffle.status === "Suspended",
                             )
                           }
                           title={
