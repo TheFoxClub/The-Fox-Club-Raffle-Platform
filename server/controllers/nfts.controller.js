@@ -10,8 +10,7 @@ const {
   SOLANA_RPC_POOL_DAS_API,
 } = require("../config/credentials");
 const redisClient = require("../util/redisClient");
-
-const umi = createUmi(SOLANA_RPC_POOL_DAS_API).use(dasApi());
+const { getUmi } = require("../config/solana");
 
 const CACHE_TTL = process.env.REDIS_TTL || 300;
 const { VerifiedCollection } = require("../models");
@@ -63,7 +62,7 @@ class HolderController {
       let allItems = [];
 
       for (const collection of collectionAddresses) {
-        const result = await umi.rpc.searchAssets({
+        const result = await getUmi().rpc.searchAssets({
           owner: publicKey(pubkey),
           grouping: ["collection", collection],
         });
@@ -144,7 +143,7 @@ class HolderController {
         owner: publicKey(pubkey),
       };
 
-      const result = await umi.rpc.searchAssets(searchParams);
+      const result = await getUmi().rpc.searchAssets(searchParams);
 
       const nfts = result.items.map((item) => ({
         mint: item.id,
