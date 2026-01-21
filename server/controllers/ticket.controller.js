@@ -66,6 +66,10 @@ class TicketController {
         return respond(res, httpStatus.BAD_REQUEST, "Raffle not found");
       }
 
+      if (raffleData.status !== RAFFLE_STATUS.LIVE) {
+        return respond(res, httpStatus.BAD_REQUEST, "Raffle is not live yet");
+      }
+
       const nftHolderInfo =
         await NFTService.checkNFTCollectionHolder(senderPubkey);
       const isNFTHolder = nftHolderInfo.isHolder;
