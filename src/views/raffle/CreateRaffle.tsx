@@ -76,34 +76,6 @@ const CreateRaffle = () => {
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [startNow, setStartNow] = useState(true);
-  // const [rewardDisclaimerShown, setRewardDisclaimerShown] = useState<{
-  //   nft: boolean;
-  //   token: boolean;
-  // }>({
-  //   nft: false,
-  //   token: false,
-  // });
-
-  // const showRewardDisclaimer = (type: "nft" | "token") => {
-  //   if (rewardDisclaimerShown[type]) return;
-
-  //   const label = type === "nft" ? "NFT" : "Token";
-
-  //   toast.warn(
-  //     `Once this raffle is created, the ${label} reward will be permanently locked and cannot be reclaimed.`,
-  //     {
-  //       autoClose: 7000,
-  //       closeOnClick: true,
-  //     }
-  //   );
-
-  //   setRewardDisclaimerShown((prev) => ({
-  //     ...prev,
-  //     [type]: true,
-  //   }));
-  // };
-
-  // ✅ DISCLAIMER MODAL STATE
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
@@ -125,9 +97,7 @@ const CreateRaffle = () => {
 
   const tokenOptions = [
     { value: "SOLANA", label: "SOL" },
-    // { value: "USDT", label: "USDT" },
-    // { value: "BONK", label: "BONK" },
-    // { value: "USDC", label: "USDC" },
+    // { value: "USDT", label: "USDT" },,
   ];
 
   useEffect(() => {
@@ -398,11 +368,17 @@ const CreateRaffle = () => {
 
     if (!title.trim()) newErrors.title = "Title is required";
     if (!description.trim()) newErrors.description = "Description is required";
-    // if (!raffleImage) {
-    //   newErrors.raffleImage = "Please upload a raffle image.";
-    // }
-    if (!ticketPrice || Number(ticketPrice) <= 0)
+    if (!ticketPrice || Number(ticketPrice) <= 0) {
       newErrors.ticketPrice = "Ticket price must be greater than 0";
+    } else {
+      // Check for max 3 decimal places
+      const decimalPart = ticketPrice.toString().split(".")[1];
+      if (decimalPart && decimalPart.length > 3) {
+        newErrors.ticketPrice =
+          "Ticket price cannot have more than 3 decimal places";
+      }
+    }
+
     if (!totalTickets || Number(totalTickets) <= 0)
       newErrors.totalTickets = "Total tickets must be greater than 0";
     if (!numberOfWinners || Number(numberOfWinners) <= 0)
@@ -846,8 +822,6 @@ const CreateRaffle = () => {
             mint: reward.mintAddress,
             name: reward.rewardName,
             amountToUse: reward.amount,
-            // We set 'amount' (wallet balance) to the used amount temporarily
-            // so validation passes until the user reconnects wallet/refreshes
             amount: reward.amount,
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
