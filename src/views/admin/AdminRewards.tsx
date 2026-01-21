@@ -410,14 +410,14 @@ export default function AdminRewards() {
               <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               Top Hosts
             </h3>
-            <Button
+            {/* <Button
               variant="outline"
               size="sm"
               onClick={() => handleExport("hosts")}
             >
               <Download className="h-3 w-3 mr-1" />
               Export
-            </Button>
+            </Button> */}
           </div>
 
           <div className="space-y-4">
@@ -470,14 +470,14 @@ export default function AdminRewards() {
               <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
               Top Buyers
             </h3>
-            <Button
+            {/* <Button
               variant="outline"
               size="sm"
               onClick={() => handleExport("buyers")}
             >
               <Download className="h-3 w-3 mr-1" />
               Export
-            </Button>
+            </Button> */}
           </div>
 
           <div className="space-y-4">

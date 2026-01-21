@@ -11,7 +11,7 @@ import {
   Trophy,
   LogOut,
   Menu,
-  Bell,
+  // Bell,
   ChevronLeft,
   Home,
   X,
@@ -20,6 +20,7 @@ import Button from "../ui/Button";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import { handleLogout } from "../../config/api";
+import { toast } from "react-toastify";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -53,6 +54,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const logout = async () => {
     await handleLogout();
     navigate("/");
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied");
+    } catch {
+      toast.error("Failed to copy wallet address");
+    }
   };
 
   return (
@@ -156,23 +166,27 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              <Button variant="ghost" size="icon" className="relative">
+              {/* <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
-              </Button>
+              </Button> */}
 
               <div className="hidden sm:flex items-center gap-3">
                 <div className="text-right">
                   <p className="text-sm font-medium">
                     {user.isAdmin ? "Admin" : "User"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+
+                  <button
+                    onClick={() => user.pubkey && copyToClipboard(user.pubkey)}
+                    className="text-xs text-muted-foreground hover:text-primary transition"
+                  >
                     {user.pubkey
                       ? shortenAddress(user.pubkey)
                       : "Not connected"}
-                  </p>
+                  </button>
                 </div>
-                <div className="h-10 w-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm">
+                <div className="h-10 w-10 rounded-full gradient-primary flex items-center justify-center text-white font-bold text-sm">
                   {user.isAdmin ? "A" : "U"}
                 </div>
               </div>

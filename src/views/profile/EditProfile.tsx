@@ -192,7 +192,7 @@ const EditProfile = () => {
 
   const handleCancel = () => navigate("/profile");
 
-  if (isLoading || !user_info) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-300">
         <p>Loading user data...</p>

@@ -105,7 +105,7 @@ type Win = {
 const Profile = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, pubkey, user_info } = useSelector(
-    (state: RootState) => state.user
+    (state: RootState) => state.user,
   );
 
   const {
@@ -118,13 +118,23 @@ const Profile = () => {
   const [totalSolSpent, setTotalSolSpent] = useState(0);
   const [rafflesWon, setRafflesWon] = useState(0);
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
-    []
+    [],
   );
+
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
+  //const reversedPurchasedTickets = [...purchasedTickets].reverse();
+
   const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>(
-    []
+    [],
   );
   const [wins, setWins] = useState<Win[]>([]);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [raffleToDelete, setRaffleToDelete] = useState<HostedRaffle | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [loadingRewards, setLoadingRewards] = useState(false);
 
   const formatEndDate = (dateString: string) => {
@@ -169,7 +179,7 @@ const Profile = () => {
             user_info: userData.user_info,
             isAuthenticated: true,
             isLoading: false,
-          })
+          }),
         );
 
         if (userData.id) {
@@ -200,12 +210,12 @@ const Profile = () => {
               t.Raffle?.status === 2
                 ? "active"
                 : t.Raffle?.status === 3
-                ? "Ended"
-                : "upcoming",
+                  ? "Ended"
+                  : "upcoming",
             endDate: t.endsAt ? t.endsAt.split("T")[0] : "N/A",
             totalTickets: t.progress?.total ?? 0,
             ticketsSold: t.progress?.sold ?? 0,
-          }))
+          })),
         );
       } catch (error) {
         dispatch(setLoading(false));
@@ -233,7 +243,7 @@ const Profile = () => {
       // Update hosted raffles data
       setHostedRafflesData((prev) =>
         prev.map((raffle) => {
-          if (raffle.id === data.raffleId) {
+          if (raffle.id === data.raffleId && raffle.payoutInfo) {
             return {
               ...raffle,
               payoutInfo: {
@@ -241,7 +251,8 @@ const Profile = () => {
                 claimedAmount: data.claimedAmount,
                 unclaimedAmount: Math.max(
                   0,
-                  (raffle.payoutInfo?.claimableAmount || 0) - data.claimedAmount
+                  (raffle.payoutInfo?.claimableAmount || 0) -
+                    data.claimedAmount,
                 ),
                 hasClaimed: true,
                 claimStatus: data.status,
@@ -250,7 +261,7 @@ const Profile = () => {
             };
           }
           return raffle;
-        })
+        }),
       );
     };
 
@@ -282,7 +293,7 @@ const Profile = () => {
           ...win,
           isClaimed: rewards.some(
             (reward: ClaimableReward) =>
-              reward.id === win.rewardId && reward.isClaimed
+              reward.id === win.rewardId && reward.isClaimed,
           ),
         }));
         setWins(updatedWins);
@@ -312,8 +323,8 @@ const Profile = () => {
       prev.map((reward) =>
         reward.id === rewardId
           ? { ...reward, isClaimed: true, claimedAt: new Date().toISOString() }
-          : reward
-      )
+          : reward,
+      ),
     );
 
     // Update wins
@@ -321,8 +332,8 @@ const Profile = () => {
       prev.map((win) =>
         win.rewardId === rewardId
           ? { ...win, isClaimed: true, claimedAt: new Date().toISOString() }
-          : win
-      )
+          : win,
+      ),
     );
 
     // Update raffles won count
@@ -334,7 +345,7 @@ const Profile = () => {
         },
         isAuthenticated: true,
         isLoading: false,
-      })
+      }),
     );
   };
 
@@ -353,8 +364,8 @@ const Profile = () => {
                 message: "Payout completed successfully",
               },
             }
-          : raffle
-      )
+          : raffle,
+      ),
     );
   };
 
@@ -364,7 +375,7 @@ const Profile = () => {
       if (res.data.success) {
         toast.success("Raffle deleted successfully!");
         setHostedRafflesData((prev) =>
-          prev.filter((raffle) => raffle.id !== raffleId)
+          prev.filter((raffle) => raffle.id !== raffleId),
         );
       } else {
         toast.error(res.data.message || "Failed to delete raffle");
@@ -374,7 +385,7 @@ const Profile = () => {
       toast.error(
         error.response?.data?.message ||
           error.message ||
-          "Failed to delete raffle"
+          "Failed to delete raffle",
       );
     }
   };
@@ -497,7 +508,7 @@ const Profile = () => {
                 className="cursor-pointer"
                 onClick={() => {
                   const element = document.querySelector(
-                    '[data-tab="won"]'
+                    '[data-tab="won"]',
                   ) as HTMLElement;
                   element?.click();
                 }}
@@ -512,7 +523,7 @@ const Profile = () => {
         {hostedRafflesData.some(
           (raffle) =>
             raffle.payoutInfo?.canClaim &&
-            raffle.payoutInfo?.unclaimedAmount > 0
+            raffle.payoutInfo?.unclaimedAmount > 0,
         ) && (
           <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 p-4">
             <div className="flex items-center justify-between">
@@ -532,7 +543,7 @@ const Profile = () => {
                 className="cursor-pointer border-green-500/30 hover:bg-green-500/10"
                 onClick={() => {
                   const element = document.querySelector(
-                    '[data-tab="hosted"]'
+                    '[data-tab="hosted"]',
                   ) as HTMLElement;
                   element?.click();
                 }}
@@ -561,14 +572,14 @@ const Profile = () => {
               {hostedRafflesData.some(
                 (raffle) =>
                   raffle.payoutInfo?.canClaim &&
-                  raffle.payoutInfo?.unclaimedAmount > 0
+                  raffle.payoutInfo?.unclaimedAmount > 0,
               ) && (
                 <span className="ml-2 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {
                     hostedRafflesData.filter(
                       (raffle) =>
                         raffle.payoutInfo?.canClaim &&
-                        raffle.payoutInfo?.unclaimedAmount > 0
+                        raffle.payoutInfo?.unclaimedAmount > 0,
                     ).length
                   }
                 </span>
@@ -628,7 +639,7 @@ const Profile = () => {
                         <div className="flex items-center gap-1">
                           <Coins className="h-4 w-4" />
                           <span>
-                            {ticket.spent} {ticket.token} spent
+                            {ticket.spent.toFixed(3)} {ticket.token} spent
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
@@ -724,7 +735,10 @@ const Profile = () => {
                           <Button
                             variant="outline"
                             disabled={raffle.ticketsSold > 0}
-                            onClick={() => handleDeleteRaffle(raffle.id)}
+                            onClick={() => {
+                              setRaffleToDelete(raffle);
+                              setDeleteModalOpen(true);
+                            }}
                             className={`flex items-center gap-1 ${
                               raffle.ticketsSold === 0
                                 ? "text-red-500 border-red-500 hover:bg-red-500"
@@ -797,7 +811,7 @@ const Profile = () => {
                             >
                               {raffle.payoutInfo.unclaimedAmount > 0
                                 ? `${raffle.payoutInfo.unclaimedAmount.toFixed(
-                                    4
+                                    4,
                                   )} SOL`
                                 : "All claimed"}
                             </p>
@@ -814,7 +828,7 @@ const Profile = () => {
                                   <p className="text-sm font-semibold">
                                     Ready to claim{" "}
                                     {raffle.payoutInfo.unclaimedAmount.toFixed(
-                                      4
+                                      4,
                                     )}{" "}
                                     SOL
                                   </p>
@@ -854,8 +868,8 @@ const Profile = () => {
                               raffle.payoutInfo.claimStatus === "confirmed"
                                 ? "text-green-600 bg-green-500/10 border border-green-500/20"
                                 : raffle.payoutInfo.claimStatus === "failed"
-                                ? "text-red-600 bg-red-500/10 border border-red-500/20"
-                                : "text-blue-600 bg-blue-500/10 border border-blue-500/20"
+                                  ? "text-red-600 bg-red-500/10 border border-red-500/20"
+                                  : "text-blue-600 bg-blue-500/10 border border-blue-500/20"
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -870,11 +884,11 @@ const Profile = () => {
                                 <p className="text-sm font-semibold">
                                   {raffle.payoutInfo.claimStatus === "confirmed"
                                     ? `Payout completed: ${raffle.payoutInfo.claimableAmount.toFixed(
-                                        4
+                                        4,
                                       )} SOL`
                                     : raffle.payoutInfo.claimStatus === "failed"
-                                    ? "Payout failed - please try again"
-                                    : `Payout ${raffle.payoutInfo.claimStatus} - processing...`}
+                                      ? "Payout failed - please try again"
+                                      : `Payout ${raffle.payoutInfo.claimStatus} - processing...`}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   {raffle.payoutInfo.message}
@@ -890,7 +904,7 @@ const Profile = () => {
                                 onClick={() =>
                                   window.open(
                                     `https://solscan.io/tx/${raffle.payoutInfo?.claimSignature}`,
-                                    "_blank"
+                                    "_blank",
                                   )
                                 }
                                 className="flex items-center gap-1 text-xs text-white bg-primary"
@@ -1037,7 +1051,7 @@ const Profile = () => {
                                 onClick={() =>
                                   window.open(
                                     `https://solscan.io/tx/${win.claimSignature}`,
-                                    "_blank"
+                                    "_blank",
                                   )
                                 }
                                 className="flex items-center gap-1 text-xs text-white bg-primary"
@@ -1060,6 +1074,56 @@ const Profile = () => {
             )}
           </TabsContent>
         </Tabs>
+        {deleteModalOpen && raffleToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <Card className="w-full max-w-md bg-card border border-border p-6">
+              <h3 className="text-lg font-bold mb-2">Delete Raffle</h3>
+
+              <p className="text-sm text-muted-foreground mb-4">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold text-foreground">
+                  {raffleToDelete.title}
+                </span>
+                ?
+                <br />
+                This action{" "}
+                <span className="text-foreground font-semibold">
+                  cannot be undone
+                </span>
+                .
+              </p>
+
+              <div className="flex justify-between gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setDeleteModalOpen(false);
+                    setRaffleToDelete(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  disabled={isDeleting}
+                  className="hover:bg-red-500 hover:text-white flex-1"
+                  onClick={async () => {
+                    if (!raffleToDelete) return;
+                    setIsDeleting(true);
+                    await handleDeleteRaffle(raffleToDelete.id);
+                    setIsDeleting(false);
+                    setDeleteModalOpen(false);
+                    setRaffleToDelete(null);
+                  }}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

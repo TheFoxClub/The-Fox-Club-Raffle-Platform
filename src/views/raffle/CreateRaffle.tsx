@@ -60,7 +60,7 @@ const CreateRaffle = () => {
 
   const [raffleImage, setRaffleImage] = useState<File | null>(null);
   const [raffleImagePreview, setRaffleImagePreview] = useState<string | null>(
-    null
+    null,
   );
   const [imageUploading, setImageUploading] = useState(false);
 
@@ -76,6 +76,8 @@ const CreateRaffle = () => {
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [startNow, setStartNow] = useState(true);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
   const [errors, setErrors] = useState<{
     [key: string]: string | undefined;
@@ -95,9 +97,7 @@ const CreateRaffle = () => {
 
   const tokenOptions = [
     { value: "SOLANA", label: "SOL" },
-    // { value: "USDT", label: "USDT" },
-    // { value: "BONK", label: "BONK" },
-    // { value: "USDC", label: "USDC" },
+    // { value: "USDT", label: "USDT" },,
   ];
 
   useEffect(() => {
@@ -205,7 +205,7 @@ const CreateRaffle = () => {
               image,
               raw: nftItem,
             };
-          })
+          }),
         );
 
         setNftCandidates(mapped);
@@ -261,6 +261,7 @@ const CreateRaffle = () => {
   const handleSelectNFT = (nft: any) => {
     if (!selectedNFTs.some((item) => item.id === nft.id)) {
       setSelectedNFTs((prev) => [...prev, nft]);
+      //  showRewardDisclaimer("nft");
     }
     // setIsNFTDialogOpen(false);
     setErrors((prev) => ({
@@ -282,6 +283,7 @@ const CreateRaffle = () => {
   }) => {
     if (!selectedTokens.some((t) => t.mint === token.mint)) {
       setSelectedTokens((prev) => [...prev, { ...token, amountToUse: 0 }]);
+      //   showRewardDisclaimer("token");
     }
     setErrors((prev) => ({
       ...prev,
@@ -293,6 +295,44 @@ const CreateRaffle = () => {
 
   const removeToken = (mint: string) => {
     setSelectedTokens((prev) => prev.filter((t) => t.mint !== mint));
+  };
+
+  // ---------- TOGGLE NFT ----------
+  const toggleNFT = (nft: any) => {
+    setSelectedNFTs((prev) => {
+      const exists = prev.some((item) => item.id === nft.id);
+      return exists
+        ? prev.filter((item) => item.id !== nft.id)
+        : [...prev, nft];
+    });
+
+    setErrors((prev) => ({
+      ...prev,
+      selectedNFT: undefined,
+      prize: undefined,
+    }));
+  };
+
+  // ---------- TOGGLE TOKEN ----------
+  const toggleToken = (token: {
+    mint: string;
+    name: string;
+    amount: number;
+    programId: string;
+  }) => {
+    setSelectedTokens((prev) => {
+      const exists = prev.some((t) => t.mint === token.mint);
+      return exists
+        ? prev.filter((t) => t.mint !== token.mint)
+        : [...prev, { ...token, amountToUse: 0 }];
+    });
+
+    setErrors((prev) => ({
+      ...prev,
+      selectedToken: undefined,
+      prize: undefined,
+      [`token-${token.mint}`]: undefined,
+    }));
   };
 
   // 🔹 AUTO-SET START DATE WHEN startNow IS TRUE
@@ -321,19 +361,24 @@ const CreateRaffle = () => {
         newErrors[`token-${t.mint}`] = "Amount must be greater than 0";
       }
       if (t.amountToUse > t.amount) {
-        newErrors[
-          `token-${t.mint}`
-        ] = `Cannot exceed available amount (${t.amount})`;
+        newErrors[`token-${t.mint}`] =
+          `Cannot exceed available amount (${t.amount})`;
       }
     });
 
     if (!title.trim()) newErrors.title = "Title is required";
     if (!description.trim()) newErrors.description = "Description is required";
-    // if (!raffleImage) {
-    //   newErrors.raffleImage = "Please upload a raffle image.";
-    // }
-    if (!ticketPrice || Number(ticketPrice) <= 0)
+    if (!ticketPrice || Number(ticketPrice) <= 0) {
       newErrors.ticketPrice = "Ticket price must be greater than 0";
+    } else {
+      // Check for max 3 decimal places
+      const decimalPart = ticketPrice.toString().split(".")[1];
+      if (decimalPart && decimalPart.length > 3) {
+        newErrors.ticketPrice =
+          "Ticket price cannot have more than 3 decimal places";
+      }
+    }
+
     if (!totalTickets || Number(totalTickets) <= 0)
       newErrors.totalTickets = "Total tickets must be greater than 0";
     if (!numberOfWinners || Number(numberOfWinners) <= 0)
@@ -423,6 +468,25 @@ const CreateRaffle = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ----------------- CREATE RAFFLE CLICK -----------------
+  const handleCreateRaffleClick = () => {
+    const isValid = validateForm();
+    if (!isValid) return; // Stop here if validation fails
+
+    // Open disclaimer modal if valid
+    setDisclaimerOpen(true);
+  };
+
+  // ----------------- FINAL SUBMIT AFTER DISCLAIMER -----------------
+  const handleDisclaimerConfirm = () => {
+    if (!disclaimerAccepted) {
+      toast.error("You must agree to the terms to proceed.");
+      return;
+    }
+    setDisclaimerOpen(false);
+    submitRaffle("UPCOMING");
+  };
+
   const submitRaffle = async (status: "UPCOMING" | "DRAFT") => {
     if (!user.isAuthenticated) {
       toast.error("Please sign in first!");
@@ -455,7 +519,7 @@ const CreateRaffle = () => {
               headers: {
                 "Content-Type": "multipart/form-data",
               },
-            }
+            },
           );
 
           if (uploadRes.data.success) {
@@ -541,12 +605,12 @@ const CreateRaffle = () => {
             {
               rewards: payload.rewards,
               fromAddress: publicKey.toString(),
-            }
+            },
           );
 
           if (!transferRes.data.success) {
             throw new Error(
-              transferRes.data.message || "Failed to prepare reward transfer"
+              transferRes.data.message || "Failed to prepare reward transfer",
             );
           }
 
@@ -560,7 +624,7 @@ const CreateRaffle = () => {
             try {
               // Try legacy transaction first (for standard NFTs)
               const txBytes = Uint8Array.from(atob(transaction), (c) =>
-                c.charCodeAt(0)
+                c.charCodeAt(0),
               );
               tx = Transaction.from(txBytes);
               isVersioned = false;
@@ -568,7 +632,7 @@ const CreateRaffle = () => {
               try {
                 // Fallback to versioned transaction (for MPL Core NFTs)
                 const txBytes = Uint8Array.from(atob(transaction), (c) =>
-                  c.charCodeAt(0)
+                  c.charCodeAt(0),
                 );
                 tx = VersionedTransaction.deserialize(txBytes);
                 isVersioned = true;
@@ -576,7 +640,7 @@ const CreateRaffle = () => {
                 console.error(
                   "Failed to deserialize transaction:",
                   error,
-                  versionedError
+                  versionedError,
                 );
                 throw new Error("Failed to deserialize transaction");
               }
@@ -587,17 +651,17 @@ const CreateRaffle = () => {
             let serializedTransaction;
             if (isVersioned) {
               serializedTransaction = Buffer.from(
-                signedTx.serialize()
+                signedTx.serialize(),
               ).toString("base64");
             } else {
               serializedTransaction = Buffer.from(
-                signedTx.serialize()
+                signedTx.serialize(),
               ).toString("base64");
             }
 
             const connection = new Connection(
               import.meta.env.VITE_SOLANA_RPC_HOST ||
-                "https://api.devnet.solana.org"
+                "https://api.devnet.solana.org",
             );
 
             let signature;
@@ -613,18 +677,17 @@ const CreateRaffle = () => {
                 {
                   signature,
                   blockhash: (await connection.getLatestBlockhash()).blockhash,
-                  lastValidBlockHeight: (
-                    await connection.getLatestBlockhash()
-                  ).lastValidBlockHeight,
+                  lastValidBlockHeight: (await connection.getLatestBlockhash())
+                    .lastValidBlockHeight,
                 },
-                "confirmed"
+                "confirmed",
               );
 
               if (confirmation.value.err) {
                 throw new Error(
                   `Transaction failed: ${JSON.stringify(
-                    confirmation.value.err
-                  )}`
+                    confirmation.value.err,
+                  )}`,
                 );
               }
             } catch (submitError: any) {
@@ -638,12 +701,11 @@ const CreateRaffle = () => {
               }
 
               try {
-                const simulation = await connection.simulateTransaction(
-                  signedTx
-                );
+                const simulation =
+                  await connection.simulateTransaction(signedTx);
                 console.error(
                   "DEBUG: Simulation accounts:",
-                  simulation.value.accounts
+                  simulation.value.accounts,
                 );
               } catch (simError) {
                 console.error("DEBUG: Simulation failed:", simError);
@@ -664,27 +726,27 @@ const CreateRaffle = () => {
               toast.error("Reward transfer was rejected by wallet");
             } else if (
               signError.message?.includes(
-                "Programmable NFTs (pNFTs) are not currently supported"
+                "Programmable NFTs (pNFTs) are not currently supported",
               )
             ) {
               toast.error(
-                "Programmable NFTs (pNFTs) are not supported yet. Please use Legacy NFTs instead."
+                "Programmable NFTs (pNFTs) are not supported yet. Please use Legacy NFTs instead.",
               );
             } else if (
               signError.message?.includes(
-                "MPL Core NFTs are not currently supported"
+                "MPL Core NFTs are not currently supported",
               )
             ) {
               toast.error(
-                "MPL Core NFTs are not supported yet. Please use Legacy NFTs instead."
+                "MPL Core NFTs are not supported yet. Please use Legacy NFTs instead.",
               );
             } else if (
               signError.message?.includes(
-                "Mixed reward types (NFT + SPL tokens) are not currently supported"
+                "Mixed reward types (NFT + SPL tokens) are not currently supported",
               )
             ) {
               toast.error(
-                "Mixed rewards (NFT + SPL tokens) are not supported yet. Please use either NFTs only or SPL tokens only."
+                "Mixed rewards (NFT + SPL tokens) are not supported yet. Please use either NFTs only or SPL tokens only.",
               );
             } else {
               toast.error(`Reward transfer failed: ${signError.message}`);
@@ -760,8 +822,6 @@ const CreateRaffle = () => {
             mint: reward.mintAddress,
             name: reward.rewardName,
             amountToUse: reward.amount,
-            // We set 'amount' (wallet balance) to the used amount temporarily
-            // so validation passes until the user reconnects wallet/refreshes
             amount: reward.amount,
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
@@ -817,6 +877,7 @@ const CreateRaffle = () => {
         setRaffleImage(null);
         setRaffleImagePreview(null);
         setErrors({});
+        // setRewardDisclaimerShown({ nft: false, token: false });
 
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -1013,22 +1074,19 @@ const CreateRaffle = () => {
                       <div className="grid grid-cols-2 gap-4">
                         {nftCandidates.map((nft) => {
                           const isSelected = selectedNFTs.some(
-                            (item) => item.id === nft.id
+                            (item) => item.id === nft.id,
                           );
 
                           return (
                             <button
                               key={nft.id}
                               type="button"
-                              onClick={() =>
-                                !isSelected && handleSelectNFT(nft)
-                              }
-                              disabled={isSelected}
+                              onClick={() => toggleNFT(nft)}
                               className={`
                 group relative overflow-hidden rounded-lg border-2 transition-all w-full h-40 flex
                 ${
                   isSelected
-                    ? "border-green-500 opacity-50 cursor-not-allowed"
+                    ? "border-green-500 ring-2 ring-green-500"
                     : "border-border hover:border-primary hover:scale-105"
                 }
               `}
@@ -1167,22 +1225,19 @@ const CreateRaffle = () => {
                       <div className="grid grid-cols-2 gap-4">
                         {tokenCandidates.map((token) => {
                           const isSelected = selectedTokens.some(
-                            (t) => t.mint === token.mint
+                            (t) => t.mint === token.mint,
                           );
 
                           return (
                             <button
                               key={token.mint}
                               type="button"
-                              onClick={() =>
-                                !isSelected && handleSelectToken(token)
-                              }
-                              disabled={isSelected}
+                              onClick={() => toggleToken(token)}
                               className={`
                                       group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2
                                       ${
                                         isSelected
-                                          ? "border-green-500 opacity-50 cursor-not-allowed"
+                                          ? "border-green-500 ring-2 ring-green-500"
                                           : "border-border hover:border-primary hover:scale-105"
                                       }
                                     `}
@@ -1269,8 +1324,8 @@ const CreateRaffle = () => {
                                   prev.map((token) =>
                                     token.mint === t.mint
                                       ? { ...token, amountToUse: value }
-                                      : token
-                                  )
+                                      : token,
+                                  ),
                                 );
                                 // Clear error if any
                                 setErrors((prev) => ({
@@ -1522,7 +1577,7 @@ const CreateRaffle = () => {
           </Button>
 
           <Button
-            onClick={() => submitRaffle("UPCOMING")}
+            onClick={handleCreateRaffleClick}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
             disabled={loading}
@@ -1532,6 +1587,65 @@ const CreateRaffle = () => {
           </Button>
         </div>
       </div>
+
+      {/* ================= DISCLAIMER MODAL ================= */}
+      <Dialog open={disclaimerOpen} onOpenChange={setDisclaimerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              Important: Irreversible Action
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>By creating this raffle:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                Selected NFT(s) and/or token rewards will be immediately
+                transferred and permanently locked
+              </li>
+              <li>
+                Locked rewards will not be refunded, even if zero tickets are
+                purchased
+              </li>
+              <li>
+                Once any ticket is purchased, the raffle cannot be cancelled or
+                deleted
+              </li>
+              <li>
+                Raffle details cannot be changed after creation, including
+                dates, ticket price, ticket supply, or rewards
+              </li>
+            </ul>
+          </div>
+
+          <label className="flex items-start gap-2 mt-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={disclaimerAccepted}
+              onChange={(e) => setDisclaimerAccepted(e.target.checked)}
+              className="mt-1"
+            />
+            <span className="text-sm">
+              I understand and agree to the above terms
+            </span>
+          </label>
+
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="outline" onClick={() => setDisclaimerOpen(false)}>
+              Cancel
+            </Button>
+
+            <Button
+              className="gradient-primary"
+              onClick={handleDisclaimerConfirm}
+            >
+              Confirm & Lock Rewards
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* ===================================================== */}
     </div>
   );
 };

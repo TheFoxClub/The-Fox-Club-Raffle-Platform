@@ -150,7 +150,7 @@ export default function AdminAnalytics() {
           onClick={fetchAnalytics}
           disabled={loading}
           title="Refresh analytics"
-          className="bg-accent"
+          className="hover:bg-accent"
         >
           <RefreshCw
             className={`h-4 w-4 ${
