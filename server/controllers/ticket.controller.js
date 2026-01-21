@@ -44,7 +44,7 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Insufficient data provided"
+          "Insufficient data provided",
         );
       }
 
@@ -56,7 +56,7 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User Not Found, please Login Again"
+          "User Not Found, please Login Again",
         );
       }
 
@@ -66,9 +66,8 @@ class TicketController {
         return respond(res, httpStatus.BAD_REQUEST, "Raffle not found");
       }
 
-      const nftHolderInfo = await NFTService.checkNFTCollectionHolder(
-        senderPubkey
-      );
+      const nftHolderInfo =
+        await NFTService.checkNFTCollectionHolder(senderPubkey);
       const isNFTHolder = nftHolderInfo.isHolder;
 
       const commissionRate = isNFTHolder
@@ -96,7 +95,7 @@ class TicketController {
               fromPubkey: senderPublicKey,
               lamports: Math.round(totalSolAmount * LAMPORTS_PER_SOL),
               toPubkey: receiverPublicKey,
-            })
+            }),
           );
           break;
         default:
@@ -180,9 +179,8 @@ class TicketController {
         isNFTHolder,
       };
 
-      const splTokenSendTxDb = await SplTokenSendTransaction.create(
-        splTokenSendTxData
-      );
+      const splTokenSendTxDb =
+        await SplTokenSendTransaction.create(splTokenSendTxData);
 
       if (raffleId && ticketCount) {
         try {
@@ -200,7 +198,7 @@ class TicketController {
             },
             {
               where: { id: raffleId },
-            }
+            },
           );
 
           const user = await User.findOne({ where: { pubkey: pubkey } });
@@ -265,7 +263,8 @@ class TicketController {
             SocketService.emitTicketPurchase(raffleId, {
               ticketCount: ticketCount,
               ticketsSold: updatedRaffle.ticketsSold,
-              ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+              ticketsLeft:
+                updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
               totalTickets: updatedRaffle.totalTickets,
               buyerPubkey: pubkey,
               ticketNumbers: tickets.map((t) => t.ticketNumber),
@@ -275,9 +274,13 @@ class TicketController {
             // Emit raffle update for live data
             SocketService.emitRaffleUpdate(raffleId, {
               ticketsSold: updatedRaffle.ticketsSold,
-              ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+              ticketsLeft:
+                updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
               totalRevenue: updatedRaffle.totalRevenue,
-              progressPercentage: ((updatedRaffle.ticketsSold / updatedRaffle.totalTickets) * 100).toFixed(2),
+              progressPercentage: (
+                (updatedRaffle.ticketsSold / updatedRaffle.totalTickets) *
+                100
+              ).toFixed(2),
             });
 
             // Emit global raffle list update for home page
@@ -285,8 +288,12 @@ class TicketController {
               raffleId: raffleId,
               ticketsSold: updatedRaffle.ticketsSold,
               totalTickets: updatedRaffle.totalTickets,
-              ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
-              progressPercentage: ((updatedRaffle.ticketsSold / updatedRaffle.totalTickets) * 100).toFixed(2),
+              ticketsLeft:
+                updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+              progressPercentage: (
+                (updatedRaffle.ticketsSold / updatedRaffle.totalTickets) *
+                100
+              ).toFixed(2),
               updateType: "ticket_purchase",
             });
 
@@ -303,7 +310,7 @@ class TicketController {
               res,
               httpStatus.OK,
               "Tickets purchased successfully!",
-              responseData
+              responseData,
             );
           }
         } catch (ticketError) {
@@ -316,7 +323,7 @@ class TicketController {
               message: "Transaction stored successfully",
               signature: signatureToStore,
               error: "Ticket creation failed",
-            }
+            },
           );
         }
       }
@@ -352,7 +359,8 @@ class TicketController {
           },
         ],
         order: [
-          [{ model: Raffle }, "endDate", "DESC"],
+          // [{ model: Raffle }, "endDate", "DESC"],
+          [{ model: Raffle }, "updatedAt", "DESC"],
           ["ticketNumber", "ASC"],
         ],
       });
@@ -376,7 +384,7 @@ class TicketController {
         groupedTickets[raffleId].tickets.push(ticket);
         groupedTickets[raffleId].totalTickets++;
         groupedTickets[raffleId].totalSpent += parseFloat(
-          ticket.raffle.ticketPrice
+          ticket.raffle.ticketPrice,
         );
         groupedTickets[raffleId].ticketNumbers.push(ticket.ticketNumber);
 
@@ -397,7 +405,7 @@ class TicketController {
           imageUrl: raffle.imageUrl,
           status: mapEnumValue(RAFFLE_STATUS, raffle.status),
           ticketCount: group.totalTickets,
-          totalSpent: group.totalSpent.toFixed(2),
+          totalSpent: group.totalSpent,
           tokenType: tokenType,
           endDate: raffle.endDate,
           ticketsSold: raffle.ticketsSold,
@@ -406,6 +414,8 @@ class TicketController {
           isWinner: group.hasWinningTicket || false,
         };
       });
+
+      raffleGroups.sort((a, b) => new Date(b.endDate) - new Date(a.endDate));
 
       const formattedResponse = raffleGroups.map((group) => ({
         id: group.raffleId,
@@ -423,7 +433,7 @@ class TicketController {
           sold: group.ticketsSold,
           total: group.totalTickets,
           percentage: Math.round(
-            (group.ticketsSold / group.totalTickets) * 100
+            (group.ticketsSold / group.totalTickets) * 100,
           ),
         },
       }));
@@ -437,7 +447,7 @@ class TicketController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         "Failed to fetch user tickets",
-        { error: error.message }
+        { error: error.message },
       );
     }
   }
