@@ -46,7 +46,7 @@ export default function AdminLeaderboards() {
           rafflesCount: host.rafflesCount,
           xp: 0,
           streak: 0,
-        }))
+        })),
       );
 
       setTopBuyers(
@@ -57,7 +57,7 @@ export default function AdminLeaderboards() {
           tickets: buyer.ticketsBought,
           xp: 0,
           streak: 0,
-        }))
+        })),
       );
     } catch (error) {
       console.error("Error fetching leaderboards:", error);
@@ -73,16 +73,16 @@ export default function AdminLeaderboards() {
 
   if (loading) return <p>Loading leaderboards...</p>;
 
-  const handleExport = () => {
-    toast.info(`
-      title: "✅ Exporting ${activeTab} leaderboard data...`);
-  };
+  // const handleExport = () => {
+  //   toast.info(`
+  //     title: "✅ Exporting ${activeTab} leaderboard data...`);
+  // };
 
-  const handleReset = () => {
-    toast.warning(
-      "⚠️ Reset leaderboard initiated. This action cannot be undone."
-    );
-  };
+  // const handleReset = () => {
+  //   toast.warning(
+  //     "⚠️ Reset leaderboard initiated. This action cannot be undone.",
+  //   );
+  // };
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -118,14 +118,14 @@ export default function AdminLeaderboards() {
               }`}
             />
           </Button>
-          <Button variant="outline" onClick={handleExport}>
+          {/* <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
-          </Button>
-          <Button variant="destructive" onClick={handleReset}>
+          </Button> */}
+          {/* <Button variant="destructive" onClick={handleReset}>
             <RotateCcw className="h-4 w-4 mr-2" />
             Reset
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -146,8 +146,8 @@ export default function AdminLeaderboards() {
                     <th className="p-4 font-medium">Wallet</th>
                     <th className="p-4 font-medium">Total Revenue</th>
                     <th className="p-4 font-medium">Raffles</th>
-                    <th className="p-4 font-medium">XP</th>
-                    <th className="p-4 font-medium">Streak</th>
+                    {/* <th className="p-4 font-medium">XP</th>
+                    <th className="p-4 font-medium">Streak</th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -164,10 +164,10 @@ export default function AdminLeaderboards() {
                                 index === 0
                                   ? "bg-gradient-primary text-white"
                                   : index === 1
-                                  ? "bg-secondary/20 text-secondary"
-                                  : index === 2
-                                  ? "bg-accent/20 text-accent"
-                                  : "bg-muted text-muted-foreground"
+                                    ? "bg-secondary/20 text-secondary"
+                                    : index === 2
+                                      ? "bg-accent/20 text-accent"
+                                      : "bg-muted text-muted-foreground"
                               }`}
                             >
                               {index + 1}
@@ -192,7 +192,7 @@ export default function AdminLeaderboards() {
                         <td className="p-4 text-muted-foreground">
                           {host.rafflesCount}
                         </td>
-                        <td className="p-4">
+                        {/* <td className="p-4">
                           <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-sm font-medium">
                             {host.xp.toLocaleString()} XP
                           </span>
@@ -201,7 +201,7 @@ export default function AdminLeaderboards() {
                           <span className="text-accent font-medium">
                             🔥 {host.streak} days
                           </span>
-                        </td>
+                        </td> */}
                       </tr>
                     ))
                   ) : (
@@ -230,8 +230,8 @@ export default function AdminLeaderboards() {
                     <th className="p-4 font-medium">Wallet</th>
                     <th className="p-4 font-medium">Total Spending</th>
                     <th className="p-4 font-medium">Tickets</th>
-                    <th className="p-4 font-medium">XP</th>
-                    <th className="p-4 font-medium">Streak</th>
+                    {/* <th className="p-4 font-medium">XP</th>
+                    <th className="p-4 font-medium">Streak</th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -248,10 +248,10 @@ export default function AdminLeaderboards() {
                                 index === 0
                                   ? "bg-gradient-primary text-white"
                                   : index === 1
-                                  ? "bg-secondary/20 text-secondary"
-                                  : index === 2
-                                  ? "bg-accent/20 text-accent"
-                                  : "bg-muted text-muted-foreground"
+                                    ? "bg-secondary/20 text-secondary"
+                                    : index === 2
+                                      ? "bg-accent/20 text-accent"
+                                      : "bg-muted text-muted-foreground"
                               }`}
                             >
                               {index + 1}
@@ -276,7 +276,7 @@ export default function AdminLeaderboards() {
                         <td className="p-4 text-muted-foreground">
                           {buyer.tickets}
                         </td>
-                        <td className="p-4">
+                        {/* <td className="p-4">
                           <span className="px-2 py-1 rounded-md bg-accent/10 text-accent text-sm font-medium">
                             {buyer.xp.toLocaleString()} XP
                           </span>
@@ -285,7 +285,7 @@ export default function AdminLeaderboards() {
                           <span className="text-accent font-medium">
                             🔥 {buyer.streak} days
                           </span>
-                        </td>
+                        </td> */}
                       </tr>
                     ))
                   ) : (

@@ -27,7 +27,7 @@ import AdminRaffles from "./views/admin/AdminRaffles";
 import AdminCollections from "./views/admin/AdminCollections";
 import AdminTokens from "./views/admin/AdminTokens";
 // import AdminFees from "./views/admin/AdminFees";
-import AdminRewards from "./views/admin/AdminRewards";
+//import AdminRewards from "./views/admin/AdminRewards";
 import AdminLeaderboards from "./views/admin/AdminLeaderboards";
 import AdminAnalytics from "./views/admin/AdminAnalytics";
 import { ProtectedAdminRoute } from "./components/auth/ProtectedAdminRoute";
@@ -42,7 +42,7 @@ function App() {
   // }
 
   const dispatch = useAppDispatch();
-  
+
   // Initialize Socket.IO connection
   useSocket();
 
@@ -74,93 +74,93 @@ function App() {
             pauseOnHover
           />
           <Routes>
-          {/* Public routes with main Layout */}
-          <Route
-            path="/"
-            element={
-              <Layout>
-                <Home />
-              </Layout>
-            }
-          />
-          <Route
-            path="/leaderboard"
-            element={
-              <Layout>
-                <Leaderboard />
-              </Layout>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <Layout>
-                <Profile />
-              </Layout>
-            }
-          />
-          <Route
-            path="/profile/EditProfile"
-            element={
-              <Layout>
-                <EditProfile />
-              </Layout>
-            }
-          />
-          <Route
-            path="/create"
-            element={
-              <Layout>
-                <CreateRaffle />
-              </Layout>
-            }
-          />
-          <Route
-            path="/raffle/:slug"
-            element={
-              <Layout>
-                <RaffleDetail />
-              </Layout>
-            }
-          />
+            {/* Public routes with main Layout */}
+            <Route
+              path="/"
+              element={
+                <Layout>
+                  <Home />
+                </Layout>
+              }
+            />
+            <Route
+              path="/leaderboard"
+              element={
+                <Layout>
+                  <Leaderboard />
+                </Layout>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <Layout>
+                  <Profile />
+                </Layout>
+              }
+            />
+            <Route
+              path="/profile/EditProfile"
+              element={
+                <Layout>
+                  <EditProfile />
+                </Layout>
+              }
+            />
+            <Route
+              path="/create"
+              element={
+                <Layout>
+                  <CreateRaffle />
+                </Layout>
+              }
+            />
+            <Route
+              path="/raffle/:slug"
+              element={
+                <Layout>
+                  <RaffleDetail />
+                </Layout>
+              }
+            />
 
-          <Route path="/forbidden" element={<Forbidden />} />
+            <Route path="/forbidden" element={<Forbidden />} />
 
-          {/* Admin routes with AdminLayout */}
-          <Route element={<ProtectedAdminRoute />}>
-            <Route
-              path="/admin"
-              element={
-                <AdminLayout>
-                  <AdminDashboard />
-                </AdminLayout>
-              }
-            />
-            <Route
-              path="/admin/raffles"
-              element={
-                <AdminLayout>
-                  <AdminRaffles />
-                </AdminLayout>
-              }
-            />
-            <Route
-              path="/admin/collections"
-              element={
-                <AdminLayout>
-                  <AdminCollections />
-                </AdminLayout>
-              }
-            />
-            <Route
-              path="/admin/tokens"
-              element={
-                <AdminLayout>
-                  <AdminTokens />
-                </AdminLayout>
-              }
-            />
-            {/* <Route
+            {/* Admin routes with AdminLayout */}
+            <Route element={<ProtectedAdminRoute />}>
+              <Route
+                path="/admin"
+                element={
+                  <AdminLayout>
+                    <AdminDashboard />
+                  </AdminLayout>
+                }
+              />
+              <Route
+                path="/admin/raffles"
+                element={
+                  <AdminLayout>
+                    <AdminRaffles />
+                  </AdminLayout>
+                }
+              />
+              <Route
+                path="/admin/collections"
+                element={
+                  <AdminLayout>
+                    <AdminCollections />
+                  </AdminLayout>
+                }
+              />
+              <Route
+                path="/admin/tokens"
+                element={
+                  <AdminLayout>
+                    <AdminTokens />
+                  </AdminLayout>
+                }
+              />
+              {/* <Route
               path="/admin/fees"
               element={
                 <AdminLayout>
@@ -168,31 +168,31 @@ function App() {
                 </AdminLayout>
               }
             /> */}
-            <Route
+              {/* <Route
               path="/admin/rewards"
               element={
                 <AdminLayout>
                   <AdminRewards />
                 </AdminLayout>
               }
-            />
-            <Route
-              path="/admin/leaderboards"
-              element={
-                <AdminLayout>
-                  <AdminLeaderboards />
-                </AdminLayout>
-              }
-            />
-            <Route
-              path="/admin/analytics"
-              element={
-                <AdminLayout>
-                  <AdminAnalytics />
-                </AdminLayout>
-              }
-            />
-          </Route>
+            /> */}
+              <Route
+                path="/admin/leaderboards"
+                element={
+                  <AdminLayout>
+                    <AdminLeaderboards />
+                  </AdminLayout>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <AdminLayout>
+                    <AdminAnalytics />
+                  </AdminLayout>
+                }
+              />
+            </Route>
           </Routes>
           {/* </UmiProvider> */}
         </WalletWrapper>

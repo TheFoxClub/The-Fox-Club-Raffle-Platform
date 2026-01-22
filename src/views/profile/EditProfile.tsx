@@ -25,7 +25,7 @@ const EditProfile = () => {
   const navigate = useNavigate();
 
   const { user_info, pubkey, isLoading } = useSelector(
-    (state: RootState) => state.user
+    (state: RootState) => state.user,
   );
 
   const [formData, setFormData] = useState<FormData>({
@@ -57,7 +57,7 @@ const EditProfile = () => {
             ...userData,
             isAuthenticated: true,
             isLoading: false,
-          })
+          }),
         );
       } catch (err) {
         console.error("Failed to fetch user info:", err);
@@ -90,7 +90,7 @@ const EditProfile = () => {
   }, [user_info]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { id, value } = e.target;
     setFormData((prev) => ({
@@ -177,7 +177,7 @@ const EditProfile = () => {
           ...res.data.data.user,
           isAuthenticated: true,
           isLoading: false,
-        })
+        }),
       );
 
       toast.success("Profile updated successfully!");
