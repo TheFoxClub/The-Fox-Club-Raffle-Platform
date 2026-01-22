@@ -62,6 +62,14 @@ class TicketController {
 
       const raffleData = await Raffle.findOne({ where: { id: raffleId } });
 
+      if (raffleData.ticketsSold + ticketCount > raffleData.totalTickets) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Not enough tickets available",
+        );
+      }
+
       if (!raffleData) {
         return respond(res, httpStatus.BAD_REQUEST, "Raffle not found");
       }
