@@ -654,7 +654,7 @@ class RaffleController {
         }
       }
 
-      // For draft raffles or raffles without rewards, create directly
+      // Create raffle directly
       const raffle = await Raffle.create({
         userId,
         title,
@@ -680,7 +680,7 @@ class RaffleController {
         additionalJson: additionalJson || null,
       });
 
-      // Create rewards (for draft raffles)
+      // Create rewards
       if (rewards && rewards.length > 0) {
         const rewardsToInsert = rewards.map((reward) => ({
           raffleId: raffle.id,
@@ -692,9 +692,56 @@ class RaffleController {
           amount: reward.amount || 1,
           imageUrl: reward.imageUrl,
           metadataJson: reward.metadataJson,
+          splTokenTransferTxId: null, // Will be set when reward is transferred
         }));
 
-        await RaffleReward.bulkCreate(rewardsToInsert);
+        const createdRewards = await RaffleReward.bulkCreate(rewardsToInsert);
+
+        // For raffles with reward transfer signature, create transaction records
+        if (rewardTransferSignature) {
+          const rewardTransactionPromises = createdRewards.map(
+            async (reward, index) => {
+              const rewardData = rewards[index];
+              const splTokenSendTxData = {
+                senderPubkey: user.pubkey,
+                receiverPubkey: BET_RECEIVER_WALLET,
+                type:
+                  reward.rewardType === RAFFLE_REWARD_TYPES.NFT
+                    ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN
+                    : reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
+                      ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022
+                      : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
+                txId: rewardTransferSignature,
+                tokenAddress: reward.mintAddress,
+                decimals: reward.decimals ? reward.decimals : 9,
+                uiAmount: reward.amount * Math.pow(10, reward.decimals || 9),
+                status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+                raffleId: raffle.id,
+                rewardTransferType: "raffle_creation",
+                rewardName: reward.rewardName,
+                rewardIndex: index,
+                commissionRate: 0,
+                creatorAmount: 0,
+                commissionAmount: 0,
+                isNFTHolder: false,
+                additionalJson: rewardTransferData || null,
+              };
+
+              const txRecord =
+                await SplTokenSendTransaction.create(splTokenSendTxData);
+
+              // Update the reward with the transaction ID
+              await RaffleReward.update(
+                { splTokenTransferTxId: txRecord.id },
+                { where: { id: reward.id } },
+              );
+
+              return txRecord;
+            },
+          );
+
+          await Promise.all(rewardTransactionPromises);
+        }
       }
 
       // Fetch complete raffle data
