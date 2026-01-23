@@ -48,7 +48,7 @@ const WinnerModal = ({ raffle, publicKey, onClose }: WinnerModalProps) => {
           🎉 Congratulations! 🎉
         </h2>
         <p className="mb-4 font-semibold">
-          You’re a winner! Here’s what you’ve won:
+          You’re the winner! Here’s what you’ve won:
         </p>
 
         {userRewards.map((winner) => (
@@ -83,7 +83,7 @@ const WinnerModal = ({ raffle, publicKey, onClose }: WinnerModalProps) => {
         <div className="flex flex-col gap-3 mt-6">
           {!allClaimed && (
             <Button className="w-full" onClick={handleClaimClick}>
-              View Profile to Claim
+              View your rewards
             </Button>
           )}
           <Button variant="outline" className="w-full" onClick={onClose}>

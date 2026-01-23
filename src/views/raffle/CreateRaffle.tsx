@@ -792,14 +792,20 @@ const CreateRaffle = () => {
       setStartDate(draft.startDate || "");
       setEndDate(draft.endDate || "");
       setSelectedTokenType(draft.tokenType || null);
+
+      if (draft.imageUrl) {
+        setRaffleImagePreview(draft.imageUrl);
+      }
     } catch (err) {
       console.error("Failed to load draft", err);
     }
     const loadedNFTs: any[] = [];
     const loadedTokens: any[] = [];
 
-    if (draft.rewards && Array.isArray(draft.rewards)) {
-      draft.rewards.forEach((reward: any) => {
+    const rewards = draft.raffle_rewards || draft.rewards || [];
+
+    if (Array.isArray(rewards)) {
+      rewards.forEach((reward: any) => {
         // Parse metadata if it exists as a string
         let metadata: any = {};
         try {
@@ -808,7 +814,15 @@ const CreateRaffle = () => {
           console.error("Error parsing metadata", e);
         }
 
-        if (reward.rewardType === "NFT") {
+        // Handle rewardType as both string and number (based on your response)
+        const rewardType =
+          typeof reward.rewardType === "number"
+            ? reward.rewardType === 0
+              ? "NFT"
+              : "SPL_TOKEN"
+            : reward.rewardType;
+
+        if (rewardType === "NFT" || rewardType === 0) {
           loadedNFTs.push({
             id: reward.mintAddress, // UI uses 'id'
             mint: reward.mintAddress,
@@ -817,12 +831,12 @@ const CreateRaffle = () => {
             collection: metadata.collection || "",
             raw: {}, // Raw data might be missing, but that's okay for display
           });
-        } else if (reward.rewardType.includes("SPL_TOKEN")) {
+        } else if (rewardType.includes("SPL_TOKEN") || rewardType === 1) {
           loadedTokens.push({
             mint: reward.mintAddress,
             name: reward.rewardName,
-            amountToUse: reward.amount,
-            amount: reward.amount,
+            amountToUse: Number(reward.amount),
+            amount: Number(reward.amount),
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
         }

@@ -156,6 +156,7 @@ const RaffleDetail = () => {
   const [hostPhotoUrl, setHostPhotoUrl] = useState<string | null>(null);
   const winners = raffle?.winnersData ?? [];
   const [nftImages, setNftImages] = useState<Record<string, string>>({});
+  const [isBuying, setIsBuying] = useState(false);
 
   const TOKEN_MAP: Record<number, string> = {
     0: "SOL",
@@ -206,6 +207,7 @@ const RaffleDetail = () => {
   };
 
   const handleBuyTickets = useCallback(async () => {
+    if (isBuying) return;
     if (!raffle) {
       toast.error("Raffle data not loaded");
       return;
@@ -232,10 +234,9 @@ const RaffleDetail = () => {
       toast.error("Not enough tickets available");
       return;
     }
-
-    toast.info("Processing transaction. Please wait...");
-
+    setIsBuying(true);
     try {
+      toast.info("Processing transaction. Please wait...");
       const transactionResponse = await server.post("/ticket/buy", {
         senderPubkey: publicKey.toBase58(),
         type: "solana",
@@ -286,6 +287,8 @@ const RaffleDetail = () => {
           confirmResponse.data.message || "Failed to confirm purchase",
         );
       }
+
+      await fetchRaffle();
     } catch (error: any) {
       console.error("Transaction error:", error);
 
@@ -300,8 +303,9 @@ const RaffleDetail = () => {
       }
     } finally {
       // setProcessing(false);
+      setIsBuying(false);
     }
-  }, [raffle, ticketCount, publicKey, signTransaction, connected]);
+  }, [raffle, ticketCount, publicKey, signTransaction, connected, isBuying]);
 
   const fetchRaffle = useCallback(async () => {
     if (!raffleId) return;
@@ -1053,10 +1057,16 @@ const RaffleDetail = () => {
               <Button
                 className="w-full gradient-primary glow-primary h-10 sm:h-12 text-base sm:text-lg mt-4"
                 onClick={handleBuyTickets}
-                disabled={!connected}
+                disabled={!connected || isBuying}
               >
-                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
+                {isBuying ? (
+                  "Processing..."
+                ) : (
+                  <>
+                    <Ticket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
+                  </>
+                )}
               </Button>
             )}
 
