@@ -538,22 +538,6 @@ class RaffleController {
     try {
       const userId = req.payload?.id;
 
-      // Check for existing draft
-      const existingDraft = await Raffle.findOne({
-        where: {
-          userId,
-          status: RAFFLE_STATUS.DRAFT,
-        },
-      });
-
-      if (existingDraft) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "You already have a draft raffle. Please edit or delete the existing draft before creating a new one.",
-        );
-      }
-
       const {
         title,
         description,
@@ -570,10 +554,246 @@ class RaffleController {
         rewards,
         rewardTransferSignature, // for proof of reward transfer
         rewardTransferData, // for reward transfer metadata
+        draftId, // for converting existing draft to live raffle
       } = req.body;
 
       const raffleStatus = req.body.status || RAFFLE_STATUS.UPCOMING;
       const statusEnum = RAFFLE_STATUS[raffleStatus] ?? RAFFLE_STATUS.UPCOMING;
+
+      const user = await User.findOne({
+        where: { id: userId },
+        attributes: ["pubkey"],
+      });
+
+      if (!user || !user.pubkey) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "User wallet not found. Please connect your wallet.",
+        );
+      }
+
+      if (!BET_RECEIVER_WALLET) {
+        return respond(
+          res,
+          httpStatus.INTERNAL_SERVER_ERROR,
+          "Bet Receiver wallet not configured",
+        );
+      }
+
+      // Handle existing draft conversion to live raffle
+      if (draftId && statusEnum !== RAFFLE_STATUS.DRAFT) {
+        // User wants to convert existing draft to live raffle
+        const existingDraft = await Raffle.findOne({
+          where: {
+            id: draftId,
+            userId,
+            status: RAFFLE_STATUS.DRAFT,
+          },
+        });
+
+        if (!existingDraft) {
+          return respond(
+            res,
+            httpStatus.NOT_FOUND,
+            "Draft raffle not found or you don't have permission to modify it.",
+          );
+        }
+
+        // Update the existing draft to live raffle
+        // Determine the correct status based on dates (same logic as cron job)
+        const currentDate = new Date();
+        let correctStatus;
+
+        const raffleStartDate = startDate
+          ? new Date(startDate)
+          : existingDraft.startDate;
+        const raffleEndDate = endDate
+          ? new Date(endDate)
+          : existingDraft.endDate;
+
+        if (raffleEndDate < currentDate) {
+          // Raffle end date has already passed
+          correctStatus = RAFFLE_STATUS.ENDED;
+        } else if (raffleStartDate < currentDate) {
+          // Raffle is currently running
+          correctStatus = RAFFLE_STATUS.LIVE;
+        } else {
+          // Raffle is upcoming
+          correctStatus = RAFFLE_STATUS.UPCOMING;
+        }
+
+        await existingDraft.update({
+          title: title || existingDraft.title,
+          description: description || existingDraft.description,
+          imageUrl: imageUrl || existingDraft.imageUrl,
+          totalTickets: totalTickets || existingDraft.totalTickets,
+          ticketPrice: ticketPrice || existingDraft.ticketPrice,
+          tokenType: tokenType
+            ? TOKEN_TYPE[tokenType]
+            : existingDraft.tokenType,
+          numberOfWinners: numberOfWinners || existingDraft.numberOfWinners,
+          startDate: raffleStartDate,
+          endDate: raffleEndDate,
+          status: correctStatus, // Use calculated status based on dates
+          platformWallet: BET_RECEIVER_WALLET,
+        });
+
+        if (
+          requiresNftVerification !== undefined ||
+          verifiedCollectionRequired !== undefined ||
+          additionalJson !== undefined
+        ) {
+          await RaffleDetail.update(
+            {
+              requiresNftVerification:
+                requiresNftVerification !== undefined
+                  ? requiresNftVerification
+                  : existingDraft.raffle_detail?.requiresNftVerification,
+              verifiedCollectionRequired:
+                verifiedCollectionRequired !== undefined
+                  ? verifiedCollectionRequired
+                  : existingDraft.raffle_detail?.verifiedCollectionRequired,
+              additionalJson:
+                additionalJson !== undefined
+                  ? additionalJson
+                  : existingDraft.raffle_detail?.additionalJson,
+            },
+            {
+              where: { raffleId: draftId },
+            },
+          );
+        }
+
+        // Handle rewards update
+        if (rewards && rewards.length > 0) {
+          // Remove existing rewards
+          await RaffleReward.destroy({ where: { raffleId: draftId } });
+
+          // Create new rewards
+          const rewardsToInsert = rewards.map((reward) => ({
+            raffleId: draftId,
+            rewardType:
+              RAFFLE_REWARD_TYPES[reward.rewardType] ||
+              RAFFLE_REWARD_TYPES.SPL_TOKEN,
+            rewardName: reward.rewardName,
+            mintAddress: reward.mintAddress,
+            amount: reward.amount || 1,
+            imageUrl: reward.imageUrl,
+            metadataJson: reward.metadataJson,
+            splTokenTransferTxId: null, // Will be set when reward is transferred
+          }));
+
+          const createdRewards = await RaffleReward.bulkCreate(rewardsToInsert);
+
+          // For non-draft raffles with reward transfer signature, create transaction records
+          if (rewardTransferSignature && statusEnum !== RAFFLE_STATUS.DRAFT) {
+            const rewardTransactionPromises = createdRewards.map(
+              async (reward, index) => {
+                const rewardData = rewards[index];
+                const splTokenSendTxData = {
+                  senderPubkey: user.pubkey,
+                  receiverPubkey: BET_RECEIVER_WALLET,
+                  type:
+                    reward.rewardType === RAFFLE_REWARD_TYPES.NFT
+                      ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN
+                      : reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
+                        ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022
+                        : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
+                  txId: rewardTransferSignature,
+                  tokenAddress: reward.mintAddress,
+                  decimals: reward.decimals ? reward.decimals : 9,
+                  uiAmount: reward.amount * Math.pow(10, reward.decimals || 9),
+                  status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+                  raffleId: draftId,
+                  rewardTransferType: "raffle_creation",
+                  rewardName: reward.rewardName,
+                  rewardIndex: index,
+                  commissionRate: 0,
+                  creatorAmount: 0,
+                  commissionAmount: 0,
+                  isNFTHolder: false,
+                  additionalJson: rewardTransferData || null,
+                };
+
+                const txRecord =
+                  await SplTokenSendTransaction.create(splTokenSendTxData);
+
+                // Update the reward with the transaction ID
+                await RaffleReward.update(
+                  { splTokenTransferTxId: txRecord.id },
+                  { where: { id: reward.id } },
+                );
+
+                return txRecord;
+              },
+            );
+
+            await Promise.all(rewardTransactionPromises);
+          }
+        }
+
+        // Fetch complete updated raffle data
+        const updatedRaffle = await Raffle.findOne({
+          where: { id: draftId },
+          include: [
+            { model: RaffleDetail },
+            {
+              model: RaffleReward,
+              attributes: { exclude: ["createdAt", "updatedAt"] },
+            },
+          ],
+        });
+
+        const raffleDataResponse = updatedRaffle.get({ plain: true });
+        raffleDataResponse.tokenType = mapEnumValue(
+          TOKEN_TYPE,
+          raffleDataResponse.tokenType,
+        );
+        raffleDataResponse.status = mapEnumValue(
+          RAFFLE_STATUS,
+          raffleDataResponse.status,
+        );
+
+        if (raffleDataResponse.raffle_rewards) {
+          raffleDataResponse.raffle_rewards =
+            raffleDataResponse.raffle_rewards.map((reward) => ({
+              ...reward,
+              rewardType: mapEnumValue(RAFFLE_REWARD_TYPES, reward.rewardType),
+            }));
+        }
+
+        logger.info(
+          `Draft raffle ${draftId} converted to live raffle by user ${userId}. Status: DRAFT → ${mapEnumValue(RAFFLE_STATUS, correctStatus)} (${correctStatus})`,
+        );
+
+        return respond(
+          res,
+          httpStatus.OK,
+          "Draft raffle converted to live raffle successfully",
+          {
+            raffle: raffleDataResponse,
+          },
+        );
+      }
+
+      // Check for existing draft only when creating new raffles (not converting existing drafts)
+      if (!draftId) {
+        const existingDraft = await Raffle.findOne({
+          where: {
+            userId,
+            status: RAFFLE_STATUS.DRAFT,
+          },
+        });
+
+        if (existingDraft) {
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "You already have a draft raffle. Please edit or delete the existing draft before creating a new one.",
+          );
+        }
+      }
 
       // Validate non-draft raffles
       if (statusEnum !== RAFFLE_STATUS.DRAFT) {
@@ -600,19 +820,6 @@ class RaffleController {
             "Start date must be before end date",
           );
         }
-      }
-
-      const user = await User.findOne({
-        where: { id: userId },
-        attributes: ["pubkey"],
-      });
-
-      if (!user || !user.pubkey) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "User wallet not found. Please connect your wallet.",
-        );
       }
 
       if (!BET_RECEIVER_WALLET) {
@@ -655,6 +862,29 @@ class RaffleController {
       }
 
       // Create raffle directly
+      let finalStatus = statusEnum;
+
+      if (statusEnum !== RAFFLE_STATUS.DRAFT) {
+        const currentDate = new Date();
+        const raffleStartDate = startDate
+          ? new Date(startDate)
+          : getFormattedDate(3);
+        const raffleEndDate = endDate
+          ? new Date(endDate)
+          : getFormattedDate(10);
+
+        if (raffleEndDate < currentDate) {
+          // Raffle end date has already passed
+          finalStatus = RAFFLE_STATUS.ENDED;
+        } else if (raffleStartDate < currentDate) {
+          // Raffle is currently running
+          finalStatus = RAFFLE_STATUS.LIVE;
+        } else {
+          // Raffle is upcoming
+          finalStatus = RAFFLE_STATUS.UPCOMING;
+        }
+      }
+
       const raffle = await Raffle.create({
         userId,
         title,
@@ -667,7 +897,7 @@ class RaffleController {
         numberOfWinners: totalWinners,
         startDate: startDate || getFormattedDate(3),
         endDate: endDate || getFormattedDate(10),
-        status: statusEnum,
+        status: finalStatus, // Use calculated status based on dates
         platformWallet: BET_RECEIVER_WALLET,
       });
 
@@ -697,8 +927,8 @@ class RaffleController {
 
         const createdRewards = await RaffleReward.bulkCreate(rewardsToInsert);
 
-        // For raffles with reward transfer signature, create transaction records
-        if (rewardTransferSignature) {
+        // For non-draft raffles with reward transfer signature, create transaction records
+        if (rewardTransferSignature && statusEnum !== RAFFLE_STATUS.DRAFT) {
           const rewardTransactionPromises = createdRewards.map(
             async (reward, index) => {
               const rewardData = rewards[index];
@@ -930,6 +1160,28 @@ class RaffleController {
           res,
           httpStatus.BAD_REQUEST,
           "Missing required data: signature, raffleId, or rewardTransferData",
+        );
+      }
+
+      // Validate that the raffle exists and is not a draft
+      const raffle = await Raffle.findOne({
+        where: { id: raffleId, userId },
+        attributes: ["id", "status"],
+      });
+
+      if (!raffle) {
+        return respond(
+          res,
+          httpStatus.NOT_FOUND,
+          "Raffle not found or you don't have permission to modify it",
+        );
+      }
+
+      if (raffle.status === RAFFLE_STATUS.DRAFT) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Cannot store reward transfer signature for draft raffles",
         );
       }
 
@@ -1976,6 +2228,8 @@ class RaffleController {
       if (!draft) {
         return respond(res, httpStatus.NOT_FOUND, "Draft Raffle Not Found");
       }
+
+      await SplTokenSendTransaction.destroy({ where: { raffleId } });
 
       await RaffleDetail.destroy({ where: { raffleId } });
       await RaffleReward.destroy({ where: { raffleId } });

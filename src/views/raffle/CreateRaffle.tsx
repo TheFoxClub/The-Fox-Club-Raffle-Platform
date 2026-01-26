@@ -595,6 +595,15 @@ const CreateRaffle = () => {
           await fetchDrafts();
         }
         return;
+      } else if (status === "DRAFT") {
+        // CREATE NEW DRAFT - No reward transfer needed
+        res = await server.post("/raffle/create", payload);
+
+        if (res.data.success) {
+          toast.success("Draft saved!");
+          await fetchDrafts();
+        }
+        return;
       } else {
         const hasRewards = selectedNFTs.length > 0 || selectedTokens.length > 0;
 
@@ -714,12 +723,20 @@ const CreateRaffle = () => {
               throw submitError;
             }
 
-            // Only NOW create the raffle with proof of successful reward transfer
-            res = await server.post("/raffle/create", {
+            // Create raffle with proof of successful reward transfer
+            // If there's a draft, convert it to live raffle; otherwise create new raffle
+            const createPayload = {
               ...payload,
               rewardTransferSignature: signature,
               rewardTransferData,
-            });
+            };
+
+            // Add draftId if converting existing draft
+            if (draftId) {
+              createPayload.draftId = draftId;
+            }
+
+            res = await server.post("/raffle/create", createPayload);
           } catch (signError: any) {
             console.error("Reward transfer failed:", signError);
             if (signError.message?.includes("rejected")) {
@@ -755,7 +772,15 @@ const CreateRaffle = () => {
           }
         } else {
           // No rewards, create raffle directly
-          res = await server.post("/raffle/create", payload);
+          // If there's a draft, convert it to live raffle; otherwise create new raffle
+          const createPayload = { ...payload };
+
+          // Add draftId if converting existing draft
+          if (draftId) {
+            createPayload.draftId = draftId;
+          }
+
+          res = await server.post("/raffle/create", createPayload);
         }
       }
 
