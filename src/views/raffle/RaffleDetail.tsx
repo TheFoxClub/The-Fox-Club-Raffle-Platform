@@ -24,7 +24,7 @@ import server from "../../config/server";
 import { toast } from "react-toastify";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
-import { storeSignature } from "./api";
+import { storeSignature, cancelReservation } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
 
@@ -234,9 +234,14 @@ const RaffleDetail = () => {
       toast.error("Not enough tickets available");
       return;
     }
+    
     setIsBuying(true);
+    let reservationId: string | null = null;
+    
     try {
-      toast.info("Processing transaction. Please wait...");
+      toast.info("Reserving tickets. Please wait...");
+      
+      // Step 1: Reserve tickets (this prevents race conditions)
       const transactionResponse = await server.post("/ticket/buy", {
         senderPubkey: publicKey.toBase58(),
         type: "solana",
@@ -246,24 +251,37 @@ const RaffleDetail = () => {
 
       if (!transactionResponse.data.success) {
         throw new Error(
-          transactionResponse.data.message || "Failed to create transaction",
+          transactionResponse.data.message || "Failed to reserve tickets",
         );
       }
 
-      const { transaction } = transactionResponse.data.data;
+      const { 
+        transaction, 
+        reservationId: resId, 
+        reservationExpiresAt,
+        reservationTimeoutSeconds 
+      } = transactionResponse.data.data;
+      
+      reservationId = resId;
 
+      // Show reservation countdown
+      toast.info(`Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`);
+
+      // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(
         Buffer.from(transaction, "base64"),
       );
 
       const signedTransaction = await signTransaction(solanaTransaction);
 
+      // Step 3: Submit transaction to Solana
       const connection = new Connection(SOLANA_RPC_HOST);
 
       const signature = await connection.sendRawTransaction(
         signedTransaction.serialize(),
       );
 
+      // Step 4: Confirm reservation with signature
       const confirmResponse = await storeSignature(
         publicKey.toBase58(),
         signature,
@@ -276,11 +294,11 @@ const RaffleDetail = () => {
         "sol",
         ticketCount,
         raffle.id,
+        reservationId // Pass reservation ID
       );
 
       if (confirmResponse.success) {
         toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
-
         await fetchRaffle();
       } else {
         throw new Error(
@@ -288,21 +306,33 @@ const RaffleDetail = () => {
         );
       }
 
-      await fetchRaffle();
     } catch (error: any) {
       console.error("Transaction error:", error);
+
+      // Cancel reservation if transaction failed
+      if (reservationId) {
+        try {
+          await cancelReservation(reservationId);
+        } catch (cancelError) {
+          console.error("Failed to cancel reservation:", cancelError);
+        }
+      }
 
       if (error.message.includes("rejected")) {
         toast.error("Transaction was rejected by wallet");
       } else if (error.message.includes("insufficient")) {
         toast.error("Insufficient balance");
+      } else if (error.message.includes("EXISTING_RESERVATION")) {
+        toast.error("You already have an active reservation for this raffle");
+      } else if (error.message.includes("INSUFFICIENT_TICKETS")) {
+        toast.error("Not enough tickets available");
+        await fetchRaffle(); // Refresh raffle data
       } else if (error.response?.data?.message) {
         toast.error(error.response.data.message);
       } else {
         toast.error(error.message || "Transaction failed");
       }
     } finally {
-      // setProcessing(false);
       setIsBuying(false);
     }
   }, [raffle, ticketCount, publicKey, signTransaction, connected, isBuying]);
