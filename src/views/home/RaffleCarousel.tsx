@@ -49,14 +49,7 @@ export default function RaffleCarousel() {
             sold: Number(r.ticketsSold ?? 0),
             total: Number(r.totalTickets),
             image: r.imageUrl,
-            tokenType:
-              r.tokenType === 0
-                ? "SOL"
-                : r.tokenType === 1
-                ? "USDT"
-                : r.tokenType === 2
-                ? "BONK"
-                : "USDC",
+            tokenType: r.tokenType === "SOLANA" ? "SOL" : r.tokenType,
             isVerified: r.raffle_detail?.requiresNftVerification ?? false,
           }));
 
@@ -95,14 +88,7 @@ export default function RaffleCarousel() {
                   sold: Number(r.ticketsSold ?? 0),
                   total: Number(r.totalTickets),
                   image: r.imageUrl,
-                  tokenType:
-                    r.tokenType === 0
-                      ? "SOL"
-                      : r.tokenType === 1
-                      ? "USDT"
-                      : r.tokenType === 2
-                      ? "BONK"
-                      : "USDC",
+                  tokenType: r.tokenType === "SOLANA" ? "SOL" : r.tokenType,
                   isVerified: r.raffle_detail?.requiresNftVerification ?? false,
                 }));
                 setRaffles(mapped);
