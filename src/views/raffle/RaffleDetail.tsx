@@ -139,6 +139,21 @@ function formatCountdown(targetDateStr: string) {
   return `${seconds}s`;
 }
 
+const isInsufficientFundsError = (error: any) => {
+  const message =
+    error?.message ||
+    error?.toString?.() ||
+    error?.response?.data?.message ||
+    "";
+
+  return (
+    message.includes("insufficient") ||
+    message.includes("Attempt to debit") ||
+    message.includes("InsufficientFunds") ||
+    message.includes("0 lamports")
+  );
+};
+
 const RaffleDetail = () => {
   const { publicKey, signTransaction, connected } = useWallet();
   const { slug } = useParams<{ slug: string }>();
@@ -163,6 +178,24 @@ const RaffleDetail = () => {
     1: "USDT",
     2: "BONK",
     3: "USDC",
+  };
+
+  const extractErrorMessage = (error: any): string => {
+    if (!error) return "";
+
+    if (typeof error === "string") return error;
+
+    if (error.message) return error.message;
+
+    if (error.error?.message) return error.error.message;
+
+    if (error.error?.data?.err) return error.error.data.err;
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "";
+    }
   };
 
   const isNFTReward = (rewardType: number) =>
@@ -234,13 +267,24 @@ const RaffleDetail = () => {
       toast.error("Not enough tickets available");
       return;
     }
-    
+
+    const connection = new Connection(SOLANA_RPC_HOST);
+    const balance = await connection.getBalance(publicKey);
+
+    if (balance === 0) {
+      toast.error(
+        "Insufficient balance. Please add SOL to your wallet to buy tickets.",
+      );
+      setIsBuying(false);
+      return;
+    }
+
     setIsBuying(true);
     let reservationId: string | null = null;
-    
+
     try {
       toast.info("Reserving tickets. Please wait...");
-      
+
       // Step 1: Reserve tickets (this prevents race conditions)
       const transactionResponse = await server.post("/ticket/buy", {
         senderPubkey: publicKey.toBase58(),
@@ -255,17 +299,19 @@ const RaffleDetail = () => {
         );
       }
 
-      const { 
-        transaction, 
-        reservationId: resId, 
+      const {
+        transaction,
+        reservationId: resId,
         reservationExpiresAt,
-        reservationTimeoutSeconds 
+        reservationTimeoutSeconds,
       } = transactionResponse.data.data;
-      
+
       reservationId = resId;
 
       // Show reservation countdown
-      toast.info(`Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`);
+      toast.info(
+        `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
+      );
 
       // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(
@@ -294,7 +340,7 @@ const RaffleDetail = () => {
         "sol",
         ticketCount,
         raffle.id,
-        reservationId // Pass reservation ID
+        reservationId, // Pass reservation ID
       );
 
       if (confirmResponse.success) {
@@ -305,7 +351,6 @@ const RaffleDetail = () => {
           confirmResponse.data.message || "Failed to confirm purchase",
         );
       }
-
     } catch (error: any) {
       console.error("Transaction error:", error);
 
@@ -318,19 +363,41 @@ const RaffleDetail = () => {
         }
       }
 
-      if (error.message.includes("rejected")) {
-        toast.error("Transaction was rejected by wallet");
-      } else if (error.message.includes("insufficient")) {
-        toast.error("Insufficient balance");
-      } else if (error.message.includes("EXISTING_RESERVATION")) {
+      const errorMessage = extractErrorMessage(error).toLowerCase();
+
+      if (
+        errorMessage.includes("blockhash not found") ||
+        errorMessage.includes("blockhashnotfound") ||
+        errorMessage.includes("transaction simulation failed") ||
+        errorMessage.includes(
+          "Transaction simulation failed: Blockhash not found",
+        )
+      ) {
+        toast.warning("Transaction expired. Please try again.");
+        return;
+      }
+
+      if (error?.message?.includes("rejected")) {
+        toast.error("Transaction was cancelled in your wallet");
+        return;
+      }
+
+      if (error.message.includes("EXISTING_RESERVATION")) {
         toast.error("You already have an active reservation for this raffle");
-      } else if (error.message.includes("INSUFFICIENT_TICKETS")) {
-        toast.error("Not enough tickets available");
-        await fetchRaffle(); // Refresh raffle data
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error(error.message || "Transaction failed");
+
+        if (isInsufficientFundsError(error)) {
+          toast.error(
+            "Insufficient balance. Please add funds to your wallet and try again.",
+          );
+          return;
+        }
+
+        if (error?.response?.data?.message) {
+          toast.error(error.response.data.message);
+          return;
+        }
+
+        toast.error("Transaction failed. Please try again.");
       }
     } finally {
       setIsBuying(false);

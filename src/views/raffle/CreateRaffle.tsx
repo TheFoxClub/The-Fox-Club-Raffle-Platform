@@ -76,6 +76,8 @@ const CreateRaffle = () => {
   const [endDate, setEndDate] = useState("");
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [awaitingWallet, setAwaitingWallet] = useState(false);
+  const [walletTimedOut, setWalletTimedOut] = useState(false);
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
@@ -478,6 +480,42 @@ const CreateRaffle = () => {
     setDisclaimerOpen(true);
   };
 
+  const isBlockheightExceededError = (error: any) => {
+    const msg =
+      error?.message?.toLowerCase?.() ||
+      error?.toString?.().toLowerCase?.() ||
+      "";
+
+    return (
+      msg.includes("blockheight exceeded") ||
+      msg.includes("block height exceeded") ||
+      msg.includes("transactionexpired") ||
+      msg.includes("blockhash not found")
+    );
+  };
+
+  const withTimeout = <T,>(
+    promise: Promise<T>,
+    ms: number,
+    message = "Wallet approval timed out",
+  ): Promise<T> => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(message));
+      }, ms);
+
+      promise
+        .then((res) => {
+          clearTimeout(timer);
+          resolve(res);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+  };
+
   // ----------------- FINAL SUBMIT AFTER DISCLAIMER -----------------
   const handleDisclaimerConfirm = () => {
     if (!disclaimerAccepted) {
@@ -663,7 +701,40 @@ const CreateRaffle = () => {
               }
             }
 
-            const signedTx = await signTransaction(tx);
+            //  const signedTx = await signTransaction(tx);
+            setAwaitingWallet(true);
+            setWalletTimedOut(false);
+            toast.dismiss();
+            toast.info("Waiting for wallet approval…", {
+              autoClose: 3000,
+            });
+
+            let signedTx;
+            try {
+              signedTx = await withTimeout(
+                signTransaction(tx),
+                60_000, // 1 minute
+                "Wallet approval timed out",
+              );
+            } catch (err: any) {
+              toast.dismiss();
+              setAwaitingWallet(false);
+              setLoading(false);
+
+              if (err.message.includes("timed out")) {
+                toast.error(
+                  "Wallet approval timed out. Approving the old Phantom popup will not work. Please close it and retry.",
+                  { autoClose: false },
+                );
+              } else if (err.message?.toLowerCase().includes("reject")) {
+                toast.error("Transaction was rejected in wallet.");
+              } else {
+                toast.error("Transaction signing was cancelled.");
+              }
+              return;
+            } finally {
+              setAwaitingWallet(false);
+            }
 
             let serializedTransaction;
             if (isVersioned) {
@@ -708,6 +779,12 @@ const CreateRaffle = () => {
                 );
               }
             } catch (submitError: any) {
+              console.error("Transaction submission failed:", submitError);
+
+              if (isBlockheightExceededError(submitError)) {
+                toast.error("Blockheight Exceeded. Please try again.");
+                return;
+              }
               if (submitError.getLogs) {
                 try {
                   const logs = await submitError.getLogs();
@@ -1633,10 +1710,14 @@ const CreateRaffle = () => {
             onClick={handleCreateRaffleClick}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
-            disabled={loading}
+            disabled={loading || awaitingWallet}
           >
             <PlusCircle className="h-4 w-4" />
-            {loading ? "Creating..." : "Create Raffle"}
+            {awaitingWallet
+              ? "Waiting for wallet approval…"
+              : loading
+                ? "Creating…"
+                : "Create Raffle"}
           </Button>
         </div>
       </div>
