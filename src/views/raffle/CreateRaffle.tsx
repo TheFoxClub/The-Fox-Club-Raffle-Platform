@@ -65,6 +65,7 @@ const CreateRaffle = () => {
   const [imageUploading, setImageUploading] = useState(false);
 
   const [savedDraft, setSavedDraft] = useState<any>(null);
+  const [isResumingDraft, setIsResumingDraft] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -581,7 +582,10 @@ const CreateRaffle = () => {
         additionalJson: { created: "user", category: "raffle" },
       };
 
-      const draftId = savedDraft?.id || savedDraft?.raffle?.id;
+      const draftId = isResumingDraft
+        ? savedDraft?.id || savedDraft?.raffle?.id
+        : null;
+
       let res;
 
       if (status === "DRAFT" && draftId) {
@@ -593,6 +597,19 @@ const CreateRaffle = () => {
         if (res.data.success) {
           toast.success("Draft saved!");
           await fetchDrafts();
+          // Reset the resuming flag since we've successfully updated the draft
+          setIsResumingDraft(false);
+        }
+        return;
+      } else if (status === "DRAFT") {
+        // CREATE NEW DRAFT - No reward transfer needed
+        res = await server.post("/raffle/create", payload);
+
+        if (res.data.success) {
+          toast.success("Draft saved!");
+          await fetchDrafts();
+          // Reset the resuming flag since we've successfully created a new draft
+          setIsResumingDraft(false);
         }
         return;
       } else {
@@ -714,12 +731,20 @@ const CreateRaffle = () => {
               throw submitError;
             }
 
-            // Only NOW create the raffle with proof of successful reward transfer
-            res = await server.post("/raffle/create", {
+            // Create raffle with proof of successful reward transfer
+            // If there's a draft, convert it to live raffle; otherwise create new raffle
+            const createPayload = {
               ...payload,
               rewardTransferSignature: signature,
               rewardTransferData,
-            });
+            };
+
+            // Add draftId if converting existing draft
+            if (draftId) {
+              createPayload.draftId = draftId;
+            }
+
+            res = await server.post("/raffle/create", createPayload);
           } catch (signError: any) {
             console.error("Reward transfer failed:", signError);
             if (signError.message?.includes("rejected")) {
@@ -755,13 +780,23 @@ const CreateRaffle = () => {
           }
         } else {
           // No rewards, create raffle directly
-          res = await server.post("/raffle/create", payload);
+          // If there's a draft, convert it to live raffle; otherwise create new raffle
+          const createPayload = { ...payload };
+
+          // Add draftId if converting existing draft
+          if (draftId) {
+            createPayload.draftId = draftId;
+          }
+
+          res = await server.post("/raffle/create", createPayload);
         }
       }
 
       if (res.data.success) {
         toast.success("Raffle created successfully!");
         const createdId = res.data.data.raffle.id;
+        // Reset the resuming flag since we've successfully created/converted the raffle
+        setIsResumingDraft(false);
         navigate(`/raffle/raffle-${createdId}`);
       } else {
         throw new Error(res.data.message || "Failed to create raffle");
@@ -769,6 +804,8 @@ const CreateRaffle = () => {
     } catch (e: any) {
       console.error("Raffle creation error:", e);
       toast.error(e.response?.data?.message || "Failed to create raffle");
+      // Reset the resuming flag on error so user can try again
+      setIsResumingDraft(false);
     } finally {
       setLoading(false);
     }
@@ -783,6 +820,10 @@ const CreateRaffle = () => {
   // Load a draft object into the form. This is a best-effort shallow merge.
   const loadDraft = (draft: any) => {
     if (!draft) return;
+
+    // Mark that we're resuming a draft
+    setIsResumingDraft(true);
+
     try {
       setTitle(draft.title || "");
       setDescription(draft.description || "");
@@ -792,14 +833,20 @@ const CreateRaffle = () => {
       setStartDate(draft.startDate || "");
       setEndDate(draft.endDate || "");
       setSelectedTokenType(draft.tokenType || null);
+
+      if (draft.imageUrl) {
+        setRaffleImagePreview(draft.imageUrl);
+      }
     } catch (err) {
       console.error("Failed to load draft", err);
     }
     const loadedNFTs: any[] = [];
     const loadedTokens: any[] = [];
 
-    if (draft.rewards && Array.isArray(draft.rewards)) {
-      draft.rewards.forEach((reward: any) => {
+    const rewards = draft.raffle_rewards || draft.rewards || [];
+
+    if (Array.isArray(rewards)) {
+      rewards.forEach((reward: any) => {
         // Parse metadata if it exists as a string
         let metadata: any = {};
         try {
@@ -808,7 +855,15 @@ const CreateRaffle = () => {
           console.error("Error parsing metadata", e);
         }
 
-        if (reward.rewardType === "NFT") {
+        // Handle rewardType as both string and number (based on your response)
+        const rewardType =
+          typeof reward.rewardType === "number"
+            ? reward.rewardType === 0
+              ? "NFT"
+              : "SPL_TOKEN"
+            : reward.rewardType;
+
+        if (rewardType === "NFT" || rewardType === 0) {
           loadedNFTs.push({
             id: reward.mintAddress, // UI uses 'id'
             mint: reward.mintAddress,
@@ -817,12 +872,12 @@ const CreateRaffle = () => {
             collection: metadata.collection || "",
             raw: {}, // Raw data might be missing, but that's okay for display
           });
-        } else if (reward.rewardType.includes("SPL_TOKEN")) {
+        } else if (rewardType.includes("SPL_TOKEN") || rewardType === 1) {
           loadedTokens.push({
             mint: reward.mintAddress,
             name: reward.rewardName,
-            amountToUse: reward.amount,
-            amount: reward.amount,
+            amountToUse: Number(reward.amount),
+            amount: Number(reward.amount),
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
         }
@@ -834,8 +889,6 @@ const CreateRaffle = () => {
   };
 
   const deleteDraft = async () => {
-    console.log("🗑️ Attempting to delete draft:", savedDraft);
-
     const raffleData = savedDraft?.raffle || savedDraft;
     const draftId = raffleData?.id;
     const status = raffleData?.status;
@@ -850,11 +903,9 @@ const CreateRaffle = () => {
       let res;
 
       if (status === "DRAFT") {
-        console.log("Calling DELETE /raffle/draft/" + draftId);
         // res = await server.delete(`/raffle/draft/${draftId}`);
         res = await server.delete(`/raffle/draft/${draftId}`);
       } else {
-        console.log("Calling DELETE /raffle/" + draftId);
         res = await server.delete(`/raffle/${draftId}`);
       }
 
@@ -863,6 +914,8 @@ const CreateRaffle = () => {
       if (res.data.success) {
         // Clear the saved draft state
         setSavedDraft(null);
+        // Reset the resuming flag since draft is deleted
+        setIsResumingDraft(false);
 
         setTitle("");
         setDescription("");

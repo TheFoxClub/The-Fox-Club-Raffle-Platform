@@ -24,7 +24,7 @@ import server from "../../config/server";
 import { toast } from "react-toastify";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
-import { storeSignature } from "./api";
+import { storeSignature, cancelReservation } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
 
@@ -156,6 +156,7 @@ const RaffleDetail = () => {
   const [hostPhotoUrl, setHostPhotoUrl] = useState<string | null>(null);
   const winners = raffle?.winnersData ?? [];
   const [nftImages, setNftImages] = useState<Record<string, string>>({});
+  const [isBuying, setIsBuying] = useState(false);
 
   const TOKEN_MAP: Record<number, string> = {
     0: "SOL",
@@ -206,6 +207,7 @@ const RaffleDetail = () => {
   };
 
   const handleBuyTickets = useCallback(async () => {
+    if (isBuying) return;
     if (!raffle) {
       toast.error("Raffle data not loaded");
       return;
@@ -232,10 +234,14 @@ const RaffleDetail = () => {
       toast.error("Not enough tickets available");
       return;
     }
-
-    toast.info("Processing transaction. Please wait...");
-
+    
+    setIsBuying(true);
+    let reservationId: string | null = null;
+    
     try {
+      toast.info("Reserving tickets. Please wait...");
+      
+      // Step 1: Reserve tickets (this prevents race conditions)
       const transactionResponse = await server.post("/ticket/buy", {
         senderPubkey: publicKey.toBase58(),
         type: "solana",
@@ -245,24 +251,37 @@ const RaffleDetail = () => {
 
       if (!transactionResponse.data.success) {
         throw new Error(
-          transactionResponse.data.message || "Failed to create transaction",
+          transactionResponse.data.message || "Failed to reserve tickets",
         );
       }
 
-      const { transaction } = transactionResponse.data.data;
+      const { 
+        transaction, 
+        reservationId: resId, 
+        reservationExpiresAt,
+        reservationTimeoutSeconds 
+      } = transactionResponse.data.data;
+      
+      reservationId = resId;
 
+      // Show reservation countdown
+      toast.info(`Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`);
+
+      // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(
         Buffer.from(transaction, "base64"),
       );
 
       const signedTransaction = await signTransaction(solanaTransaction);
 
+      // Step 3: Submit transaction to Solana
       const connection = new Connection(SOLANA_RPC_HOST);
 
       const signature = await connection.sendRawTransaction(
         signedTransaction.serialize(),
       );
 
+      // Step 4: Confirm reservation with signature
       const confirmResponse = await storeSignature(
         publicKey.toBase58(),
         signature,
@@ -275,33 +294,48 @@ const RaffleDetail = () => {
         "sol",
         ticketCount,
         raffle.id,
+        reservationId // Pass reservation ID
       );
 
       if (confirmResponse.success) {
         toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
-
         await fetchRaffle();
       } else {
         throw new Error(
           confirmResponse.data.message || "Failed to confirm purchase",
         );
       }
+
     } catch (error: any) {
       console.error("Transaction error:", error);
+
+      // Cancel reservation if transaction failed
+      if (reservationId) {
+        try {
+          await cancelReservation(reservationId);
+        } catch (cancelError) {
+          console.error("Failed to cancel reservation:", cancelError);
+        }
+      }
 
       if (error.message.includes("rejected")) {
         toast.error("Transaction was rejected by wallet");
       } else if (error.message.includes("insufficient")) {
         toast.error("Insufficient balance");
+      } else if (error.message.includes("EXISTING_RESERVATION")) {
+        toast.error("You already have an active reservation for this raffle");
+      } else if (error.message.includes("INSUFFICIENT_TICKETS")) {
+        toast.error("Not enough tickets available");
+        await fetchRaffle(); // Refresh raffle data
       } else if (error.response?.data?.message) {
         toast.error(error.response.data.message);
       } else {
         toast.error(error.message || "Transaction failed");
       }
     } finally {
-      // setProcessing(false);
+      setIsBuying(false);
     }
-  }, [raffle, ticketCount, publicKey, signTransaction, connected]);
+  }, [raffle, ticketCount, publicKey, signTransaction, connected, isBuying]);
 
   const fetchRaffle = useCallback(async () => {
     if (!raffleId) return;
@@ -1053,10 +1087,16 @@ const RaffleDetail = () => {
               <Button
                 className="w-full gradient-primary glow-primary h-10 sm:h-12 text-base sm:text-lg mt-4"
                 onClick={handleBuyTickets}
-                disabled={!connected}
+                disabled={!connected || isBuying}
               >
-                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
+                {isBuying ? (
+                  "Processing..."
+                ) : (
+                  <>
+                    <Ticket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
+                  </>
+                )}
               </Button>
             )}
 

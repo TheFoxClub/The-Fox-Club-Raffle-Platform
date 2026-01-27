@@ -24,7 +24,8 @@ export const storeSignature = async (
   isNFTHolder: boolean,
   entryToken: string | "",
   ticketCount: number,
-  raffleId: number
+  raffleId: number,
+  reservationId: string // NEW: Required reservation ID
 ): Promise<ResponseDataType> => {
   return apiRequest({
     method: "post",
@@ -41,6 +42,35 @@ export const storeSignature = async (
       entryToken,
       ticketCount,
       raffleId,
+      reservationId, // NEW: Include reservation ID
     },
+  });
+};
+
+export const cancelReservation = async (
+  reservationId: string
+): Promise<ResponseDataType> => {
+  return apiRequest({
+    method: "post",
+    url: "ticket/cancel-reservation",
+    data: { reservationId },
+  });
+};
+
+export const getReservationStatus = async (
+  reservationId: string
+): Promise<ResponseDataType> => {
+  return apiRequest({
+    method: "get",
+    url: `ticket/reservation-status/${reservationId}`,
+  });
+};
+
+export const getAvailableTickets = async (
+  raffleId: number
+): Promise<ResponseDataType> => {
+  return apiRequest({
+    method: "get",
+    url: `ticket/available-tickets/${raffleId}`,
   });
 };
