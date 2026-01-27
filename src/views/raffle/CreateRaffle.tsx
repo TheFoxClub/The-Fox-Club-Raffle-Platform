@@ -65,6 +65,7 @@ const CreateRaffle = () => {
   const [imageUploading, setImageUploading] = useState(false);
 
   const [savedDraft, setSavedDraft] = useState<any>(null);
+  const [isResumingDraft, setIsResumingDraft] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -581,7 +582,10 @@ const CreateRaffle = () => {
         additionalJson: { created: "user", category: "raffle" },
       };
 
-      const draftId = savedDraft?.id || savedDraft?.raffle?.id;
+      const draftId = isResumingDraft
+        ? savedDraft?.id || savedDraft?.raffle?.id
+        : null;
+
       let res;
 
       if (status === "DRAFT" && draftId) {
@@ -593,6 +597,8 @@ const CreateRaffle = () => {
         if (res.data.success) {
           toast.success("Draft saved!");
           await fetchDrafts();
+          // Reset the resuming flag since we've successfully updated the draft
+          setIsResumingDraft(false);
         }
         return;
       } else if (status === "DRAFT") {
@@ -602,6 +608,8 @@ const CreateRaffle = () => {
         if (res.data.success) {
           toast.success("Draft saved!");
           await fetchDrafts();
+          // Reset the resuming flag since we've successfully created a new draft
+          setIsResumingDraft(false);
         }
         return;
       } else {
@@ -787,6 +795,8 @@ const CreateRaffle = () => {
       if (res.data.success) {
         toast.success("Raffle created successfully!");
         const createdId = res.data.data.raffle.id;
+        // Reset the resuming flag since we've successfully created/converted the raffle
+        setIsResumingDraft(false);
         navigate(`/raffle/raffle-${createdId}`);
       } else {
         throw new Error(res.data.message || "Failed to create raffle");
@@ -794,6 +804,8 @@ const CreateRaffle = () => {
     } catch (e: any) {
       console.error("Raffle creation error:", e);
       toast.error(e.response?.data?.message || "Failed to create raffle");
+      // Reset the resuming flag on error so user can try again
+      setIsResumingDraft(false);
     } finally {
       setLoading(false);
     }
@@ -808,6 +820,10 @@ const CreateRaffle = () => {
   // Load a draft object into the form. This is a best-effort shallow merge.
   const loadDraft = (draft: any) => {
     if (!draft) return;
+
+    // Mark that we're resuming a draft
+    setIsResumingDraft(true);
+
     try {
       setTitle(draft.title || "");
       setDescription(draft.description || "");
@@ -873,8 +889,6 @@ const CreateRaffle = () => {
   };
 
   const deleteDraft = async () => {
-    console.log("🗑️ Attempting to delete draft:", savedDraft);
-
     const raffleData = savedDraft?.raffle || savedDraft;
     const draftId = raffleData?.id;
     const status = raffleData?.status;
@@ -889,11 +903,9 @@ const CreateRaffle = () => {
       let res;
 
       if (status === "DRAFT") {
-        console.log("Calling DELETE /raffle/draft/" + draftId);
         // res = await server.delete(`/raffle/draft/${draftId}`);
         res = await server.delete(`/raffle/draft/${draftId}`);
       } else {
-        console.log("Calling DELETE /raffle/" + draftId);
         res = await server.delete(`/raffle/${draftId}`);
       }
 
@@ -902,6 +914,8 @@ const CreateRaffle = () => {
       if (res.data.success) {
         // Clear the saved draft state
         setSavedDraft(null);
+        // Reset the resuming flag since draft is deleted
+        setIsResumingDraft(false);
 
         setTitle("");
         setDescription("");

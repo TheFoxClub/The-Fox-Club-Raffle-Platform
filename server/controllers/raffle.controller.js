@@ -787,11 +787,17 @@ class RaffleController {
         });
 
         if (existingDraft) {
-          return respond(
-            res,
-            httpStatus.BAD_REQUEST,
-            "You already have a draft raffle. Please edit or delete the existing draft before creating a new one.",
-          );
+          if (statusEnum === RAFFLE_STATUS.DRAFT) {
+            return respond(
+              res,
+              httpStatus.BAD_REQUEST,
+              "You already have a draft raffle. Please edit or delete the existing draft before creating a new one.",
+            );
+          } else {
+            logger.info(
+              `User ${userId} is creating a new live raffle while having an existing draft (ID: ${existingDraft.id}). Draft will remain untouched.`,
+            );
+          }
         }
       }
 
