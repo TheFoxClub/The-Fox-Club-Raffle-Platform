@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Search,
   Filter,
@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "../../components/ui/Dialog";
 import { Switch } from "../../components/ui/Switch";
+import Pagination from "../../components/ui/Pagination";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import { formatPrice } from "../../helpers/formatPrice";
@@ -52,15 +53,23 @@ interface Raffle {
   endDate?: string;
 }
 
+interface PaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 const tokenMap: Record<number, string> = {
   0: "SOL",
   3: "USDC",
 };
 
 const statusMap: Record<number, string> = {
-  2: "Live",
   1: "Upcoming",
+  2: "Live",
   3: "Ended",
+  5: "Suspended",
 };
 
 const mapRaffle = (r: any): Raffle => ({
@@ -127,12 +136,51 @@ export default function AdminRaffles() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const fetchRaffles = async () => {
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [pagination, setPagination] = useState<PaginationData>({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 0,
+  });
+
+  const fetchRaffles = async (
+    page: number = currentPage,
+    status?: string,
+    search?: string,
+    limit?: number,
+  ) => {
     try {
       setLoading(true);
-      const res = await server.get("/admin/raffles");
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: (limit || pageSize).toString(),
+      });
+
+      const filterStatus = status || statusFilter;
+      if (filterStatus && filterStatus !== "all") {
+        const statusMap: Record<string, string> = {
+          upcoming: "1",
+          live: "2",
+          ended: "3",
+          suspended: "5",
+        };
+        if (statusMap[filterStatus.toLowerCase()]) {
+          params.append("status", statusMap[filterStatus.toLowerCase()]);
+        }
+      }
+
+      const searchQuery = search !== undefined ? search : searchTerm;
+      if (searchQuery && searchQuery.trim()) {
+        params.append("search", searchQuery.trim());
+      }
+
+      const res = await server.get(`/admin/raffles?${params.toString()}`);
       const mapped = res.data.data.raffles.map(mapRaffle);
       setRaffles(mapped);
+      setPagination(res.data.data.pagination);
     } catch (err) {
       console.error("Error fetching raffles", err);
       toast.error("Failed to refresh raffles");
@@ -142,8 +190,39 @@ export default function AdminRaffles() {
   };
 
   useEffect(() => {
-    fetchRaffles();
+    fetchRaffles(1);
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchRaffles(1, statusFilter);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm !== undefined) {
+        setCurrentPage(1);
+        fetchRaffles(1, statusFilter, searchTerm);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchRaffles(page, statusFilter, searchTerm);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
+    fetchRaffles(1, statusFilter, searchTerm, newPageSize);
+  };
+
+  const handleRefresh = () => {
+    fetchRaffles(currentPage, statusFilter, searchTerm);
+  };
 
   // Initialize dialog state when a raffle is selected
   useEffect(() => {
@@ -246,10 +325,13 @@ export default function AdminRaffles() {
     }
   };
 
-  // Helper to highlight search term matches
+  // Helper to highlight search term matches (for server-side search results)
   const highlightText = (text: string, highlight: string) => {
-    if (!highlight) return text;
-    const regex = new RegExp(`(${highlight})`, "gi");
+    if (!highlight || !highlight.trim()) return text;
+    const regex = new RegExp(
+      `(${highlight.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+      "gi",
+    );
     const parts = text.split(regex);
     return parts.map((part, index) =>
       regex.test(part) ? (
@@ -262,30 +344,30 @@ export default function AdminRaffles() {
     );
   };
 
-  // Filtered raffles based on search term and status filter
-  const filteredRaffles = raffles
-    .filter((raffle) => {
-      const term = searchTerm.toLowerCase();
-      return (
-        raffle.name.toLowerCase().includes(term) ||
-        raffle.creator.toLowerCase().includes(term)
-      );
-    })
-    .filter((raffle) => {
-      if (statusFilter === "all") return true;
-      return raffle.status.toLowerCase() === statusFilter.toLowerCase();
-    });
+  const filteredRaffles = raffles;
 
   return (
     <div className="w-84 md:w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-2xl font-bold">Raffles Management</p>
+        <div>
+          <p className="text-2xl font-bold">Raffles Management</p>
+          {!loading && pagination.total > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {pagination.total} total raffles
+              {statusFilter !== "all" &&
+                ` • Filtered by ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`}
+              {searchTerm &&
+                searchTerm.trim() &&
+                ` • Search: "${searchTerm.trim()}"`}
+            </p>
+          )}
+        </div>
 
         <Button
           variant="default"
           size="icon"
-          onClick={fetchRaffles}
+          onClick={handleRefresh}
           disabled={loading}
           title="Refresh raffles"
           className="hover:bg-accent"
@@ -303,11 +385,25 @@ export default function AdminRaffles() {
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search raffles..."
+              placeholder="Search raffles by name or creator wallet..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 text-sm"
+              className="pl-10 pr-10 text-sm"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
+            {loading && searchTerm && (
+              <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full md:w-[180px]">
@@ -316,9 +412,24 @@ export default function AdminRaffles() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
               <SelectItem value="live">Live</SelectItem>
               <SelectItem value="ended">Ended</SelectItem>
               <SelectItem value="suspended">Suspended</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={pageSize.toString()}
+            onValueChange={(value) => handlePageSizeChange(Number(value))}
+          >
+            <SelectTrigger className="w-full md:w-[120px]">
+              <SelectValue placeholder="Per page" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 per page</SelectItem>
+              <SelectItem value="20">20 per page</SelectItem>
+              <SelectItem value="50">50 per page</SelectItem>
+              <SelectItem value="100">100 per page</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -349,7 +460,11 @@ export default function AdminRaffles() {
                     colSpan={8}
                     className="py-10 text-center text-muted-foreground"
                   >
-                    No raffles found
+                    {searchTerm
+                      ? `No raffles found matching "${searchTerm}"`
+                      : pagination.total === 0
+                        ? "No raffles found"
+                        : "No raffles match the current filters"}
                   </td>
                 </tr>
               ) : (
@@ -452,35 +567,47 @@ export default function AdminRaffles() {
               )}
             </tbody>
           </table>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Raffle</DialogTitle>
-              </DialogHeader>
-
-              {selectedRaffle && (
-                <div className="space-y-4 py-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      Featured on Homepage
-                    </span>
-                    <Switch
-                      checked={isFeatured}
-                      onCheckedChange={setIsFeatured}
-                    />
-                  </div>
-
-                  <Button
-                    className="w-full gradient-primary"
-                    onClick={handleSaveChanges}
-                  >
-                    Save Changes
-                  </Button>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
         </div>
+
+        {/* Pagination */}
+        {!loading && (
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+          />
+        )}
+
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Raffle</DialogTitle>
+            </DialogHeader>
+
+            {selectedRaffle && (
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    Featured on Homepage
+                  </span>
+                  <Switch
+                    checked={isFeatured}
+                    onCheckedChange={setIsFeatured}
+                  />
+                </div>
+
+                <Button
+                  className="w-full gradient-primary"
+                  onClick={handleSaveChanges}
+                >
+                  Save Changes
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
