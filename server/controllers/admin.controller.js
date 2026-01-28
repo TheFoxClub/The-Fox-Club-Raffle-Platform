@@ -28,42 +28,66 @@ const {
 class AdminController {
   static async getAllRaffles(req, res) {
     try {
-      const { status, page = 1, limit = 20 } = req.query;
+      const { status, page = 1, limit = 20, search } = req.query;
       const offset = (page - 1) * limit;
 
-      let whereClause = {};
-      const now = new Date();
+      let whereClause = {
+        status: {
+          [Op.ne]: RAFFLE_STATUS.DRAFT,
+        },
+      };
 
-      if (status === RAFFLE_STATUS.LIVE) {
-        whereClause = {
-          startDate: { [Op.lte]: now },
-          endDate: { [Op.gte]: now },
-          endedAt: null,
-        };
-      } else if (status === RAFFLE_STATUS.ENDED) {
-        whereClause = {
-          [Op.or]: [
-            { endDate: { [Op.lt]: now } },
-            { endedAt: { [Op.not]: null } },
-          ],
-        };
-      } else if (status === RAFFLE_STATUS.UPCOMING) {
-        whereClause = {
-          startDate: { [Op.gt]: now },
-        };
+      if (status) {
+        const statusValue = parseInt(status);
+        if (statusValue && statusValue !== RAFFLE_STATUS.DRAFT) {
+          whereClause.status = statusValue;
+        }
       }
 
+      let finalWhereClause = whereClause;
+
+      if (search && search.trim()) {
+        const searchTerm = search.trim().toLowerCase(); // Convert to lowercase for consistency
+
+        const titleSearchCondition = Sequelize.where(
+          Sequelize.fn("LOWER", Sequelize.col("raffle.title")),
+          "LIKE",
+          `%${searchTerm}%`,
+        );
+
+        const userSearchCondition = Sequelize.where(
+          Sequelize.fn("LOWER", Sequelize.col("user.pubkey")),
+          "LIKE",
+          `%${searchTerm}%`,
+        );
+
+        const searchCondition = {
+          [Op.or]: [titleSearchCondition, userSearchCondition],
+        };
+
+        if (Object.keys(whereClause).length > 0) {
+          finalWhereClause = {
+            [Op.and]: [whereClause, searchCondition],
+          };
+        } else {
+          finalWhereClause = searchCondition;
+        }
+      }
+
+      const includeOptions = [
+        {
+          model: RaffleDetail,
+        },
+        {
+          model: User,
+          attributes: ["id", "pubkey"],
+          required: false,
+        },
+      ];
+
       const { count, rows: raffles } = await Raffle.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: RaffleDetail,
-          },
-          {
-            model: User,
-            attributes: ["id", "pubkey"],
-          },
-        ],
+        where: finalWhereClause,
+        include: includeOptions,
         order: [["createdAt", "DESC"]],
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -77,13 +101,14 @@ class AdminController {
           limit: parseInt(limit),
           totalPages: Math.ceil(count / limit),
         },
+        search: search || null,
       });
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -131,14 +156,14 @@ class AdminController {
         "Featured status updated successfully",
         {
           raffle,
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -196,14 +221,14 @@ class AdminController {
         suspend
           ? "Raffle suspended successfully"
           : "Raffle resumed successfully",
-        { raffle }
+        { raffle },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -232,14 +257,14 @@ class AdminController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -260,7 +285,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.CONFLICT,
-          "Collection with this address already exists"
+          "Collection with this address already exists",
         );
       }
 
@@ -274,14 +299,14 @@ class AdminController {
         res,
         httpStatus.CREATED,
         "Verified collection created successfully!",
-        { collection }
+        { collection },
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -307,7 +332,7 @@ class AdminController {
           return respond(
             res,
             httpStatus.CONFLICT,
-            "Address already exists for another collection"
+            "Address already exists for another collection",
           );
         }
       }
@@ -327,7 +352,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -350,7 +375,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -373,7 +398,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -398,14 +423,14 @@ class AdminController {
         `Collection ${
           collection.isVerified ? "verified" : "unverified"
         } successfully`,
-        { collection }
+        { collection },
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -469,7 +494,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -489,14 +514,14 @@ class AdminController {
       return respond(
         res,
         httpStatus.OK,
-        `${deletedCount} collection(s) deleted successfully`
+        `${deletedCount} collection(s) deleted successfully`,
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -539,7 +564,7 @@ class AdminController {
         res,
         httpStatus.OK,
         "Top raffle creators fetched!",
-        ranked
+        ranked,
       );
     } catch (error) {
       console.error(error);
@@ -624,7 +649,7 @@ class AdminController {
         `,
         {
           replacements: [parseInt(limit, 10)],
-        }
+        },
       );
 
       const raffles = queryResult[0] || [];
@@ -644,14 +669,14 @@ class AdminController {
         res,
         httpStatus.OK,
         "Top performing raffles fetched!",
-        formattedRaffles
+        formattedRaffles,
       );
     } catch (error) {
       logger.error("Error getting top performing raffles:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to retrieve top performing raffles"
+        "Failed to retrieve top performing raffles",
       );
     }
   }
@@ -673,7 +698,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to fetch top hosts and buyers"
+        "Failed to fetch top hosts and buyers",
       );
     }
   }
@@ -702,14 +727,14 @@ class AdminController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -739,14 +764,14 @@ class AdminController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -767,7 +792,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.CONFLICT,
-          "Token with this address already exists"
+          "Token with this address already exists",
         );
       }
 
@@ -782,14 +807,14 @@ class AdminController {
         res,
         httpStatus.CREATED,
         "Verified token created successfully!",
-        { token }
+        { token },
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -812,7 +837,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -835,7 +860,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
@@ -858,14 +883,14 @@ class AdminController {
         res,
         httpStatus.OK,
         `Token ${token.isVerified ? "verified" : "unverified"} successfully`,
-        { token }
+        { token },
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error)
+        parseSequelizeErrors(error),
       );
     }
   }
