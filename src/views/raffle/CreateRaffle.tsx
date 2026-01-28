@@ -26,7 +26,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, Connection, VersionedTransaction } from "@solana/web3.js";
-
+import { formatPrice } from "../../helpers/formatPrice";
 // Constants for Token Program IDs
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
@@ -81,6 +81,7 @@ const CreateRaffle = () => {
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
 
   const [errors, setErrors] = useState<{
     [key: string]: string | undefined;
@@ -159,6 +160,7 @@ const CreateRaffle = () => {
   const handleRemoveImage = () => {
     setRaffleImage(null);
     setRaffleImagePreview(null);
+    setExistingImageUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -236,7 +238,7 @@ const CreateRaffle = () => {
         // const res = await server.get(`/tokens/${user.pubkey}`);
         const res = await server.get(`/tokens/verified`);
         const spl = res.data?.message?.splTokens || [];
-        const mapped = spl.map((t: any, idx: number) => {
+        const mapped = spl.map((t: any) => {
           const info = t.account?.data?.parsed?.info;
           // const mint = info?.mint || `unknown-${idx}`;
           const mint = t.mint;
@@ -244,9 +246,6 @@ const CreateRaffle = () => {
           const amount = t?.amount?.uiAmount ?? 0;
           const programId = t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
           const name = t.metadata?.name || `Token ${mint.slice(0, 6)}...`;
-          // const name = info?.tokenAmount?.decimals
-          //   ? `Token ${mint.slice(0, 6)}...`
-          //   : "Unknown Token";
           return { mint, name, amount, programId };
         });
         setTokenCandidates(mapped);
@@ -260,6 +259,55 @@ const CreateRaffle = () => {
 
     fetchTokens();
   }, [isTokenDialogOpen, user?.pubkey]);
+
+  useEffect(() => {
+    if (selectedTokens.length === 0 || tokenCandidates.length === 0) return;
+
+    setSelectedTokens((prev) =>
+      prev.map((selected) => {
+        const walletToken = tokenCandidates.find(
+          (t) => t.mint === selected.mint,
+        );
+
+        return walletToken
+          ? {
+              ...selected,
+              amount: walletToken.amount,
+            }
+          : selected;
+      }),
+    );
+  }, [tokenCandidates]);
+
+  useEffect(() => {
+    if (!isResumingDraft) return;
+    if (selectedTokens.length === 0) return;
+
+    // reuse the same fetch logic
+    (async () => {
+      if (!user?.pubkey) return;
+
+      try {
+        setTokenLoading(true);
+        const res = await server.get(`/tokens/verified`);
+        const spl = res.data?.message?.splTokens || [];
+
+        const mapped = spl.map((t: any) => ({
+          mint: t.mint,
+          name: t.metadata?.name || `Token ${t.mint.slice(0, 6)}...`,
+          amount: t?.amount?.uiAmount ?? 0,
+          programId: t.account?.owner || t.programId || TOKEN_PROGRAM_ID,
+        }));
+
+        setTokenCandidates(mapped);
+      } catch (err) {
+        console.error("Failed to fetch tokens", err);
+        setTokenCandidates([]);
+      } finally {
+        setTokenLoading(false);
+      }
+    })();
+  }, [isResumingDraft, selectedTokens.length, user?.pubkey]);
 
   const handleSelectNFT = (nft: any) => {
     if (!selectedNFTs.some((item) => item.id === nft.id)) {
@@ -409,7 +457,7 @@ const CreateRaffle = () => {
     }
 
     // Only require image for non-draft submissions
-    if (!raffleImage) {
+    if (!raffleImage && !existingImageUrl) {
       newErrors.raffleImage = "Please upload a raffle image.";
     }
 
@@ -574,11 +622,15 @@ const CreateRaffle = () => {
         } finally {
           setImageUploading(false);
         }
-      } else if (status !== "DRAFT") {
+      } else if (status !== "DRAFT" && !existingImageUrl) {
         // Only require image for non-draft raffles
         toast.error("Please upload a raffle image");
         setLoading(false);
         return;
+      }
+
+      if (!uploadedImageUrl && existingImageUrl) {
+        uploadedImageUrl = existingImageUrl;
       }
 
       const finalStartDate = startNow ? new Date().toISOString() : startDate;
@@ -904,7 +956,12 @@ const CreateRaffle = () => {
     try {
       setTitle(draft.title || "");
       setDescription(draft.description || "");
-      setTicketPrice(draft.ticketPrice ?? "");
+      // setTicketPrice(draft.ticketPrice ?? "");
+      setTicketPrice(
+        draft.ticketPrice !== undefined && draft.ticketPrice !== null
+          ? Number(formatPrice(draft.ticketPrice))
+          : "",
+      );
       setTotalTickets(draft.totalTickets ?? "");
       setNumberOfWinners(draft.numberOfWinners ?? 1);
       setStartDate(draft.startDate || "");
@@ -912,6 +969,7 @@ const CreateRaffle = () => {
       setSelectedTokenType(draft.tokenType || null);
 
       if (draft.imageUrl) {
+        setExistingImageUrl(draft.imageUrl);
         setRaffleImagePreview(draft.imageUrl);
       }
     } catch (err) {
@@ -954,7 +1012,7 @@ const CreateRaffle = () => {
             mint: reward.mintAddress,
             name: reward.rewardName,
             amountToUse: Number(reward.amount),
-            amount: Number(reward.amount),
+            amount: 0,
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
         }
