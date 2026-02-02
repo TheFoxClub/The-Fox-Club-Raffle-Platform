@@ -19,6 +19,7 @@ const {
   RAFFLE_FEATURED_STATUS,
   RAFFLE_FEATURED_POSITION,
   mapEnumValue,
+  SPL_TOKEN_ADDRESS,
 } = require("../config/data");
 const {
   getTopHosts,
@@ -866,10 +867,18 @@ class AdminController {
 
   static async createVerifiedToken(req, res) {
     try {
-      const { address, name, decimals } = req.body;
+      const { address, name, decimals, symbol, programId } = req.body;
 
       if (!address) {
         return respond(res, httpStatus.BAD_REQUEST, "Address is required");
+      }
+
+      if (address === SPL_TOKEN_ADDRESS.SOLANA) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Solana is a built-in token and cannot be added manually",
+        );
       }
 
       const existingToken = await VerifiedToken.findOne({
@@ -884,11 +893,34 @@ class AdminController {
         );
       }
 
+      let tokenType = TOKEN_TYPE.SPL_TOKEN;
+      let finalProgramId = programId;
+
+      if (programId === "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb") {
+        tokenType = TOKEN_TYPE.SPL_TOKEN_2022;
+        finalProgramId = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+      } else {
+        tokenType = TOKEN_TYPE.SPL_TOKEN;
+        finalProgramId = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+      }
+
+      let finalSymbol = symbol || name || null;
+      if (finalSymbol && finalSymbol.length > 10) {
+        logger.info(
+          `Token symbol truncated from "${finalSymbol}" to "${finalSymbol.substring(0, 10)}" for address ${address}`,
+        );
+        finalSymbol = finalSymbol.substring(0, 10);
+      }
+
       const token = await VerifiedToken.create({
         address,
         name: name || null,
-        decimals,
+        symbol: finalSymbol,
+        decimals: decimals || 0,
+        tokenType,
+        programId: finalProgramId,
         isVerified: false,
+        isPaymentToken: false,
       });
 
       return respond(
@@ -915,6 +947,14 @@ class AdminController {
 
       if (!token) {
         return respond(res, httpStatus.NOT_FOUND, "Token not found");
+      }
+
+      if (token.address === SPL_TOKEN_ADDRESS.SOLANA) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Solana is a built-in token and cannot be deleted",
+        );
       }
 
       await token.destroy();
@@ -963,6 +1003,14 @@ class AdminController {
         return respond(res, httpStatus.NOT_FOUND, "Token not found");
       }
 
+      if (token.address === SPL_TOKEN_ADDRESS.SOLANA) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Solana is a built-in token and cannot be modified",
+        );
+      }
+
       await token.update({
         isVerified: !token.isVerified,
       });
@@ -991,6 +1039,14 @@ class AdminController {
 
       if (!token) {
         return respond(res, httpStatus.NOT_FOUND, "Token not found");
+      }
+
+      if (token.address === SPL_TOKEN_ADDRESS.SOLANA) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Solana is a built-in token and cannot be modified",
+        );
       }
 
       if (!token.isVerified && !token.isPaymentToken) {

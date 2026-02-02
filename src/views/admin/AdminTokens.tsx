@@ -45,7 +45,13 @@ function TokenTableSkeleton() {
             <div className="h-4 w-40 rounded bg-muted animate-pulse" />
           </td>
           <td className="p-4">
+            <div className="h-4 w-20 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="p-4">
             <div className="h-4 w-10 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="p-4">
+            <div className="h-5 w-10 rounded bg-muted animate-pulse" />
           </td>
           <td className="p-4">
             <div className="h-5 w-10 rounded bg-muted animate-pulse" />
@@ -63,7 +69,13 @@ export default function AdminTokens() {
   const user = useSelector((state: RootState) => state.user);
   const [open, setOpen] = useState(false);
   const [tokenCandidates, setTokenCandidates] = useState<
-    { mint: string; name: string; decimals: number; programId: string }[]
+    {
+      mint: string;
+      name: string;
+      symbol: string;
+      decimals: number;
+      programId: string;
+    }[]
   >([]);
   const [verifiedTokens, setVerifiedTokens] = useState<
     {
@@ -73,6 +85,7 @@ export default function AdminTokens() {
       symbol: string;
       decimals: number;
       tokenType: number;
+      programId: string;
       isVerified: boolean;
       isPaymentToken: boolean;
     }[]
@@ -83,6 +96,7 @@ export default function AdminTokens() {
   const [selectedToken, setSelectedToken] = useState<{
     mint: string;
     name: string;
+    symbol: string;
     decimals: number;
     programId: string;
   } | null>(null);
@@ -96,17 +110,36 @@ export default function AdminTokens() {
         setLoading(true);
         const res = await server.get(`/tokens/${user.pubkey}`);
         const spl = res.data?.message?.splTokens || [];
-        const mapped = spl.map((t: any, idx: number) => {
-          const info = t.account?.data?.parsed?.info;
-          const decimals = info?.tokenAmount?.decimals ?? 0;
-          const mint = info?.mint || `unknown-${idx}`;
-          const programId = t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
-          const name =
-            t.metadata?.name ||
-            t.metadata?.symbol ||
-            `Token ${mint.slice(0, 6)}...`;
-          return { mint, name, decimals, programId };
-        });
+        const SOLANA_MINT = "So11111111111111111111111111111111111111112";
+
+        const mapped = spl
+          .filter((t: any) => {
+            const info = t.account?.data?.parsed?.info;
+            const mint = info?.mint;
+            // Filter out Solana token to prevent duplication
+            return mint && mint !== SOLANA_MINT;
+          })
+          .map((t: any, idx: number) => {
+            const info = t.account?.data?.parsed?.info;
+            const decimals = info?.tokenAmount?.decimals ?? 0;
+            const mint = info?.mint || `unknown-${idx}`;
+            const programId =
+              t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
+
+            // Try to get symbol from metadata, fallback to name or mint
+            let symbol =
+              t.metadata?.symbol ||
+              t.metadata?.name ||
+              `Token ${mint.slice(0, 6)}...`;
+            let name = t.metadata?.name || symbol;
+
+            // Truncate symbol to 10 characters maximum (database limit)
+            if (symbol.length > 10) {
+              symbol = symbol.substring(0, 10);
+            }
+
+            return { mint, name, symbol, decimals, programId };
+          });
         setTokenCandidates(mapped);
       } catch (err) {
         console.error(err);
@@ -145,6 +178,7 @@ export default function AdminTokens() {
   const handleSelectToken = (token: {
     mint: string;
     name: string;
+    symbol: string;
     decimals: number;
     programId: string;
   }) => {
@@ -153,19 +187,47 @@ export default function AdminTokens() {
 
   const handleAddVerifiedToken = async () => {
     if (!selectedToken) return;
+
     try {
+      // Prevent Solana token duplication
+      const SOLANA_MINT = "So11111111111111111111111111111111111111112";
+      if (selectedToken.mint === SOLANA_MINT) {
+        toast.error("Solana is a built-in token and cannot be added manually");
+        return;
+      }
+
+      // Determine token symbol - try to get from metadata or fallback to name
+      let symbol =
+        selectedToken.symbol ||
+        selectedToken.name ||
+        `Token ${selectedToken.mint.slice(0, 6)}...`;
+
+      const originalSymbol = symbol;
+      if (symbol.length > 10) {
+        symbol = symbol.substring(0, 10);
+        console.log(
+          `Token symbol truncated from "${originalSymbol}" to "${symbol}" (10 char limit)`,
+        );
+      }
+
       await server.post("/admin/verified-token", {
         address: selectedToken.mint,
         name: selectedToken.name,
+        symbol: symbol,
         decimals: selectedToken.decimals,
+        programId: selectedToken.programId,
       });
+
       setOpen(false);
       setSelectedToken(null);
+      toast.success("Token added successfully!");
+
       // Refresh verified tokens list
-      const res = await server.get("/admin/verified-token");
-      setVerifiedTokens(res.data?.data?.tokens || []);
-    } catch (err) {
+      await fetchVerifiedTokens();
+    } catch (err: any) {
       console.error("Failed to create verified token", err);
+      const errorMessage = err.response?.data?.message || "Failed to add token";
+      toast.error(errorMessage);
     }
   };
 
@@ -334,9 +396,21 @@ export default function AdminTokens() {
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm truncate">
                             {token.name}
+                            {token.symbol && token.symbol !== token.name && (
+                              <span className="text-muted-foreground ml-1">
+                                ({token.symbol})
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
                             Mint: {token.mint}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            Program:{" "}
+                            {token.programId ===
+                            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+                              ? "Token 2022"
+                              : "SPL Token"}
                           </p>
                         </div>
                         {isSelected && (
@@ -372,6 +446,7 @@ export default function AdminTokens() {
               <tr className="text-left text-sm text-muted-foreground whitespace-nowrap">
                 <th className="p-4 font-medium">Token Name</th>
                 <th className="p-4 font-medium">Address</th>
+                <th className="p-4 font-medium">Program</th>
                 <th className="p-4 font-medium">Decimals</th>
                 <th className="p-4 font-medium">Verified</th>
                 <th className="p-4 font-medium">Payment Token</th>
@@ -400,6 +475,11 @@ export default function AdminTokens() {
                         {truncateAddress(solanaToken.mint)}
                         <Copy className="h-3 w-3 opacity-50 ml-1" />
                       </button>
+                    </td>
+                    <td className="p-4 text-muted-foreground">
+                      <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs">
+                        Native
+                      </span>
                     </td>
                     <td className="p-4 text-muted-foreground">
                       {solanaToken.decimals}
@@ -444,6 +524,21 @@ export default function AdminTokens() {
                           {truncateAddress(token.address)}
                           <Copy className="h-3 w-3 opacity-50 ml-1" />
                         </button>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`px-2 py-1 rounded-md text-xs ${
+                            token.programId ===
+                            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {token.programId ===
+                          "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+                            ? "Token 2022"
+                            : "SPL Token"}
+                        </span>
                       </td>
                       <td className="p-4 text-muted-foreground">
                         {token.decimals}
