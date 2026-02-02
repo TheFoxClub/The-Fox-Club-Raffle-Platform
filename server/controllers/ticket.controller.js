@@ -413,6 +413,12 @@ class TicketController {
         );
       }
 
+      // Fetch raffle data to get correct token information
+      const raffleData = await Raffle.findOne({ where: { id: raffleId } });
+      if (!raffleData) {
+        return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
+      }
+
       const signatureToStore = signature;
 
       let senderPubkey, receiverPubkey;
@@ -426,22 +432,59 @@ class TicketController {
           break;
       }
 
+      // Determine correct token information based on raffle's tokenType
+      let tokenType, tokenAddress, decimals;
+
+      if (raffleData.tokenType === TOKEN_TYPE.SOLANA) {
+        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+        tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+        decimals = 9;
+      } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN) {
+        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+        tokenAddress = raffleData.tokenAddress;
+
+        try {
+          const { getTokenDetail } = require("../helpers/solana/token-program");
+          const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
+          decimals = tokenDetail.decimals || 9;
+        } catch (error) {
+          logger.warn(
+            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
+          );
+          decimals = tokenDecimals || 9;
+        }
+      } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN_2022) {
+        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
+        tokenAddress = raffleData.tokenAddress;
+
+        try {
+          const { getTokenDetail } = require("../helpers/solana/token-program");
+          const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
+          decimals = tokenDetail.decimals || 9;
+        } catch (error) {
+          logger.warn(
+            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
+          );
+          decimals = tokenDecimals || 9;
+        }
+      } else if (raffleData.tokenType === TOKEN_TYPE.USDC) {
+        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+        tokenAddress = raffleData.tokenAddress || SPL_TOKEN_ADDRESS.USDC;
+        decimals = 6;
+      } else {
+        // Fallback to Solana
+        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+        tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+        decimals = 9;
+      }
+
       const splTokenSendTxData = {
         senderPubkey,
         receiverPubkey,
-        type:
-          entryToken === "sol" || entryToken === "solana"
-            ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA
-            : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
+        type: tokenType,
         txId: signatureToStore,
-        tokenAddress:
-          entryToken === "sol" || entryToken === "solana"
-            ? SPL_TOKEN_ADDRESS.SOLANA
-            : entryToken,
-        decimals:
-          entryToken === "sol" || entryToken === "solana"
-            ? 9
-            : tokenDecimals || 9,
+        tokenAddress: tokenAddress,
+        decimals: decimals,
         uiAmount: Math.round(Number(lamports)),
         status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
         commissionRate,
