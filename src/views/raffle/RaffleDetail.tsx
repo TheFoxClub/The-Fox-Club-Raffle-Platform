@@ -70,7 +70,7 @@ export interface RaffleType {
   // hostReputation: number;
   isVerified: boolean;
   isFeatured: boolean;
-  prizeValue: string;
+  //prizeValue: string;
   startDate?: string;
   endDate?: string;
   endedAt?: string;
@@ -429,7 +429,7 @@ const RaffleDetail = () => {
           // hostReputation: data.userReputation || 100,
           isVerified: data.raffle_detail?.requiresNftVerification || false,
           isFeatured: data.raffle_detail?.isFeatured || false,
-          prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
+          // prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
           // tokenMint: data.tokenMint,
           startDate: data.startDate,
           endDate: data.endDate,
@@ -779,8 +779,8 @@ const RaffleDetail = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-3 sm:pt-4 border-t border-border/50">
-              <div className="space-y-1">
+            <div className="grid grid-cols-2 sm:grid-cols-2 pt-3 sm:pt-4 border-t border-border/50">
+              {/* <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                   <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="truncate">Prize Value</span>
@@ -788,7 +788,7 @@ const RaffleDetail = () => {
                 <p className="font-bold text-base sm:text-lg truncate">
                   ~{raffle.prizeValue}
                 </p>
-              </div>
+              </div> */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                   <Users className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -903,57 +903,57 @@ const RaffleDetail = () => {
                   {winners.map((winner, index) => (
                     <div
                       key={winner.rewardId}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
+                      className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
                     >
-                      <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="flex flex-col sm:flex-col gap-1 min-w-[160px]">
+                        <span className="font-semibold text-xs sm:text-sm">
+                          Winner #{index + 1}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(winner.winnerPubkey)}
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition group break-all"
+                        >
+                          {/* Mobile (short) */}
+                          <span className="sm:hidden">
+                            {winner.winnerPubkey.slice(0, 4)}…
+                            {winner.winnerPubkey.slice(-4)}
+                          </span>
+
+                          {/* Desktop (full) */}
+                          <span className="hidden sm:block">
+                            {winner.winnerPubkey}
+                          </span>
+
+                          <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                        </button>
+
+                        <span className="text-xs text-muted-foreground">
+                          Ticket #{winner.ticketNumber}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 flex-1 min-w-0">
                         {winner.imageUrl && (
                           <img
                             src={winner.imageUrl}
                             alt={winner.rewardName}
-                            className="w-10 h-10 rounded-md object-cover shrink-0"
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover shrink-0"
                           />
                         )}
-
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-xs sm:text-sm">
-                            Winner #{index + 1}
+                        {/* Reward details */}
+                        <div className="flex flex-col text-left min-w-0">
+                          <span className="text-sm font-medium block">
+                            {winner.rewardName}
                           </span>
-                          <button
-                            onClick={() => copyToClipboard(winner.winnerPubkey)}
-                            className="flex items-center gap-1 text-left text-xs text-muted-foreground hover:text-primary transition group"
-                          >
-                            {/* Mobile (short) */}
-                            <span className="sm:hidden">
-                              {winner.winnerPubkey.slice(0, 4)}…
-                              {winner.winnerPubkey.slice(-4)}
-                            </span>
-
-                            {/* Desktop (full) */}
-                            <span className="hidden sm:block break-all">
-                              {winner.winnerPubkey}
-                            </span>
-
-                            <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
-                          </button>
-
                           <span className="text-xs text-muted-foreground">
-                            Ticket #{winner.ticketNumber}
+                            Amount: {parseFloat(winner.amount)}
                           </span>
+                          {winner.isClaimed && (
+                            <div className="text-xs text-green-500 mt-1">
+                              ✓ Claimed
+                            </div>
+                          )}
                         </div>
-                      </div>
-
-                      <div className="text-left sm:text-right">
-                        <span className="text-sm font-medium block">
-                          {winner.rewardName}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Amount: {parseFloat(winner.amount)}
-                        </span>
-                        {winner.isClaimed && (
-                          <div className="text-xs text-green-500 mt-1">
-                            ✓ Claimed
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}

@@ -425,7 +425,7 @@ const Profile = () => {
                     <CheckCircle size={12} /> Verified
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center text-sm gap-3 mt-2">
+                <div className="flex flex-wrap items-center text-sm gap-6 mt-2">
                   <div className="flex items-center gap-1">
                     <Trophy className="h-4 w-4 text-accent" />
                     <span className="text-muted-foreground">Level 1</span>
@@ -434,10 +434,10 @@ const Profile = () => {
                     <Award className="h-4 w-4 text-primary" />
                     <span className="text-muted-foreground">#1 Ranked</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  {/* <div className="flex items-center gap-1">
                     <Flame className="h-4 w-4 text-orange-500" />
                     <span className="text-muted-foreground">1 Day Streak</span>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 

@@ -57,7 +57,7 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
           ...user,
           level: 1,
           rank: 1,
-          streak: 1,
+          // streak: 1,
           xp: 0,
           xpGoal: 15000,
           photoUrl: user.user_info?.photoUrl || "",
@@ -109,7 +109,7 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
               </div>
 
               {/* Level, Rank, Streak */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
+              <div className="flex items-center justify-start text-xs text-muted-foreground gap-10">
                 <div className="flex items-center gap-1">
                   <Trophy className="h-4 w-4 text-accent" /> Level{" "}
                   {hostData.level}
@@ -118,10 +118,10 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                   <Award className="h-4 w-4 text-primary" /> Rank #
                   {hostData.rank}
                 </div>
-                <div className="flex items-center gap-1">
+                {/* <div className="flex items-center gap-1">
                   <Flame className="h-4 w-4 text-orange-500" />{" "}
                   {hostData.streak}-Day Streak
-                </div>
+                </div> */}
               </div>
 
               {/* XP Bar */}

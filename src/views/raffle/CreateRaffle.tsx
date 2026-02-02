@@ -27,9 +27,24 @@ import type { RootState } from "../../redux/store";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, Connection, VersionedTransaction } from "@solana/web3.js";
 import { formatPrice } from "../../helpers/formatPrice";
+import { normalizeIpfs } from "../../helpers/ipfs";
+import TOKEN_PLACEHOLDER from "../../../public/uploads/token-placeholder.png";
+import NFT_PLACEHOLDER from "../../../public/uploads/nft-placeholder.svg";
 // Constants for Token Program IDs
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+
+const normalizeRewardType = (rewardType: any) => {
+  if (rewardType === 0 || rewardType === "NFT") return "NFT";
+  if (
+    rewardType === 1 ||
+    rewardType === "SPL_TOKEN" ||
+    rewardType === "SPL_TOKEN_2022"
+  )
+    return "SPL_TOKEN";
+
+  return null;
+};
 
 const CreateRaffle = () => {
   const navigate = useNavigate();
@@ -44,6 +59,7 @@ const CreateRaffle = () => {
       amount: number;
       amountToUse: number;
       programId: string;
+      image?: string | null;
     }[]
   >([]);
 
@@ -54,7 +70,13 @@ const CreateRaffle = () => {
   const [nftLoading, setNftLoading] = useState(false);
 
   const [tokenCandidates, setTokenCandidates] = useState<
-    { mint: string; name: string; programId: string; amount: number }[]
+    {
+      mint: string;
+      name: string;
+      programId: string;
+      amount: number;
+      image?: string | null;
+    }[]
   >([]);
   const [tokenLoading, setTokenLoading] = useState(false);
 
@@ -101,7 +123,8 @@ const CreateRaffle = () => {
 
   const tokenOptions = [
     { value: "SOLANA", label: "SOL" },
-    // { value: "USDT", label: "USDT" },,
+    { value: "USDT", label: "USDT" },
+    ,
   ];
 
   useEffect(() => {
@@ -177,8 +200,8 @@ const CreateRaffle = () => {
       }
       try {
         setNftLoading(true);
-        // const res = await server.get(`/nfts/${user.pubkey}`);
-        const res = await server.get(`/nfts/onCollection`);
+        const res = await server.get(`/nfts/${user.pubkey}`);
+        // const res = await server.get(`/nfts/onCollection`);
         const nftsFromApi: any[] = res.data?.data?.nfts || [];
 
         const mapped = await Promise.all(
@@ -238,17 +261,51 @@ const CreateRaffle = () => {
         // const res = await server.get(`/tokens/${user.pubkey}`);
         const res = await server.get(`/tokens/verified`);
         const spl = res.data?.message?.splTokens || [];
-        const mapped = spl.map((t: any) => {
-          const info = t.account?.data?.parsed?.info;
-          // const mint = info?.mint || `unknown-${idx}`;
-          const mint = t.mint;
-          // const amount = info?.tokenAmount?.uiAmount ?? 0;
-          const amount = t?.amount?.uiAmount ?? 0;
-          const programId = t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
-          const name = t.metadata?.name || `Token ${mint.slice(0, 6)}...`;
-          return { mint, name, amount, programId };
-        });
+        // const mapped = spl.map((t: any) => {
+        //   const info = t.account?.data?.parsed?.info;
+        // const mint = info?.mint || `unknown-${idx}`;
+        const mapped = await Promise.all(
+          spl.map(async (t: any, idx: number) => {
+            const mint = t.mint;
+            // const amount = info?.tokenAmount?.uiAmount ?? 0;
+            const amount = t?.amount?.uiAmount ?? 0;
+            const programId =
+              t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
+            let name =
+              t.metadata?.name ||
+              t.metadata?.symbol ||
+              `Token ${mint.slice(0, 6)}...`;
+            let image: string | null = null;
+            const uri = t.metadata?.uri;
+            if (uri) {
+              try {
+                const res = await fetch(normalizeIpfs(uri)!);
+                if (res.ok) {
+                  const meta = await res.json();
+                  if (meta?.image) {
+                    image = normalizeIpfs(meta.image);
+                  }
+                  if (!t.metadata?.name && meta?.name) {
+                    name = meta.name;
+                  }
+                }
+              } catch (err) {
+                console.warn("Failed to fetch token metadata:", uri);
+              }
+            }
+
+            return {
+              mint,
+              name,
+              image,
+              amount,
+              programId,
+            };
+          }),
+        );
+
         setTokenCandidates(mapped);
+        console.log("Token candidates:", mapped);
       } catch (err) {
         console.error("Failed to fetch tokens", err);
         setTokenCandidates([]);
@@ -292,12 +349,45 @@ const CreateRaffle = () => {
         const res = await server.get(`/tokens/verified`);
         const spl = res.data?.message?.splTokens || [];
 
-        const mapped = spl.map((t: any) => ({
-          mint: t.mint,
-          name: t.metadata?.name || `Token ${t.mint.slice(0, 6)}...`,
-          amount: t?.amount?.uiAmount ?? 0,
-          programId: t.account?.owner || t.programId || TOKEN_PROGRAM_ID,
-        }));
+        const mapped = await Promise.all(
+          spl.map(async (t: any, idx: number) => {
+            const mint = t.mint;
+            // const amount = info?.tokenAmount?.uiAmount ?? 0;
+            const amount = t?.amount?.uiAmount ?? 0;
+            const programId =
+              t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
+            let name =
+              t.metadata?.name ||
+              t.metadata?.symbol ||
+              `Token ${mint.slice(0, 6)}...`;
+            let image: string | null = null;
+            const uri = t.metadata?.uri;
+            if (uri) {
+              try {
+                const res = await fetch(normalizeIpfs(uri)!);
+                if (res.ok) {
+                  const meta = await res.json();
+                  if (meta?.image) {
+                    image = normalizeIpfs(meta.image);
+                  }
+                  if (!t.metadata?.name && meta?.name) {
+                    name = meta.name;
+                  }
+                }
+              } catch (err) {
+                console.warn("Failed to fetch token metadata:", uri);
+              }
+            }
+
+            return {
+              mint,
+              name,
+              image,
+              amount,
+              programId,
+            };
+          }),
+        );
 
         setTokenCandidates(mapped);
       } catch (err) {
@@ -331,6 +421,7 @@ const CreateRaffle = () => {
     name: string;
     amount: number;
     programId: string;
+    image?: string | null;
   }) => {
     if (!selectedTokens.some((t) => t.mint === token.mint)) {
       setSelectedTokens((prev) => [...prev, { ...token, amountToUse: 0 }]);
@@ -370,6 +461,7 @@ const CreateRaffle = () => {
     name: string;
     amount: number;
     programId: string;
+    image?: string | null;
   }) => {
     setSelectedTokens((prev) => {
       const exists = prev.some((t) => t.mint === token.mint);
@@ -653,7 +745,7 @@ const CreateRaffle = () => {
             rewardName: nft.name,
             mintAddress: nft.mint,
             amount: 1,
-            imageUrl: uploadedImageUrl,
+            imageUrl: nft.image || NFT_PLACEHOLDER,
             metadataJson: JSON.stringify({ collection: nft.collection }),
           })),
 
@@ -665,7 +757,7 @@ const CreateRaffle = () => {
             rewardName: token.name,
             mintAddress: token.mint,
             amount: token.amountToUse,
-            imageUrl: uploadedImageUrl,
+            imageUrl: token.image || TOKEN_PLACEHOLDER,
             metadataJson: JSON.stringify({ programId: token.programId }),
           })),
         ],
@@ -991,27 +1083,25 @@ const CreateRaffle = () => {
         }
 
         // Handle rewardType as both string and number (based on your response)
-        const rewardType =
-          typeof reward.rewardType === "number"
-            ? reward.rewardType === 0
-              ? "NFT"
-              : "SPL_TOKEN"
-            : reward.rewardType;
+        const type = normalizeRewardType(reward.rewardType);
 
-        if (rewardType === "NFT" || rewardType === 0) {
+        if (type === "NFT") {
           loadedNFTs.push({
             id: reward.mintAddress, // UI uses 'id'
             mint: reward.mintAddress,
             name: reward.rewardName,
             image: reward.imageUrl,
             collection: metadata.collection || "",
-            raw: {}, // Raw data might be missing, but that's okay for display
+            raw: {},
           });
-        } else if (rewardType.includes("SPL_TOKEN") || rewardType === 1) {
+        }
+
+        if (type === "SPL_TOKEN") {
           loadedTokens.push({
             mint: reward.mintAddress,
             name: reward.rewardName,
             amountToUse: Number(reward.amount),
+            image: reward.imageUrl,
             amount: 0,
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
@@ -1309,9 +1399,9 @@ const CreateRaffle = () => {
                         })}
                       </div>
                     )}
-                    <div className="flex justify-end mt-4">
+                    <div className="sticky bottom-0 pb-2 flex justify-end">
                       <Button
-                        className="gradient-primary"
+                        className="gradient-primary shadow-lg shadow-black/80"
                         onClick={() => setIsNFTDialogOpen(false)}
                       >
                         Done
@@ -1461,10 +1551,10 @@ const CreateRaffle = () => {
                       </div>
                     )}
 
-                    <div className="flex justify-end mt-4">
+                    <div className="sticky bottom-0 pb-2 flex justify-end">
                       <Button
-                        className="gradient-primary"
-                        onClick={() => setIsTokenDialogOpen(false)}
+                        className="gradient-primary shadow-lg shadow-black/80"
+                        onClick={() => setIsNFTDialogOpen(false)}
                       >
                         Done
                       </Button>

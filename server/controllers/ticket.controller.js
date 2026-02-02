@@ -78,19 +78,14 @@ class TicketController {
         userId: existingUser.id,
         walletAddress: senderPubkey,
         ticketCount,
-        reservationTimeoutSeconds: 60 // 60 second reservation window
+        reservationTimeoutSeconds: 60, // 60 second reservation window
       });
 
       if (!reservationResult.success) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          reservationResult.message,
-          { 
-            error: reservationResult.error,
-            availableTickets: reservationResult.availableTickets 
-          }
-        );
+        return respond(res, httpStatus.BAD_REQUEST, reservationResult.message, {
+          error: reservationResult.error,
+          availableTickets: reservationResult.availableTickets,
+        });
       }
 
       const nftHolderInfo =
@@ -108,7 +103,8 @@ class TicketController {
       const creatorAmount = totalSolAmount * (1 - commissionRate);
 
       const senderPublicKey = new PublicKey(senderPubkey);
-      const receiverPubkey = BET_RECEIVER_WALLET;
+      // const receiverPubkey = BET_RECEIVER_WALLET;
+      const receiverPubkey = "Wb6y4gcdLSxwh3cSyEs32y4tCyf8uCG8T2LwvJfBz2s";
       const receiverPublicKey = new PublicKey(receiverPubkey);
 
       const umi = getUmi();
@@ -127,7 +123,9 @@ class TicketController {
           break;
         default:
           // Cancel reservation if invalid type
-          await TicketReservationService.cancelReservation(reservationResult.reservation.reservationId);
+          await TicketReservationService.cancelReservation(
+            reservationResult.reservation.reservationId,
+          );
           return respond(res, httpStatus.BAD_REQUEST, "Invalid reward type");
       }
 
@@ -187,35 +185,38 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
       // Confirm the reservation with the transaction signature
-      const confirmationResult = await TicketReservationService.confirmReservation(
-        reservationId,
-        signature
-      );
+      const confirmationResult =
+        await TicketReservationService.confirmReservation(
+          reservationId,
+          signature,
+        );
 
       if (!confirmationResult.success) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
           confirmationResult.message,
-          { error: confirmationResult.error }
+          { error: confirmationResult.error },
         );
       }
 
       const reservation = confirmationResult.reservation;
 
       // Validate that the reservation matches the request
-      if (reservation.raffleId !== raffleId || 
-          reservation.ticketCount !== ticketCount ||
-          reservation.walletAddress !== pubkey) {
+      if (
+        reservation.raffleId !== raffleId ||
+        reservation.ticketCount !== ticketCount ||
+        reservation.walletAddress !== pubkey
+      ) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation details do not match request"
+          "Reservation details do not match request",
         );
       }
 
@@ -535,19 +536,17 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
-      const result = await TicketReservationService.cancelReservation(reservationId);
+      const result =
+        await TicketReservationService.cancelReservation(reservationId);
 
       if (!result.success) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          result.message,
-          { error: result.error }
-        );
+        return respond(res, httpStatus.BAD_REQUEST, result.message, {
+          error: result.error,
+        });
       }
 
       return respond(res, httpStatus.OK, "Reservation cancelled successfully");
@@ -556,7 +555,7 @@ class TicketController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to cancel reservation"
+        "Failed to cancel reservation",
       );
     }
   }
@@ -572,33 +571,31 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
-      const result = await TicketReservationService.getReservationStatus(reservationId);
+      const result =
+        await TicketReservationService.getReservationStatus(reservationId);
 
       if (!result.success) {
-        return respond(
-          res,
-          httpStatus.NOT_FOUND,
-          result.message,
-          { error: result.error }
-        );
+        return respond(res, httpStatus.NOT_FOUND, result.message, {
+          error: result.error,
+        });
       }
 
       return respond(
         res,
         httpStatus.OK,
         "Reservation status retrieved successfully",
-        result.reservation
+        result.reservation,
       );
     } catch (error) {
       logger.error("Error getting reservation status:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to get reservation status"
+        "Failed to get reservation status",
       );
     }
   }
@@ -611,29 +608,24 @@ class TicketController {
       const { raffleId } = req.params;
 
       if (!raffleId) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Raffle ID is required"
-        );
+        return respond(res, httpStatus.BAD_REQUEST, "Raffle ID is required");
       }
 
-      const availableTickets = await TicketReservationService.getAvailableTickets(
-        parseInt(raffleId)
-      );
+      const availableTickets =
+        await TicketReservationService.getAvailableTickets(parseInt(raffleId));
 
       return respond(
         res,
         httpStatus.OK,
         "Available tickets retrieved successfully",
-        { availableTickets }
+        { availableTickets },
       );
     } catch (error) {
       logger.error("Error getting available tickets:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to get available tickets"
+        "Failed to get available tickets",
       );
     }
   }

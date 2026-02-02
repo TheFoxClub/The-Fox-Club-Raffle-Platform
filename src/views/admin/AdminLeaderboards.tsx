@@ -45,7 +45,7 @@ export default function AdminLeaderboards() {
           tokenType: host.tokenType,
           rafflesCount: host.rafflesCount,
           xp: 0,
-          streak: 0,
+          //  streak: 0,
         })),
       );
 
@@ -56,7 +56,7 @@ export default function AdminLeaderboards() {
           tokenType: buyer.tokenType,
           tickets: buyer.ticketsBought,
           xp: 0,
-          streak: 0,
+          //  streak: 0,
         })),
       );
     } catch (error) {
