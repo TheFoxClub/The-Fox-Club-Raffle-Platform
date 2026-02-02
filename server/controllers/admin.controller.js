@@ -528,36 +528,62 @@ class AdminController {
 
   static async getTopRaffleCreators(req, res) {
     try {
-      const creators = await Raffle.findAll({
-        attributes: [
-          "userId",
-          [Sequelize.fn("SUM", Sequelize.col("totalRevenue")), "totalRevenue"],
-        ],
-        include: [
-          {
-            model: User,
-            attributes: ["pubkey"],
-            include: [
-              {
-                model: UserInfo,
-                attributes: ["username", "photoUrl"],
-              },
-            ],
-          },
-        ],
-        group: ["userId", "user.id", "user->user_info.id"],
-        order: [[Sequelize.literal("totalRevenue"), "DESC"]],
-        limit: 3,
-        raw: false,
-      });
+      // const creators = await Raffle.findAll({
+      //   attributes: [
+      //     "userId",
+      //     [Sequelize.fn("SUM", Sequelize.col("totalRevenue")), "totalRevenue"],
+      //   ],
+      //   include: [
+      //     {
+      //       model: User,
+      //       attributes: ["pubkey"],
+      //       include: [
+      //         {
+      //           model: UserInfo,
+      //           attributes: ["username", "photoUrl"],
+      //         },
+      //       ],
+      //     },
+      //   ],
+      //   group: ["userId", "user.id", "user->user_info.id"],
+      //   order: [[Sequelize.literal("totalRevenue"), "DESC"]],
+      //   limit: 3,
+      //   raw: false,
+      // });
 
-      const ranked = creators.map((row, index) => ({
+      // Get top creators by SOL revenue only (tokenType = 0)
+      const creators = await sequelize.query(
+        `
+        SELECT 
+          r.userId,
+          u.pubkey as walletAddress,
+          ui.username,
+          ui.photoUrl,
+          SUM(CASE WHEN r.tokenType = 0 THEN r.totalRevenue ELSE 0 END) as totalRevenue,
+          0 as tokenType
+        FROM raffles r
+        LEFT JOIN users u ON r.userId = u.id
+        LEFT JOIN user_infos ui ON u.id = ui.userId
+        WHERE r.status != 0
+        GROUP BY r.userId, u.pubkey, ui.username, ui.photoUrl
+        HAVING totalRevenue > 0
+        ORDER BY totalRevenue DESC
+        LIMIT 3
+        `,
+        {
+          type: sequelize.QueryTypes.SELECT,
+        },
+      );
+
+      const ranked = creators.map((creator, index) => ({
         rank: index + 1,
-        userId: row.userId,
-        walletAddress: row.user?.pubkey,
-        username: row.user?.user_info?.username ?? null,
-        photoUrl: row.user?.user_info?.photoUrl ?? null,
-        totalRevenue: Number(row.dataValues.totalRevenue),
+        userId: creator.userId,
+        walletAddress: creator.walletAddress,
+        username: creator.username ?? null,
+        photoUrl: creator.photoUrl ?? null,
+        totalRevenue: Number(creator.totalRevenue || 0),
+        tokenType: mapEnumValue(TOKEN_TYPE, creator.tokenType),
+        tokenAddress: null,
       }));
 
       return respond(
@@ -576,20 +602,38 @@ class AdminController {
 
   static async getDashboardStats(req, res) {
     try {
-      const stats = await Raffle.findOne({
-        attributes: [
-          [Sequelize.fn("SUM", Sequelize.col("totalRevenue")), "totalRevenue"],
-          [
-            Sequelize.fn("SUM", Sequelize.col("ticketsSold")),
-            "totalTicketsSold",
-          ],
-          [
-            Sequelize.fn("SUM", Sequelize.col("platformRevenue")),
-            "totalPlatformRevenue",
-          ],
-        ],
-        raw: true,
-      });
+      // const stats = await Raffle.findOne({
+      //   attributes: [
+      //     [Sequelize.fn("SUM", Sequelize.col("totalRevenue")), "totalRevenue"],
+      //     [
+      //       Sequelize.fn("SUM", Sequelize.col("ticketsSold")),
+      //       "totalTicketsSold",
+      //     ],
+      //     [
+      //       Sequelize.fn("SUM", Sequelize.col("platformRevenue")),
+      //       "totalPlatformRevenue",
+      //     ],
+      //   ],
+      //   raw: true,
+      // });
+      // Get stats grouped by token type from raffles table
+      const tokenStats = await sequelize.query(
+        `
+        SELECT 
+          r.tokenType,
+          SUM(COALESCE(r.totalRevenue, 0)) as totalRevenue,
+          SUM(COALESCE(r.ticketsSold, 0)) as totalTicketsSold,
+          SUM(COALESCE(r.platformRevenue, 0)) as totalPlatformRevenue
+        FROM raffles r
+        WHERE r.status != ?
+        GROUP BY r.tokenType
+        ORDER BY totalRevenue DESC
+        `,
+        {
+          replacements: [0], // Exclude DRAFT raffles
+          type: sequelize.QueryTypes.SELECT,
+        },
+      );
 
       const liveRaffleCount = await Raffle.count({
         where: {
@@ -597,11 +641,50 @@ class AdminController {
         },
       });
 
+      const statsByToken = tokenStats.map((stat) => ({
+        tokenType: mapEnumValue(TOKEN_TYPE, stat.tokenType),
+        tokenTypeRaw: stat.tokenType,
+        totalRevenue: Number(stat.totalRevenue || 0),
+        totalTicketsSold: Number(stat.totalTicketsSold || 0),
+        totalPlatformRevenue: Number(stat.totalPlatformRevenue || 0),
+      }));
+
+      // Calculate totals across all token types
+      const totals = tokenStats.reduce(
+        (acc, stat) => ({
+          totalRevenue: acc.totalRevenue + Number(stat.totalRevenue || 0),
+          totalTicketsSold:
+            acc.totalTicketsSold + Number(stat.totalTicketsSold || 0),
+          totalPlatformRevenue:
+            acc.totalPlatformRevenue + Number(stat.totalPlatformRevenue || 0),
+        }),
+        { totalRevenue: 0, totalTicketsSold: 0, totalPlatformRevenue: 0 },
+      );
+
+      // Get SOL-only stats (tokenType = 0)
+      const solStats = tokenStats.find((s) => s.tokenType === 0) || {
+        tokenType: 0,
+        totalRevenue: 0,
+        totalTicketsSold: 0,
+        totalPlatformRevenue: 0,
+      };
+
       const response = {
-        totalRevenue: Number(stats.totalRevenue || 0),
-        totalTicketsSold: Number(stats.totalTicketsSold || 0),
-        totalPlatformRevenue: Number(stats.totalPlatformRevenue || 0),
+        // Legacy totals (mixed tokens)
+        totalRevenue: totals.totalRevenue,
+        totalTicketsSold: totals.totalTicketsSold,
+        totalPlatformRevenue: totals.totalPlatformRevenue,
         liveRaffleCount,
+        // breakdown by token type
+        statsByToken,
+        // SOL-only stats for clean display
+        primaryTokenStats: {
+          tokenType: mapEnumValue(TOKEN_TYPE, solStats.tokenType),
+          tokenTypeRaw: solStats.tokenType,
+          totalRevenue: Number(solStats.totalRevenue || 0),
+          totalTicketsSold: Number(solStats.totalTicketsSold || 0),
+          totalPlatformRevenue: Number(solStats.totalPlatformRevenue || 0),
+        },
       };
 
       return respond(res, httpStatus.OK, "Dashboard stats fetched!", response);
@@ -624,6 +707,8 @@ class AdminController {
           r.title,
           r.ticketPrice,
           r.status,
+          r.tokenType,
+          r.tokenAddress,
           u.pubkey as creatorAddress,
           COALESCE(
             (
@@ -659,10 +744,13 @@ class AdminController {
         raffleId: raffle.id,
         raffleName: raffle.title,
         creatorAddress: raffle.creatorAddress,
-        revenueInSOL: parseFloat(raffle.revenue || 0),
+        revenue: parseFloat(raffle.revenue || 0),
         totalTicketsSold: parseInt(raffle.totalTicketsSold || 0, 10),
         status: mapEnumValue(RAFFLE_STATUS, raffle.status),
         ticketPrice: parseFloat(raffle.ticketPrice || 0),
+        tokenType: mapEnumValue(TOKEN_TYPE, raffle.tokenType),
+        tokenTypeRaw: raffle.tokenType,
+        tokenAddress: raffle.tokenAddress,
       }));
 
       return respond(
@@ -883,6 +971,44 @@ class AdminController {
         res,
         httpStatus.OK,
         `Token ${token.isVerified ? "verified" : "unverified"} successfully`,
+        { token },
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(error),
+      );
+    }
+  }
+
+  static async togglePaymentToken(req, res) {
+    try {
+      const { id } = req.params;
+
+      const token = await VerifiedToken.findByPk(id);
+
+      if (!token) {
+        return respond(res, httpStatus.NOT_FOUND, "Token not found");
+      }
+
+      if (!token.isVerified && !token.isPaymentToken) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Token must be verified before it can be enabled for payments",
+        );
+      }
+
+      await token.update({
+        isPaymentToken: !token.isPaymentToken,
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        `Token ${token.isPaymentToken ? "enabled" : "disabled"} for payments successfully`,
         { token },
       );
     } catch (error) {

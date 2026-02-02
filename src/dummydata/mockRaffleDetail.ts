@@ -8,6 +8,8 @@ export interface RaffleType {
   sold: number;
   endTime: string;
   tokenType: string;
+  tokenTypeNumber: number;
+  tokenAddress?: string;
   isVerified: boolean;
   host: string;
   hostReputation: string;

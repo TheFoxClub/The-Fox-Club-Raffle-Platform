@@ -4,15 +4,18 @@ import { Transaction } from "@solana/web3.js";
 import Button from "../../components/ui/Button";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { getTokenSymbol } from "../../utils/tokenUtils";
 
 interface ClaimPayoutProps {
   raffleId: number;
   payoutAmount: number;
+  tokenType: string;
+  tokenAddress?: string;
   onClaimed: () => void;
   disabled?: boolean;
 }
 
-const ClaimPayout = ({ raffleId, payoutAmount, onClaimed, disabled }: ClaimPayoutProps) => {
+const ClaimPayout = ({ raffleId, payoutAmount, tokenType, tokenAddress, onClaimed, disabled }: ClaimPayoutProps) => {
   const { publicKey, signTransaction } = useWallet();
   const [claiming, setClaiming] = useState(false);
 
@@ -55,7 +58,7 @@ const ClaimPayout = ({ raffleId, payoutAmount, onClaimed, disabled }: ClaimPayou
       
       if (submitResponse.data.success) {
         toast.success(
-          `Payout transaction submitted! Your ${payoutAmount.toFixed(4)} SOL will be processed shortly.`
+          `Payout transaction submitted! Your ${payoutAmount.toFixed(4)} ${getTokenSymbol(tokenType, tokenAddress)} will be processed shortly.`
         );
 
         onClaimed();

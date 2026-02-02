@@ -23,7 +23,7 @@ const { Wallet } = require("./wallet.js");
 const { addCommissionToTransaction } = require("../../services/commissions.js");
 const { SOLANA_TOKEN_ADDRESS } = require("../../config/constants.js");
 const { addNftSendTransaction } = require("./send-nft.js");
-const { RAFFLE_REWARD_TYPES } = require("../../config/data.js");
+const { RAFFLE_REWARD_TYPES, TOKEN_TYPE } = require("../../config/data.js");
 const {
   signerIdentity,
   createNoopSigner,
@@ -57,13 +57,13 @@ const sendMultipleSplTokenTx = async ({
     transaction.add(
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: 300_000,
-      })
+      }),
     );
 
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({
         units: 300_000,
-      })
+      }),
     );
 
     let signatures = [];
@@ -80,7 +80,7 @@ const sendMultipleSplTokenTx = async ({
               fromPubkey: new PublicKey(fromAccount),
               toPubkey: new PublicKey(toAccount),
               lamports: amount * LAMPORTS_PER_SOL,
-            })
+            }),
           );
 
           transactionDetails.push({
@@ -98,7 +98,9 @@ const sendMultipleSplTokenTx = async ({
           // NFT transfers cannot be combined with other transfers in the same transaction
           // If there are multiple rewards including NFTs, we need to handle them separately
           if (splTokenSendSummary.length > 1) {
-            throw new Error("Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only.");
+            throw new Error(
+              "Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only.",
+            );
           }
 
           // Single NFT transfer
@@ -163,14 +165,14 @@ const sendMultipleSplTokenTx = async ({
               new PublicKey(tokenAddress),
               new PublicKey(fromAccount),
               false,
-              tokenProgramId
+              tokenProgramId,
             );
 
             const toAta = getAssociatedTokenAddressSync(
               new PublicKey(tokenAddress),
               new PublicKey(toAccount),
               false,
-              tokenProgramId
+              tokenProgramId,
             );
 
             // Check if destination account exists, create if needed
@@ -186,8 +188,8 @@ const sendMultipleSplTokenTx = async ({
                     new PublicKey(toAccount), // Owner
                     new PublicKey(tokenAddress),
                     tokenProgramId,
-                    ASSOCIATED_TOKEN_PROGRAM_ID
-                  )
+                    ASSOCIATED_TOKEN_PROGRAM_ID,
+                  ),
                 );
               } else {
                 throw e;
@@ -201,7 +203,7 @@ const sendMultipleSplTokenTx = async ({
                 transferFeeConfig?.newerTransferFee?.transferFeeBasisPoints ||
                 0;
               const maxFee = BigInt(
-                transferFeeConfig?.newerTransferFee?.maximumFee || 0
+                transferFeeConfig?.newerTransferFee?.maximumFee || 0,
               );
               const fee =
                 (BigInt(uiAmount) * BigInt(feeBasisPoints)) / BigInt(10_000);
@@ -217,8 +219,8 @@ const sendMultipleSplTokenTx = async ({
                   decimals,
                   actualFee,
                   [],
-                  tokenProgramId
-                )
+                  tokenProgramId,
+                ),
               );
             } else {
               // Regular SPL token transfer
@@ -229,8 +231,8 @@ const sendMultipleSplTokenTx = async ({
                   new PublicKey(fromAccount),
                   uiAmount,
                   [],
-                  tokenProgramId
-                )
+                  tokenProgramId,
+                ),
               );
             }
 
@@ -250,11 +252,9 @@ const sendMultipleSplTokenTx = async ({
                 : "platform_to_user",
             });
           } catch (tokenError) {
-            // logger.error(
-            //   `Token transfer failed for ${tokenAddress}:`,
-            //   tokenError
-            // );
-            throw new Error(`Token transfer failed: ${tokenError.message}`);
+            throw new Error(
+              `Token transfer failed for ${tokenAddress}: ${tokenError.message}`,
+            );
           }
           break;
       }
@@ -374,13 +374,13 @@ const createClaimTransaction = async ({
     transaction.add(
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: 300_000,
-      })
+      }),
     );
 
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({
         units: 300_000,
-      })
+      }),
     );
 
     const { tokenAddress, amount, type } = reward;
@@ -393,7 +393,7 @@ const createClaimTransaction = async ({
             fromPubkey: new PublicKey(fromAccount),
             toPubkey: new PublicKey(toAccount),
             lamports: amount * LAMPORTS_PER_SOL,
-          })
+          }),
         );
         break;
 
@@ -426,14 +426,14 @@ const createClaimTransaction = async ({
           new PublicKey(tokenAddress),
           new PublicKey(fromAccount),
           false,
-          tokenProgramId
+          tokenProgramId,
         );
 
         const toAta = getAssociatedTokenAddressSync(
           new PublicKey(tokenAddress),
           new PublicKey(toAccount),
           false,
-          tokenProgramId
+          tokenProgramId,
         );
 
         // Check if destination account exists, create if needed
@@ -448,8 +448,8 @@ const createClaimTransaction = async ({
                 new PublicKey(toAccount),
                 new PublicKey(tokenAddress),
                 tokenProgramId,
-                ASSOCIATED_TOKEN_PROGRAM_ID
-              )
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+              ),
             );
           }
         }
@@ -459,7 +459,7 @@ const createClaimTransaction = async ({
           const feeBasisPoints =
             transferFeeConfig?.newerTransferFee?.transferFeeBasisPoints || 0;
           const maxFee = BigInt(
-            transferFeeConfig?.newerTransferFee?.maximumFee || 0
+            transferFeeConfig?.newerTransferFee?.maximumFee || 0,
           );
           const fee =
             (BigInt(uiAmount) * BigInt(feeBasisPoints)) / BigInt(10_000);
@@ -475,8 +475,8 @@ const createClaimTransaction = async ({
               decimals,
               actualFee,
               [],
-              tokenProgramId
-            )
+              tokenProgramId,
+            ),
           );
         } else {
           transaction.add(
@@ -486,8 +486,8 @@ const createClaimTransaction = async ({
               new PublicKey(fromAccount),
               uiAmount,
               [],
-              tokenProgramId
-            )
+              tokenProgramId,
+            ),
           );
         }
         break;
@@ -537,6 +537,8 @@ const createPayoutTransaction = async ({
   toAccount,
   fromAccount,
   feePayer,
+  tokenType = 0, // Default to SOLANA (0)
+  tokenAddress = null, // Token address for SPL tokens
 }) => {
   try {
     const { Wallet } = require("./wallet.js");
@@ -547,23 +549,81 @@ const createPayoutTransaction = async ({
     transaction.add(
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: 300_000,
-      })
+      }),
     );
 
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({
         units: 300_000,
-      })
+      }),
     );
 
-    // SOL transfer from platform to user
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: new PublicKey(fromAccount), // Platform wallet
-        toPubkey: new PublicKey(toAccount), // User wallet
-        lamports: amount * LAMPORTS_PER_SOL,
-      })
-    );
+    if (tokenType === TOKEN_TYPE.SOLANA) {
+      // SOL transfer from platform to user
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(fromAccount), // Platform wallet
+          toPubkey: new PublicKey(toAccount), // User wallet
+          lamports: amount * LAMPORTS_PER_SOL,
+        }),
+      );
+    } else {
+      // SPL Token transfer
+      if (!tokenAddress) {
+        throw new Error("Token address is required for SPL token payouts");
+      }
+
+      const tokenDetail = await getTokenDetail(tokenAddress);
+      const { decimals, tokenProgramId } = tokenDetail;
+
+      const uiAmount = amount * Math.pow(10, decimals);
+
+      // Get token accounts
+      const fromAta = getAssociatedTokenAddressSync(
+        new PublicKey(tokenAddress),
+        new PublicKey(fromAccount),
+        false,
+        tokenProgramId,
+      );
+
+      const toAta = getAssociatedTokenAddressSync(
+        new PublicKey(tokenAddress),
+        new PublicKey(toAccount),
+        false,
+        tokenProgramId,
+      );
+
+      try {
+        await getAccount(connection, toAta, "confirmed", tokenProgramId);
+      } catch (e) {
+        if (e instanceof TokenAccountNotFoundError) {
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              new PublicKey(feePayer), // User
+              toAta,
+              new PublicKey(toAccount), // Owner
+              new PublicKey(tokenAddress),
+              tokenProgramId,
+              ASSOCIATED_TOKEN_PROGRAM_ID,
+            ),
+          );
+        } else {
+          throw e;
+        }
+      }
+
+      // Add SPL token transfer instruction
+      transaction.add(
+        createTransferInstruction(
+          fromAta,
+          toAta,
+          new PublicKey(fromAccount),
+          uiAmount,
+          [],
+          tokenProgramId,
+        ),
+      );
+    }
 
     const latestBlockhash = await connection.getLatestBlockhash();
     transaction.recentBlockhash = latestBlockhash.blockhash;
@@ -615,12 +675,12 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
     // Wait for confirmation
     const confirmation = await connection.confirmTransaction(
       signature,
-      "confirmed"
+      "confirmed",
     );
 
     if (confirmation.value.err) {
       throw new Error(
-        `Transaction failed: ${JSON.stringify(confirmation.value.err)}`
+        `Transaction failed: ${JSON.stringify(confirmation.value.err)}`,
       );
     }
 

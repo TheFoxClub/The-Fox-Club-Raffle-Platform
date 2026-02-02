@@ -3,13 +3,19 @@ import type { ResponseDataType } from "../../config/type";
 
 export const buyTicket = async (
   senderPubkey: string,
-  tokenAddress: string,
-  gameEntryAmount: number
+  tokenType: string,
+  raffleId: number,
+  ticketCount: number,
 ): Promise<ResponseDataType> => {
   return apiRequest({
     method: "post",
     url: "ticket/buy",
-    data: { type: "solana", senderPubkey, tokenAddress, gameEntryAmount },
+    data: {
+      type: tokenType,
+      senderPubkey,
+      raffleId,
+      ticketCount,
+    },
   });
 };
 
@@ -25,7 +31,8 @@ export const storeSignature = async (
   entryToken: string | "",
   ticketCount: number,
   raffleId: number,
-  reservationId: string // NEW: Required reservation ID
+  reservationId: string,
+  tokenDecimals: number = 9,
 ): Promise<ResponseDataType> => {
   return apiRequest({
     method: "post",
@@ -42,13 +49,14 @@ export const storeSignature = async (
       entryToken,
       ticketCount,
       raffleId,
-      reservationId, // NEW: Include reservation ID
+      reservationId,
+      tokenDecimals,
     },
   });
 };
 
 export const cancelReservation = async (
-  reservationId: string
+  reservationId: string,
 ): Promise<ResponseDataType> => {
   return apiRequest({
     method: "post",
@@ -58,7 +66,7 @@ export const cancelReservation = async (
 };
 
 export const getReservationStatus = async (
-  reservationId: string
+  reservationId: string,
 ): Promise<ResponseDataType> => {
   return apiRequest({
     method: "get",
@@ -67,10 +75,17 @@ export const getReservationStatus = async (
 };
 
 export const getAvailableTickets = async (
-  raffleId: number
+  raffleId: number,
 ): Promise<ResponseDataType> => {
   return apiRequest({
     method: "get",
     url: `ticket/available-tickets/${raffleId}`,
+  });
+};
+
+export const getVerifiedPaymentTokens = async (): Promise<ResponseDataType> => {
+  return apiRequest({
+    method: "get",
+    url: "tokens/payment-tokens",
   });
 };

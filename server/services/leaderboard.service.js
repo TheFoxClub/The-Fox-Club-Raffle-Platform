@@ -8,17 +8,20 @@ const logger = require("../util/logger");
 
 const getTopHosts = async (limit = 10) => {
   try {
+    // Get top hosts by SOL revenue only (tokenType = 0) from raffles table
     const results = await sequelize.query(
       `
       SELECT
         u.pubkey as walletAddress,
-        COALESCE(SUM(r.claimableAmount + r.totalCommission), 0) AS totalRevenue,
-        COUNT(r.id) as rafflesCount,
-        r.tokenType as raffleTokenType
+        COALESCE(SUM(
+          CASE WHEN r.tokenType = 0 THEN r.claimableAmount + r.totalCommission ELSE 0 END
+        ), 0) AS totalRevenue,
+        COUNT(CASE WHEN r.tokenType = 0 THEN r.id END) as rafflesCount,
+        0 as tokenType
       FROM users u
-      LEFT JOIN raffles r ON u.id = r.userId
-      GROUP BY u.id, u.pubkey, r.tokenType
-      HAVING COUNT(r.id) > 0
+      LEFT JOIN raffles r ON u.id = r.userId AND r.status != 0
+      GROUP BY u.id, u.pubkey
+      HAVING totalRevenue > 0
       ORDER BY totalRevenue DESC
       LIMIT ?
       `,
@@ -33,7 +36,8 @@ const getTopHosts = async (limit = 10) => {
       walletAddress: host.walletAddress,
       totalRevenue: parseFloat(host.totalRevenue || 0),
       rafflesCount: parseInt(host.rafflesCount || 0, 10),
-      tokenType: mapEnumValue(TOKEN_TYPE, host.raffleTokenType),
+      tokenType: mapEnumValue(TOKEN_TYPE, host.tokenType),
+      tokenAddress: null, 
     }));
   } catch (error) {
     logger.error("Error getting top hosts:", error);
@@ -43,6 +47,7 @@ const getTopHosts = async (limit = 10) => {
 
 const getTopBuyers = async (limit = 10) => {
   try {
+    // Get top buyers by SOL spending only (type = 0)
     const results = await sequelize.query(
       `
       SELECT
@@ -51,10 +56,10 @@ const getTopBuyers = async (limit = 10) => {
         SUM(COALESCE(commissionAmount, 0) + COALESCE(creatorAmount, 0)) AS totalSpent,
         SUM(COALESCE(commissionAmount, 0)) AS totalCommission,
         SUM(COALESCE(creatorAmount, 0)) AS totalCreatorAmount,
-        type AS transactionType
+        0 AS tokenType
       FROM spl_token_send_transactions
-      WHERE status = ?
-      GROUP BY senderPubkey, type
+      WHERE status = ? AND type = 0
+      GROUP BY senderPubkey
       HAVING totalSpent > 0
       ORDER BY totalSpent DESC
       LIMIT ?
@@ -94,6 +99,7 @@ const getTopBuyers = async (limit = 10) => {
       WHERE st.senderPubkey IN (?)
         AND rt.isWinner = 1
         AND st.status = ?
+        AND st.type = 0
       GROUP BY st.senderPubkey
       `,
       {
@@ -115,7 +121,8 @@ const getTopBuyers = async (limit = 10) => {
       ticketsBought: parseInt(ticketCounts[buyer.walletAddress] || 0, 10),
       transactionsCount: parseInt(buyer.transactionsCount || 0, 10),
       totalWins: winsLookup[buyer.walletAddress] || 0,
-      tokenType: mapEnumValue(TOKEN_TYPE, buyer.transactionType),
+      tokenType: mapEnumValue(TOKEN_TYPE, buyer.tokenType),
+      tokenAddress: null, 
     }));
   } catch (error) {
     logger.error("Error getting top buyers:", error);

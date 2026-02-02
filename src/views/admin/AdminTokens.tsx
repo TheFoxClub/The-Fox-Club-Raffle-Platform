@@ -18,11 +18,15 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { toast } from "react-toastify";
 
 const solanaToken = {
-  id: 1,
+  id: "sol-builtin",
   name: "Solana",
+  symbol: "SOL",
   mint: "So11111111111111111111111111111111111111112",
   decimals: 9,
-  active: true,
+  tokenType: 0,
+  isVerified: true,
+  isPaymentToken: true,
+  isBuiltIn: true,
 };
 
 function truncateAddress(address: string) {
@@ -66,8 +70,11 @@ export default function AdminTokens() {
       id: number;
       address: string;
       name: string;
+      symbol: string;
       decimals: number;
+      tokenType: number;
       isVerified: boolean;
+      isPaymentToken: boolean;
     }[]
   >([]);
   const [loading, setLoading] = useState(false);
@@ -111,12 +118,17 @@ export default function AdminTokens() {
     fetchTokens();
   }, [open, user.isAuthenticated, user.pubkey]);
 
-  // Fetch verified tokens from API
+  // Fetch verified tokens from API (excluding SOL which is built-in)
   const fetchVerifiedTokens = async () => {
     try {
       setLoadingVerified(true);
       const res = await server.get("/admin/verified-token");
-      setVerifiedTokens(res.data?.data?.tokens || []);
+      // Filter out SOL if it exists in database - it should be built-in only
+      const tokens = (res.data?.data?.tokens || []).filter(
+        (token) =>
+          token.address !== "So11111111111111111111111111111111111111112",
+      );
+      setVerifiedTokens(tokens);
     } catch (err) {
       console.error("Failed to fetch verified tokens", err);
       toast.error("Failed to refresh tokens");
@@ -160,14 +172,14 @@ export default function AdminTokens() {
   const handleToggleVerify = async (tokenId: number) => {
     try {
       const res = await server.patch(
-        `/admin/verified-token/${tokenId}/toggle-verify`
+        `/admin/verified-token/${tokenId}/toggle-verify`,
       );
       const updatedToken = res.data?.data?.token;
 
       if (updatedToken) {
         // Update the local state to reflect the change
         setVerifiedTokens((prev) =>
-          prev.map((t) => (t.id === updatedToken.id ? updatedToken : t))
+          prev.map((t) => (t.id === updatedToken.id ? updatedToken : t)),
         );
         if (updatedToken.isVerified) {
           toast.success("Token verified successfully!");
@@ -177,6 +189,29 @@ export default function AdminTokens() {
       }
     } catch (err) {
       console.error("Failed to toggle token verification", err);
+    }
+  };
+
+  const handleTogglePaymentToken = async (tokenId: number) => {
+    try {
+      const res = await server.patch(
+        `/admin/verified-token/${tokenId}/toggle-payment`,
+      );
+      const updatedToken = res.data?.data?.token;
+
+      if (updatedToken) {
+        setVerifiedTokens((prev) =>
+          prev.map((t) => (t.id === updatedToken.id ? updatedToken : t)),
+        );
+        if (updatedToken.isPaymentToken) {
+          toast.success("Token enabled for payments!");
+        } else {
+          toast.success("Token disabled for payments!");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle payment token status", err);
+      toast.error("Failed to update payment token status");
     }
   };
 
@@ -338,8 +373,8 @@ export default function AdminTokens() {
                 <th className="p-4 font-medium">Token Name</th>
                 <th className="p-4 font-medium">Address</th>
                 <th className="p-4 font-medium">Decimals</th>
-                {/* <th className="p-4 font-medium">Fee %</th>
-                <th className="p-4 font-medium">Status</th> */}
+                <th className="p-4 font-medium">Verified</th>
+                <th className="p-4 font-medium">Payment Token</th>
                 <th className="p-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -349,9 +384,14 @@ export default function AdminTokens() {
                 <TokenTableSkeleton />
               ) : (
                 <>
-                  {/* Solana token first */}
-                  <tr className="border-b border-border/30 hover:bg-muted/20 transition-colors">
-                    <td className="p-4 font-medium">{solanaToken.name}</td>
+                  {/* Solana token first - Built-in */}
+                  <tr className="border-b border-border/30 hover:bg-muted/20 transition-colors bg-muted/10">
+                    <td className="p-4 font-medium">
+                      {solanaToken.name}
+                      <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                        Built-in
+                      </span>
+                    </td>
                     <td className="p-4">
                       <button
                         className="flex items-center gap-1 hover:text-primary transition"
@@ -364,19 +404,23 @@ export default function AdminTokens() {
                     <td className="p-4 text-muted-foreground">
                       {solanaToken.decimals}
                     </td>
-                    {/* <td className="p-4">
-                  <Switch
-                    checked={solanaVerified}
-                    onCheckedChange={(val) => {
-                      setSolanaVerified(val);
-                      if (val) {
-                        toast.success("Solana token verified successfully!");
-                      } else {
-                        toast.success("Solana token unverified successfully!");
-                      }
-                    }}
-                  />
-                </td> */}
+                    <td className="p-4">
+                      <Switch
+                        checked={true}
+                        disabled={true}
+                        title="SOL is always verified"
+                      />
+                    </td>
+                    <td className="p-4">
+                      <Switch
+                        checked={true}
+                        disabled={true}
+                        title="SOL is always available for payments"
+                      />
+                    </td>
+                    <td className="p-4 text-muted-foreground">
+                      <span className="text-sm">Built-in</span>
+                    </td>
                   </tr>
 
                   {verifiedTokens.map((token) => (
@@ -384,7 +428,14 @@ export default function AdminTokens() {
                       key={token.id}
                       className="border-b border-border/30 hover:bg-muted/20 transition-colors"
                     >
-                      <td className="p-4 font-medium">{token.name}</td>
+                      <td className="p-4 font-medium">
+                        {token.name}
+                        {token.symbol && token.symbol !== token.name && (
+                          <span className="text-muted-foreground ml-1">
+                            ({token.symbol})
+                          </span>
+                        )}
+                      </td>
                       <td className="p-4">
                         <button
                           className="flex items-center gap-1 hover:text-primary transition"
@@ -397,18 +448,6 @@ export default function AdminTokens() {
                       <td className="p-4 text-muted-foreground">
                         {token.decimals}
                       </td>
-                      {/* <td className="p-4">
-                    <span className="text-accent font-medium">
-                      {token.fee}%
-                    </span>
-                  </td>
-
-                  <td className="p-4 whitespace-nowrap">
-                    <span className="text-accent font-medium">
-                      {token.fee}%
-                    </span>
-                  </td> */}
-
                       <td className="p-4 whitespace-nowrap">
                         <Switch
                           checked={token.isVerified}
@@ -420,12 +459,24 @@ export default function AdminTokens() {
                           }
                         />
                       </td>
-
+                      <td className="p-4 whitespace-nowrap">
+                        <Switch
+                          checked={token.isPaymentToken}
+                          onCheckedChange={() =>
+                            handleTogglePaymentToken(token.id)
+                          }
+                          disabled={!token.isVerified}
+                          title={
+                            !token.isVerified
+                              ? "Token must be verified first"
+                              : token.isPaymentToken
+                                ? "Click to disable for payments"
+                                : "Click to enable for payments"
+                          }
+                        />
+                      </td>
                       <td className="p-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          {/* <Button variant="ghost" size="icon">
-                        <Edit className="h-4 w-4" />
-                      </Button> */}
                           <Button
                             variant="ghost"
                             size="icon"

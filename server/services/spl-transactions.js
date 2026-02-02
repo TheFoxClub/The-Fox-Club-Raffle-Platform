@@ -3,6 +3,7 @@ const { SplTokenSendTransaction, GameReward, Raffle } = require("../models");
 const {
   SPL_TOKEN_SEND_TX_STATUS,
   SPL_TOKEN_SEND_TRANSACTION_TYPE,
+  TOKEN_TYPE,
 } = require("../config/data");
 const { DEFAULT_COMMISSION } = require("../config/constants");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
@@ -93,13 +94,13 @@ const getSplTokenSendTransactions = async () => {
   });
 
   logger.info(
-    `Found ${regularRows.length} regular pending transactions, ${payoutRows.length} pending payout transactions, and ${successfulPayoutRows.length} successful payout transactions needing claimedAmount updates`
+    `Found ${regularRows.length} regular pending transactions, ${payoutRows.length} pending payout transactions, and ${successfulPayoutRows.length} successful payout transactions needing claimedAmount updates`,
   );
 
   if (allRows.length > 0) {
     allRows.forEach((row) => {
       logger.info(
-        `Transaction to process: ${row.txId}, type: ${row.type}, rewardTransferType: ${row.rewardTransferType}, raffleId: ${row.raffleId}, status: ${row.status}, created: ${row.createdAt}`
+        `Transaction to process: ${row.txId}, type: ${row.type}, rewardTransferType: ${row.rewardTransferType}, raffleId: ${row.raffleId}, status: ${row.status}, created: ${row.createdAt}`,
       );
     });
   }
@@ -122,7 +123,7 @@ const updateDbAndConfirmTransactions = async (op) => {
       }
 
       logger.info(
-        `Processing transaction ${tx.txId}: type=${existingTransaction.type}, rewardTransferType=${existingTransaction.rewardTransferType}, raffleId=${existingTransaction.raffleId}`
+        `Processing transaction ${tx.txId}: type=${existingTransaction.type}, rewardTransferType=${existingTransaction.rewardTransferType}, raffleId=${existingTransaction.raffleId}`,
       );
 
       if (tx.details.txType === SPL_TOKEN_SEND_TRANSACTION_TYPE.MULTIPLE) {
@@ -138,7 +139,7 @@ const updateDbAndConfirmTransactions = async (op) => {
             (amount) =>
               amount ===
                 Number(existingTransaction.uiAmount) + commissionInLamports || // <-- transferring commission and amount to same wallet.
-              amount === Number(existingTransaction.uiAmount)
+              amount === Number(existingTransaction.uiAmount),
           );
         }
         return Number(existingTransaction.uiAmount) === tx.details.amount;
@@ -157,7 +158,7 @@ const updateDbAndConfirmTransactions = async (op) => {
         existingTransaction.raffleId
       ) {
         logger.info(
-          `Processing payout transaction: ${existingTransaction.txId}, isValid: ${isValid}, status: ${existingTransaction.status}, raffleId: ${existingTransaction.raffleId}, uiAmount: ${existingTransaction.uiAmount}`
+          `Processing payout transaction: ${existingTransaction.txId}, isValid: ${isValid}, status: ${existingTransaction.status}, raffleId: ${existingTransaction.raffleId}, uiAmount: ${existingTransaction.uiAmount}`,
         );
 
         // Handle successful transactions (either newly validated or already successful)
@@ -167,31 +168,54 @@ const updateDbAndConfirmTransactions = async (op) => {
 
         if (shouldUpdateClaimedAmount) {
           try {
-            const payoutAmountInSOL =
-              Number(existingTransaction.uiAmount) / LAMPORTS_PER_SOL;
-
-            logger.info(
-              `Attempting to update claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmountInSOL} SOL (uiAmount: ${existingTransaction.uiAmount} lamports)`
-            );
-
-            // Check if claimedAmount needs updating
+            // Get raffle information to determine token type and decimals
             const currentRaffle = await Raffle.findOne({
               where: { id: existingTransaction.raffleId },
-              attributes: ["id", "claimedAmount", "claimableAmount"],
+              attributes: [
+                "id",
+                "claimedAmount",
+                "claimableAmount",
+                "tokenType",
+                "tokenAddress",
+              ],
             });
 
-            if (
-              currentRaffle &&
-              parseFloat(currentRaffle.claimedAmount) === 0
-            ) {
+            if (!currentRaffle) {
+              logger.error(
+                `Raffle not found for transaction ${existingTransaction.txId}`,
+              );
+            }
+
+            let payoutAmount;
+            let tokenSymbol;
+
+            if (currentRaffle.tokenType === TOKEN_TYPE.SOLANA) {
+              // SOL transaction - uiAmount in lamports
+              payoutAmount =
+                Number(existingTransaction.uiAmount) / LAMPORTS_PER_SOL;
+              tokenSymbol = "SOL";
+            } else {
+              // SPL Token transaction - uiAmount is already in smallest token units
+              // Convert back to human-readable amount using the stored decimals
+              payoutAmount =
+                Number(existingTransaction.uiAmount) /
+                Math.pow(10, existingTransaction.decimals || 9);
+              tokenSymbol = "SPL";
+            }
+
+            logger.info(
+              `Attempting to update claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (uiAmount: ${existingTransaction.uiAmount}, decimals: ${existingTransaction.decimals})`,
+            );
+
+            if (parseFloat(currentRaffle.claimedAmount) === 0) {
               // Update the raffle's claimedAmount
               const [affectedRows] = await Raffle.increment(
-                { claimedAmount: payoutAmountInSOL },
-                { where: { id: existingTransaction.raffleId } }
+                { claimedAmount: payoutAmount },
+                { where: { id: existingTransaction.raffleId } },
               );
 
               logger.info(
-                `Updated claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmountInSOL} SOL (Transaction: ${existingTransaction.txId}), affected rows: ${affectedRows}`
+                `Updated claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (Transaction: ${existingTransaction.txId}), affected rows: ${affectedRows}`,
               );
 
               // Verify the update
@@ -202,13 +226,13 @@ const updateDbAndConfirmTransactions = async (op) => {
 
               if (updatedRaffle) {
                 logger.info(
-                  `Raffle ${existingTransaction.raffleId} after update - claimedAmount: ${updatedRaffle.claimedAmount}, claimableAmount: ${updatedRaffle.claimableAmount}`
+                  `Raffle ${existingTransaction.raffleId} after update - claimedAmount: ${updatedRaffle.claimedAmount}, claimableAmount: ${updatedRaffle.claimableAmount}`,
                 );
 
                 // Get raffle owner for Socket.IO event
                 const raffleOwner = await Raffle.findOne({
                   where: { id: existingTransaction.raffleId },
-                  attributes: ['userId']
+                  attributes: ["userId"],
                 });
 
                 if (raffleOwner) {
@@ -217,22 +241,22 @@ const updateDbAndConfirmTransactions = async (op) => {
                     raffleId: existingTransaction.raffleId,
                     claimedAmount: updatedRaffle.claimedAmount,
                     claimableAmount: updatedRaffle.claimableAmount,
-                    payoutAmount: payoutAmountInSOL,
+                    payoutAmount: payoutAmount,
                     transactionId: existingTransaction.id,
                     signature: existingTransaction.txId,
-                    status: 'confirmed',
+                    status: "confirmed",
                   });
                 }
               }
             } else {
               logger.info(
-                `Skipping claimedAmount update for raffle ${existingTransaction.raffleId} - already updated (current: ${currentRaffle?.claimedAmount})`
+                `Skipping claimedAmount update for raffle ${existingTransaction.raffleId} - already updated (current: ${currentRaffle?.claimedAmount})`,
               );
             }
           } catch (payoutError) {
             logger.error(
               `Failed to update claimedAmount for raffle ${existingTransaction.raffleId}:`,
-              payoutError
+              payoutError,
             );
           }
         } else {
@@ -245,16 +269,16 @@ const updateDbAndConfirmTransactions = async (op) => {
                   id: existingTransaction.raffleId,
                   creatorClaimTxId: existingTransaction.id,
                 },
-              }
+              },
             );
 
             logger.info(
-              `Reset creatorClaimTxId for raffle ${existingTransaction.raffleId} due to mismatched payout transaction ${existingTransaction.txId}`
+              `Reset creatorClaimTxId for raffle ${existingTransaction.raffleId} due to mismatched payout transaction ${existingTransaction.txId}`,
             );
           } catch (resetError) {
             logger.error(
               `Failed to reset creatorClaimTxId for raffle ${existingTransaction.raffleId}:`,
-              resetError
+              resetError,
             );
           }
         }
@@ -272,7 +296,7 @@ const updateDbAndConfirmTransactions = async (op) => {
           where: {
             txId: { [Op.in]: failedTxIds },
           },
-        }
+        },
       );
 
       // Handle failed payout transactions - reset creatorClaimTxId in raffle table
@@ -292,16 +316,16 @@ const updateDbAndConfirmTransactions = async (op) => {
               { creatorClaimTxId: null },
               {
                 where: { id: failedTx.raffleId, creatorClaimTxId: failedTx.id },
-              }
+              },
             );
 
             logger.info(
-              `Reset creatorClaimTxId for raffle ${failedTx.raffleId} due to failed payout transaction ${failedTx.txId}`
+              `Reset creatorClaimTxId for raffle ${failedTx.raffleId} due to failed payout transaction ${failedTx.txId}`,
             );
           } catch (resetError) {
             logger.error(
               `Failed to reset creatorClaimTxId for raffle ${failedTx.raffleId}:`,
-              resetError
+              resetError,
             );
           }
         }

@@ -5,13 +5,25 @@ const {
   RaffleTicket,
   RaffleReward,
   TicketReservation,
+  VerifiedToken,
 } = require("../models");
 const {
   PublicKey,
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
+  ComputeBudgetProgram,
 } = require("@solana/web3.js");
+const {
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createTransferInstruction,
+  getAccount,
+  TokenAccountNotFoundError,
+} = require("@solana/spl-token");
 
 const { getUmi } = require("../config/solana");
 const { BET_RECEIVER_WALLET } = require("../config/credentials");
@@ -72,25 +84,70 @@ class TicketController {
         return respond(res, httpStatus.BAD_REQUEST, "Raffle is not live yet");
       }
 
+      let expectedTokenAddress = null;
+      let expectedTokenType = raffleData.tokenType;
+
+      if (expectedTokenType === TOKEN_TYPE.SOLANA) {
+        expectedTokenAddress = "solana";
+      } else {
+        if (raffleData.tokenAddress) {
+          expectedTokenAddress = raffleData.tokenAddress;
+        } else {
+          const raffleToken = await VerifiedToken.findOne({
+            where: {
+              tokenType: expectedTokenType,
+              isVerified: true,
+              isPaymentToken: true,
+            },
+          });
+
+          if (!raffleToken) {
+            return respond(
+              res,
+              httpStatus.BAD_REQUEST,
+              "Raffle token configuration is invalid",
+            );
+          }
+
+          expectedTokenAddress = raffleToken.address;
+        }
+      }
+
+      console.log("Expected token address:", expectedTokenAddress); // Debug log
+
+      if (type !== expectedTokenAddress) {
+        let raffleTokenName = "Unknown";
+        if (expectedTokenType === TOKEN_TYPE.SOLANA) {
+          raffleTokenName = "SOL";
+        } else {
+          const tokenRecord = await VerifiedToken.findOne({
+            where: { tokenType: expectedTokenType },
+          });
+          raffleTokenName =
+            tokenRecord?.symbol || tokenRecord?.name || "Unknown";
+        }
+
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `This raffle requires payment in ${raffleTokenName}. Please use the correct token.`,
+        );
+      }
+
       // CRITICAL: Use reservation system to prevent race conditions
       const reservationResult = await TicketReservationService.reserveTickets({
         raffleId,
         userId: existingUser.id,
         walletAddress: senderPubkey,
         ticketCount,
-        reservationTimeoutSeconds: 60 // 60 second reservation window
+        reservationTimeoutSeconds: 60, // 60 second reservation window
       });
 
       if (!reservationResult.success) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          reservationResult.message,
-          { 
-            error: reservationResult.error,
-            availableTickets: reservationResult.availableTickets 
-          }
-        );
+        return respond(res, httpStatus.BAD_REQUEST, reservationResult.message, {
+          error: reservationResult.error,
+          availableTickets: reservationResult.availableTickets,
+        });
       }
 
       const nftHolderInfo =
@@ -113,7 +170,73 @@ class TicketController {
 
       const umi = getUmi();
 
+      let tokenDetails = null;
+      let tokenAddress = null;
+      let tokenDecimals = 9;
+      let tokenProgramId = null;
+      let transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+
+      if (type !== "solana") {
+        tokenDetails = await VerifiedToken.findOne({
+          where: {
+            address: type,
+            isVerified: true,
+            isPaymentToken: true,
+          },
+        });
+
+        if (!tokenDetails) {
+          await TicketReservationService.cancelReservation(
+            reservationResult.reservation.reservationId,
+          );
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "Invalid or unverified token type",
+          );
+        }
+
+        tokenAddress = tokenDetails.address;
+        tokenDecimals = tokenDetails.decimals;
+        tokenProgramId = tokenDetails.programId
+          ? new PublicKey(tokenDetails.programId)
+          : TOKEN_PROGRAM_ID;
+
+        switch (tokenDetails.tokenType) {
+          case TOKEN_TYPE.SPL_TOKEN:
+            transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+            break;
+          case TOKEN_TYPE.SPL_TOKEN_2022:
+            transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
+            break;
+          case TOKEN_TYPE.USDC:
+            transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+            break;
+          default:
+            await TicketReservationService.cancelReservation(
+              reservationResult.reservation.reservationId,
+            );
+            return respond(
+              res,
+              httpStatus.BAD_REQUEST,
+              "Unsupported token type",
+            );
+        }
+      }
+
       let transaction = new Transaction();
+
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: 100_000,
+        }),
+      );
+
+      transaction.add(
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: 200_000,
+        }),
+      );
 
       switch (type) {
         case "solana":
@@ -124,11 +247,70 @@ class TicketController {
               toPubkey: receiverPublicKey,
             }),
           );
+          tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
           break;
+
         default:
-          // Cancel reservation if invalid type
-          await TicketReservationService.cancelReservation(reservationResult.reservation.reservationId);
-          return respond(res, httpStatus.BAD_REQUEST, "Invalid reward type");
+          // SPL Token transfer
+          const tokenAmount = Math.round(
+            totalSolAmount * Math.pow(10, tokenDecimals),
+          );
+          const mint = new PublicKey(tokenAddress);
+
+          const senderTokenAccount = getAssociatedTokenAddressSync(
+            mint,
+            senderPublicKey,
+            false,
+            tokenProgramId,
+          );
+
+          const receiverTokenAccount = getAssociatedTokenAddressSync(
+            mint,
+            receiverPublicKey,
+            false,
+            tokenProgramId,
+          );
+
+          try {
+            const connection = getUmi().rpc;
+            const accountInfo =
+              await connection.getAccount(receiverTokenAccount);
+            if (!accountInfo.exists) {
+              transaction.add(
+                createAssociatedTokenAccountInstruction(
+                  senderPublicKey,
+                  receiverTokenAccount,
+                  receiverPublicKey,
+                  mint,
+                  tokenProgramId,
+                  ASSOCIATED_TOKEN_PROGRAM_ID,
+                ),
+              );
+            }
+          } catch (error) {
+            transaction.add(
+              createAssociatedTokenAccountInstruction(
+                senderPublicKey,
+                receiverTokenAccount,
+                receiverPublicKey,
+                mint,
+                tokenProgramId,
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+              ),
+            );
+          }
+
+          transaction.add(
+            createTransferInstruction(
+              senderTokenAccount,
+              receiverTokenAccount,
+              senderPublicKey,
+              BigInt(tokenAmount),
+              [],
+              tokenProgramId,
+            ),
+          );
+          break;
       }
 
       const latestBlockhash = await umi.rpc.getLatestBlockhash();
@@ -145,7 +327,10 @@ class TicketController {
         transaction: transactionBase64,
         blockhash: latestBlockhash,
         totalSolAmount: totalSolAmount,
-        lamports: totalSolAmount * LAMPORTS_PER_SOL,
+        lamports:
+          type === "solana"
+            ? totalSolAmount * LAMPORTS_PER_SOL
+            : Math.round(totalSolAmount * Math.pow(10, tokenDecimals)),
         commissionRate: commissionRate,
         commissionAmount: commissionAmount,
         creatorAmount: creatorAmount,
@@ -156,6 +341,11 @@ class TicketController {
         reservationId: reservationResult.reservation.reservationId,
         reservationExpiresAt: reservationResult.reservation.expiresAt,
         reservationTimeoutSeconds: reservationResult.reservation.timeoutSeconds,
+        // Token details
+        tokenType: type,
+        tokenAddress: tokenAddress,
+        tokenDecimals: tokenDecimals,
+        transactionType: transactionType,
       };
 
       return respond(res, httpStatus.OK, "Success", resData);
@@ -179,7 +369,8 @@ class TicketController {
         creatorAmount,
         commissionAmount,
         isNFTHolder = false,
-        reservationId, // NEW: Required reservation ID
+        reservationId,
+        tokenDecimals = 9,
       } = req.body;
 
       // CRITICAL: Validate reservation before processing
@@ -187,35 +378,38 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
       // Confirm the reservation with the transaction signature
-      const confirmationResult = await TicketReservationService.confirmReservation(
-        reservationId,
-        signature
-      );
+      const confirmationResult =
+        await TicketReservationService.confirmReservation(
+          reservationId,
+          signature,
+        );
 
       if (!confirmationResult.success) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
           confirmationResult.message,
-          { error: confirmationResult.error }
+          { error: confirmationResult.error },
         );
       }
 
       const reservation = confirmationResult.reservation;
 
       // Validate that the reservation matches the request
-      if (reservation.raffleId !== raffleId || 
-          reservation.ticketCount !== ticketCount ||
-          reservation.walletAddress !== pubkey) {
+      if (
+        reservation.raffleId !== raffleId ||
+        reservation.ticketCount !== ticketCount ||
+        reservation.walletAddress !== pubkey
+      ) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation details do not match request"
+          "Reservation details do not match request",
         );
       }
 
@@ -236,12 +430,18 @@ class TicketController {
         senderPubkey,
         receiverPubkey,
         type:
-          entryToken === "sol"
+          entryToken === "sol" || entryToken === "solana"
             ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA
             : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
         txId: signatureToStore,
-        tokenAddress: entryToken === "sol" ? SPL_TOKEN_ADDRESS.SOLANA : "",
-        decimals: 9,
+        tokenAddress:
+          entryToken === "sol" || entryToken === "solana"
+            ? SPL_TOKEN_ADDRESS.SOLANA
+            : entryToken,
+        decimals:
+          entryToken === "sol" || entryToken === "solana"
+            ? 9
+            : tokenDecimals || 9,
         uiAmount: Math.round(Number(lamports)),
         status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
         commissionRate,
@@ -479,6 +679,7 @@ class TicketController {
           ticketCount: group.totalTickets,
           totalSpent: group.totalSpent,
           tokenType: tokenType,
+          tokenAddress: raffle.tokenAddress, // for proper symbol mapping
           endDate: raffle.endDate,
           ticketsSold: raffle.ticketsSold,
           totalTickets: raffle.totalTickets,
@@ -499,6 +700,7 @@ class TicketController {
         tickets: group.ticketCount,
         spent: group.totalSpent,
         tokenType: group.tokenType,
+        tokenAddress: group.tokenAddress,
         endsAt: group.endDate,
         ticketNumbers: group.ticketNumbers,
         progress: {
@@ -535,19 +737,17 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
-      const result = await TicketReservationService.cancelReservation(reservationId);
+      const result =
+        await TicketReservationService.cancelReservation(reservationId);
 
       if (!result.success) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          result.message,
-          { error: result.error }
-        );
+        return respond(res, httpStatus.BAD_REQUEST, result.message, {
+          error: result.error,
+        });
       }
 
       return respond(res, httpStatus.OK, "Reservation cancelled successfully");
@@ -556,7 +756,7 @@ class TicketController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to cancel reservation"
+        "Failed to cancel reservation",
       );
     }
   }
@@ -572,33 +772,31 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
-      const result = await TicketReservationService.getReservationStatus(reservationId);
+      const result =
+        await TicketReservationService.getReservationStatus(reservationId);
 
       if (!result.success) {
-        return respond(
-          res,
-          httpStatus.NOT_FOUND,
-          result.message,
-          { error: result.error }
-        );
+        return respond(res, httpStatus.NOT_FOUND, result.message, {
+          error: result.error,
+        });
       }
 
       return respond(
         res,
         httpStatus.OK,
         "Reservation status retrieved successfully",
-        result.reservation
+        result.reservation,
       );
     } catch (error) {
       logger.error("Error getting reservation status:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to get reservation status"
+        "Failed to get reservation status",
       );
     }
   }
@@ -611,29 +809,24 @@ class TicketController {
       const { raffleId } = req.params;
 
       if (!raffleId) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Raffle ID is required"
-        );
+        return respond(res, httpStatus.BAD_REQUEST, "Raffle ID is required");
       }
 
-      const availableTickets = await TicketReservationService.getAvailableTickets(
-        parseInt(raffleId)
-      );
+      const availableTickets =
+        await TicketReservationService.getAvailableTickets(parseInt(raffleId));
 
       return respond(
         res,
         httpStatus.OK,
         "Available tickets retrieved successfully",
-        { availableTickets }
+        { availableTickets },
       );
     } catch (error) {
       logger.error("Error getting available tickets:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to get available tickets"
+        "Failed to get available tickets",
       );
     }
   }

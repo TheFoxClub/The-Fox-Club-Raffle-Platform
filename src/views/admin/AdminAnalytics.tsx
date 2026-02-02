@@ -23,6 +23,7 @@ import { useState, useEffect } from "react";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import Button from "../../components/ui/Button";
+import { getTokenSymbol } from "../../utils/tokenUtils";
 
 interface VolumeData {
   date: string;
@@ -49,12 +50,28 @@ export default function AdminAnalytics() {
     totalUsers: 0,
     activeWallets: 0,
     avgTicketPrice: 0,
+    avgTicketTokenType: "SOLANA", // for avg ticket price
     growthRate: 0,
   });
 
   const [volumeData, setVolumeData] = useState<VolumeData[]>([]);
   const [tokenData, setTokenData] = useState<TokenData[]>([]);
   const [topWallets, setTopWallets] = useState<TopWallet[]>([]);
+
+  const mapNumericTokenType = (numericTokenType: number): string => {
+    switch (numericTokenType) {
+      case 0:
+        return "SOLANA";
+      case 1:
+        return "SPL_TOKEN";
+      case 2:
+        return "SPL_TOKEN_2022";
+      case 3:
+        return "USDC";
+      default:
+        return "SOLANA";
+    }
+  };
 
   const shortWallet = (wallet: string) =>
     wallet.slice(0, 4) + "..." + wallet.slice(-4);
@@ -71,6 +88,9 @@ export default function AdminAnalytics() {
           totalUsers: data.totalUsers,
           activeWallets: data.activeUsers,
           avgTicketPrice: data.averageTicketPrice.average,
+          avgTicketTokenType: mapNumericTokenType(
+            data.averageTicketPrice.tokenType || 0,
+          ),
           growthRate: data.growthRate.percentage,
         });
 
@@ -78,7 +98,7 @@ export default function AdminAnalytics() {
           data.volumeOverTime.map((v: any) => ({
             date: v.date,
             volume: v.totalVolume,
-          }))
+          })),
         );
 
         const colors = [
@@ -88,17 +108,15 @@ export default function AdminAnalytics() {
           "hsl(240 5% 26%)",
         ];
 
-        const TOKEN_LABELS: Record<string, string> = {
-          SOLANA: "SOL",
-          USDC: "USDC",
-        };
-
         setTokenData(
           data.volumeByTokenType.map((t: any, index: number) => ({
-            name: TOKEN_LABELS[t.tokenType] || t.tokenType,
+            name: getTokenSymbol(
+              mapNumericTokenType(t.tokenTypeRaw || 0),
+              t.tokenAddress,
+            ),
             value: t.percentage,
             color: colors[index % colors.length],
-          }))
+          })),
         );
       }
 
@@ -107,11 +125,9 @@ export default function AdminAnalytics() {
         setTopWallets(
           leaderboardRes.data.topBuyers.map((b: any) => ({
             wallet: b.walletAddress,
-            spending: `${b.totalSpent} ${
-              b.tokenType === "SOLANA" ? "SOL" : b.tokenType
-            }`,
+            spending: `${b.totalSpent} ${getTokenSymbol(mapNumericTokenType(b.tokenType || 0), b.tokenAddress)}`,
             raffles: b.ticketsBought,
-          }))
+          })),
         );
       }
     } catch (error) {
@@ -178,7 +194,7 @@ export default function AdminAnalytics() {
         />
         <StatCard
           title="Avg. Ticket Price"
-          value={`${kpiData.avgTicketPrice} SOL`}
+          value={`${kpiData.avgTicketPrice} ${getTokenSymbol(kpiData.avgTicketTokenType)}`}
           // change={0}
           // trend="up"
           icon={<Activity className="h-6 w-6 text-muted-foreground" />}
@@ -285,10 +301,10 @@ export default function AdminAnalytics() {
                           index === 0
                             ? "bg-gradient-primary text-white"
                             : index === 1
-                            ? "bg-secondary/20 text-secondary"
-                            : index === 2
-                            ? "bg-accent/20 text-accent"
-                            : "bg-muted text-muted-foreground"
+                              ? "bg-secondary/20 text-secondary"
+                              : index === 2
+                                ? "bg-accent/20 text-accent"
+                                : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {index + 1}

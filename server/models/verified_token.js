@@ -15,8 +15,13 @@ module.exports = (sequelize, DataTypes) => {
     {
       address: DataTypes.STRING,
       name: DataTypes.STRING,
+      symbol: DataTypes.STRING,
       decimals: DataTypes.INTEGER,
+      tokenType: DataTypes.INTEGER,
+      programId: DataTypes.STRING,
+      conversionRate: DataTypes.DECIMAL(20, 9),
       isVerified: DataTypes.BOOLEAN,
+      isPaymentToken: DataTypes.BOOLEAN,
     },
     {
       sequelize,

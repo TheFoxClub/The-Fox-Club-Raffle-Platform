@@ -29,6 +29,7 @@ import Pagination from "../../components/ui/Pagination";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import { formatPrice } from "../../helpers/formatPrice";
+import { getTokenSymbol } from "../../utils/tokenUtils";
 
 interface RaffleDetail {
   id: number;
@@ -51,6 +52,8 @@ interface Raffle {
   totalRevenue: number;
   raffle_detail?: RaffleDetail;
   endDate?: string;
+  tokenType?: number;
+  tokenAddress?: string;
 }
 
 interface PaginationData {
@@ -60,9 +63,19 @@ interface PaginationData {
   totalPages: number;
 }
 
-const tokenMap: Record<number, string> = {
-  0: "SOL",
-  3: "USDC",
+const mapNumericTokenType = (numericTokenType: number): string => {
+  switch (numericTokenType) {
+    case 0:
+      return "SOLANA";
+    case 1:
+      return "SPL_TOKEN";
+    case 2:
+      return "SPL_TOKEN_2022";
+    case 3:
+      return "USDC";
+    default:
+      return "SOLANA";
+  }
 };
 
 const statusMap: Record<number, string> = {
@@ -76,7 +89,7 @@ const mapRaffle = (r: any): Raffle => ({
   id: r.id,
   name: r.title,
   creator: r.user?.pubkey || "Unknown",
-  token: tokenMap[r.tokenType] ?? "Unknown",
+  token: getTokenSymbol(mapNumericTokenType(r.tokenType), r.tokenAddress),
   price: r.ticketPrice,
   sold: r.ticketsSold,
   total: r.totalTickets,
@@ -85,6 +98,8 @@ const mapRaffle = (r: any): Raffle => ({
   totalRevenue: Number(r.totalRevenue ?? 0),
   raffle_detail: r.raffle_detail,
   endDate: r.endDate,
+  tokenType: r.tokenType,
+  tokenAddress: r.tokenAddress,
 });
 
 const shortPubkey = (key: string) => {

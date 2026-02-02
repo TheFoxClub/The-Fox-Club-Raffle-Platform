@@ -545,6 +545,7 @@ class RaffleController {
         totalTickets,
         ticketPrice,
         tokenType,
+        tokenAddress,
         startDate,
         endDate,
         numberOfWinners,
@@ -623,15 +624,71 @@ class RaffleController {
           correctStatus = RAFFLE_STATUS.UPCOMING;
         }
 
+        let resolvedTokenType = existingDraft.tokenType;
+
+        if (tokenType !== undefined && tokenType !== null) {
+          if (typeof tokenType === "number") {
+            resolvedTokenType = tokenType;
+
+            if (tokenAddress && tokenType !== TOKEN_TYPE.SOLANA) {
+              const { VerifiedToken } = require("../models");
+              const tokenRecord = await VerifiedToken.findOne({
+                where: {
+                  address: tokenAddress,
+                  tokenType: tokenType,
+                  isVerified: true,
+                  isPaymentToken: true,
+                },
+              });
+
+              if (!tokenRecord) {
+                console.warn(
+                  `Token address ${tokenAddress} does not match tokenType ${tokenType} or is not verified`,
+                );
+              } else {
+                console.log(
+                  `Validated token: ${tokenRecord.symbol} (${tokenRecord.name}) with tokenType ${tokenType}`,
+                );
+              }
+            }
+          } else if (typeof tokenType === "string") {
+            if (TOKEN_TYPE[tokenType] !== undefined) {
+              resolvedTokenType = TOKEN_TYPE[tokenType];
+            } else if (
+              tokenType === "So11111111111111111111111111111111111111112" ||
+              tokenType === "solana"
+            ) {
+              resolvedTokenType = TOKEN_TYPE.SOLANA;
+            } else {
+              const { VerifiedToken } = require("../models");
+              const tokenRecord = await VerifiedToken.findOne({
+                where: {
+                  address: tokenType,
+                  isVerified: true,
+                  isPaymentToken: true,
+                },
+              });
+
+              if (tokenRecord) {
+                resolvedTokenType = tokenRecord.tokenType;
+              }
+            }
+          } else if (
+            typeof tokenType === "object" &&
+            tokenType.tokenType !== undefined
+          ) {
+            resolvedTokenType = tokenType.tokenType;
+          }
+        }
+
         await existingDraft.update({
           title: title || existingDraft.title,
           description: description || existingDraft.description,
           imageUrl: imageUrl || existingDraft.imageUrl,
           totalTickets: totalTickets || existingDraft.totalTickets,
           ticketPrice: ticketPrice || existingDraft.ticketPrice,
-          tokenType: tokenType
-            ? TOKEN_TYPE[tokenType]
-            : existingDraft.tokenType,
+          tokenType: resolvedTokenType,
+          tokenAddress: tokenAddress || existingDraft.tokenAddress,
           numberOfWinners: numberOfWinners || existingDraft.numberOfWinners,
           startDate: raffleStartDate,
           endDate: raffleEndDate,
@@ -891,6 +948,63 @@ class RaffleController {
         }
       }
 
+      let resolvedTokenType = TOKEN_TYPE.SOLANA; // default
+
+      if (tokenType !== undefined && tokenType !== null) {
+        if (typeof tokenType === "number") {
+          resolvedTokenType = tokenType;
+
+          if (tokenAddress && tokenType !== TOKEN_TYPE.SOLANA) {
+            const { VerifiedToken } = require("../models");
+            const tokenRecord = await VerifiedToken.findOne({
+              where: {
+                address: tokenAddress,
+                tokenType: tokenType,
+                isVerified: true,
+                isPaymentToken: true,
+              },
+            });
+
+            if (!tokenRecord) {
+              console.warn(
+                `Token address ${tokenAddress} does not match tokenType ${tokenType} or is not verified`,
+              );
+            } else {
+              console.log(
+                `Validated token: ${tokenRecord.symbol} (${tokenRecord.name}) with tokenType ${tokenType}`,
+              );
+            }
+          }
+        } else if (typeof tokenType === "string") {
+          if (TOKEN_TYPE[tokenType] !== undefined) {
+            resolvedTokenType = TOKEN_TYPE[tokenType];
+          } else if (
+            tokenType === "So11111111111111111111111111111111111111112" ||
+            tokenType === "solana"
+          ) {
+            resolvedTokenType = TOKEN_TYPE.SOLANA;
+          } else {
+            const { VerifiedToken } = require("../models");
+            const tokenRecord = await VerifiedToken.findOne({
+              where: {
+                address: tokenType,
+                isVerified: true,
+                isPaymentToken: true,
+              },
+            });
+
+            if (tokenRecord) {
+              resolvedTokenType = tokenRecord.tokenType;
+            }
+          }
+        } else if (
+          typeof tokenType === "object" &&
+          tokenType.tokenType !== undefined
+        ) {
+          resolvedTokenType = tokenType.tokenType;
+        }
+      }
+
       const raffle = await Raffle.create({
         userId,
         title,
@@ -899,7 +1013,8 @@ class RaffleController {
         totalTickets: totalTickets || 0,
         ticketPrice: ticketPrice || 0,
         ticketsSold: 0,
-        tokenType: TOKEN_TYPE[tokenType] || TOKEN_TYPE.SOLANA,
+        tokenType: resolvedTokenType,
+        tokenAddress: tokenAddress || null,
         numberOfWinners: totalWinners,
         startDate: startDate || getFormattedDate(3),
         endDate: endDate || getFormattedDate(10),
@@ -2639,10 +2754,12 @@ class RaffleController {
         if (transaction && !transaction.finished) {
           await transaction.rollback();
         }
+        const tokenSymbol =
+          raffle.tokenType === TOKEN_TYPE.SOLANA ? "SOL" : "tokens";
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Minimum payout amount is ${MIN_PAYOUT_AMOUNT} SOL`,
+          `Minimum payout amount is ${MIN_PAYOUT_AMOUNT} ${tokenSymbol}`,
         );
       }
 
@@ -2669,6 +2786,8 @@ class RaffleController {
         toAccount: user.pubkey,
         fromAccount: platformWallet,
         feePayer: user.pubkey, // User pays transaction fees
+        tokenType: raffle.tokenType,
+        tokenAddress: raffle.tokenAddress,
       });
 
       if (!payoutResponse.success) {
@@ -2687,14 +2806,65 @@ class RaffleController {
       }
 
       // Create SplTokenSendTransaction record with PENDING status
+      // Determine transaction type and token details based on raffle's token type
+      let transactionType, tokenAddress, decimals, uiAmount;
+
+      if (raffle.tokenType === TOKEN_TYPE.SOLANA) {
+        // SOL payout
+        transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+        tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+        decimals = 9;
+        uiAmount = Math.round(unclaimedAmount * LAMPORTS_PER_SOL).toString();
+      } else if (raffle.tokenType === TOKEN_TYPE.SPL_TOKEN) {
+        // SPL Token payout
+        transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+        tokenAddress = raffle.tokenAddress;
+        // Get token details for decimals
+        const tokenDetail =
+          await require("../helpers/solana/token-program").getTokenDetail(
+            raffle.tokenAddress,
+          );
+        decimals = tokenDetail.decimals;
+        uiAmount = Math.round(
+          unclaimedAmount * Math.pow(10, decimals),
+        ).toString();
+      } else if (raffle.tokenType === TOKEN_TYPE.SPL_TOKEN_2022) {
+        // SPL Token 2022 payout
+        transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
+        tokenAddress = raffle.tokenAddress;
+        // Get token details for decimals
+        const tokenDetail =
+          await require("../helpers/solana/token-program").getTokenDetail(
+            raffle.tokenAddress,
+          );
+        decimals = tokenDetail.decimals;
+        uiAmount = Math.round(
+          unclaimedAmount * Math.pow(10, decimals),
+        ).toString();
+      } else if (raffle.tokenType === TOKEN_TYPE.USDC) {
+        // USDC payout (special case of SPL token)
+        transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+        tokenAddress = raffle.tokenAddress || SPL_TOKEN_ADDRESS.USDC;
+        decimals = 6;
+        uiAmount = Math.round(
+          unclaimedAmount * Math.pow(10, decimals),
+        ).toString();
+      } else {
+        // Fallback to SOL for unknown token types
+        transactionType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+        tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+        decimals = 9;
+        uiAmount = Math.round(unclaimedAmount * LAMPORTS_PER_SOL).toString();
+      }
+
       const splTokenSendTxData = {
         senderPubkey: platformWallet,
         receiverPubkey: user.pubkey,
-        type: SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA,
+        type: transactionType,
         txId: null,
-        tokenAddress: SPL_TOKEN_ADDRESS.SOLANA,
-        decimals: 9,
-        uiAmount: Math.round(unclaimedAmount * LAMPORTS_PER_SOL).toString(),
+        tokenAddress: tokenAddress,
+        decimals: decimals,
+        uiAmount: uiAmount,
         status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
         raffleId: raffleIdNum,
         rewardTransferType: "creator_payout",

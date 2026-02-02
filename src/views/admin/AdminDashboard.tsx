@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { getTokenSymbol } from "../../utils/tokenUtils";
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,7 @@ export default function AdminDashboard() {
     totalTicketsSold: 0,
     totalPlatformRevenue: 0,
     liveRaffleCount: 0,
+    tokenType: "MIXED", // Indicates mixed token types -> show as "Total Volume" instead of specific token
   });
 
   const [topRaffles, setTopRaffles] = useState<any[]>([]);
@@ -31,6 +33,21 @@ export default function AdminDashboard() {
   const shortWallet = (address: string) => {
     if (!address) return "";
     return address.slice(0, 6) + "..." + address.slice(-6);
+  };
+
+  const mapNumericTokenType = (numericTokenType: number): string => {
+    switch (numericTokenType) {
+      case 0:
+        return "SOLANA";
+      case 1:
+        return "SPL_TOKEN";
+      case 2:
+        return "SPL_TOKEN_2022";
+      case 3:
+        return "USDC";
+      default:
+        return "SOLANA";
+    }
   };
 
   const copyToClipboard = async (text: string) => {
@@ -62,7 +79,13 @@ export default function AdminDashboard() {
       ]);
       setTopCreators(creatorsRes.data.data);
       setTopRaffles(rafflesRes.data.data);
-      setStats(statsRes.data.data);
+      setStats({
+        totalRevenue: statsRes.data.data.totalRevenue,
+        totalTicketsSold: statsRes.data.data.totalTicketsSold,
+        totalPlatformRevenue: statsRes.data.data.totalPlatformRevenue,
+        liveRaffleCount: statsRes.data.data.liveRaffleCount,
+        tokenType: "MIXED", // contains mixed token types
+      });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast.error("Failed to refresh dashboard data");
@@ -123,7 +146,11 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatCard
           title="Total Volume"
-          value={`${stats.totalRevenue} SOL`}
+          value={
+            stats.tokenType === "MIXED"
+              ? `${stats.totalRevenue} (Mixed)`
+              : `${stats.totalRevenue} ${getTokenSymbol(stats.tokenType)}`
+          }
           //change={0}
           //trend="up"
           icon={<Wallet className="h-6 w-6" />}
@@ -144,7 +171,11 @@ export default function AdminDashboard() {
         />
         <StatCard
           title="Platform Fees Earned"
-          value={`${stats.totalPlatformRevenue} SOL`}
+          value={
+            stats.tokenType === "MIXED"
+              ? `${stats.totalPlatformRevenue} (Mixed)`
+              : `${stats.totalPlatformRevenue} ${getTokenSymbol(stats.tokenType)}`
+          }
           // change={0}
           // trend="up"
           icon={<Coins className="h-6 w-6" />}
@@ -186,7 +217,11 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex justify-between sm:flex-col sm:items-end gap-2 w-full sm:w-auto">
                     <p className="font-bold text-primary">
-                      {raffle.revenueInSOL} SOL
+                      {raffle.revenue}{" "}
+                      {getTokenSymbol(
+                        mapNumericTokenType(raffle.tokenTypeRaw || 0),
+                        raffle.tokenAddress,
+                      )}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {raffle.totalTicketsSold} tickets
@@ -198,8 +233,8 @@ export default function AdminDashboard() {
                         raffle.status === "LIVE"
                           ? "bg-green-500/20 text-green-500"
                           : raffle.status == "UPCOMING"
-                          ? "bg-secondary/20 text-secondary"
-                          : "bg-muted text-muted-foreground"
+                            ? "bg-secondary/20 text-secondary"
+                            : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {raffle.status}
@@ -268,8 +303,8 @@ export default function AdminDashboard() {
                         creator.rank === 1
                           ? "bg-gradient-primary text-white"
                           : creator.rank === 2
-                          ? "bg-secondary/20 text-secondary"
-                          : "bg-accent/20 text-accent"
+                            ? "bg-secondary/20 text-secondary"
+                            : "bg-accent/20 text-accent"
                       }`}
                     >
                       {creator.rank}
@@ -283,7 +318,11 @@ export default function AdminDashboard() {
                         <Copy className="h-3 w-3 opacity-50" />
                       </button>
                       <p className="text-xs text-muted-foreground">
-                        {creator.totalRevenue} SOL
+                        {creator.totalRevenue}{" "}
+                        {getTokenSymbol(
+                          creator.tokenType || "SOLANA",
+                          creator.tokenAddress,
+                        )}
                       </p>
                     </div>
                   </div>

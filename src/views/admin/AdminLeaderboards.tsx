@@ -10,6 +10,7 @@ import {
 import { toast } from "react-toastify";
 import { useEffect } from "react";
 import server from "../../config/server";
+import { getTokenSymbol } from "../../utils/tokenUtils";
 
 export default function AdminLeaderboards() {
   const [activeTab, setActiveTab] = useState("hosts");
@@ -21,15 +22,24 @@ export default function AdminLeaderboards() {
   const shortWallet = (wallet: string) =>
     wallet.slice(0, 4) + "..." + wallet.slice(-4);
 
-  const formatAmount = (amount: number, tokenType: string) => {
-    if (amount === null || amount === undefined) return `0 ${tokenType}`;
+  const mapNumericTokenType = (numericTokenType: number): string => {
+    switch (numericTokenType) {
+      case 0:
+        return "SOLANA";
+      case 1:
+        return "SPL_TOKEN";
+      case 2:
+        return "SPL_TOKEN_2022";
+      case 3:
+        return "USDC";
+      default:
+        return "SOLANA";
+    }
+  };
 
-    const TOKEN_LABELS: Record<string, string> = {
-      SOLANA: "SOL",
-      USDC: "USDC",
-    };
-
-    return `${amount} ${TOKEN_LABELS[tokenType] ?? tokenType}`;
+  const formatAmount = (amount: number, tokenType: string, tokenAddress?: string) => {
+    if (amount === null || amount === undefined) return `0 ${getTokenSymbol(tokenType, tokenAddress)}`;
+    return `${amount} ${getTokenSymbol(tokenType, tokenAddress)}`;
   };
 
   const fetchLeaderboards = async () => {
@@ -42,7 +52,8 @@ export default function AdminLeaderboards() {
         topHosts.map((host: any) => ({
           walletAddress: host.walletAddress,
           totalRevenue: host.totalRevenue,
-          tokenType: host.tokenType,
+          tokenType: mapNumericTokenType(host.tokenType || 0),
+          tokenAddress: host.tokenAddress,
           rafflesCount: host.rafflesCount,
           xp: 0,
           streak: 0,
@@ -53,7 +64,8 @@ export default function AdminLeaderboards() {
         topBuyers.map((buyer: any) => ({
           walletAddress: buyer.walletAddress,
           spending: buyer.totalSpent,
-          tokenType: buyer.tokenType,
+          tokenType: mapNumericTokenType(buyer.tokenType || 0),
+          tokenAddress: buyer.tokenAddress,
           tickets: buyer.ticketsBought,
           xp: 0,
           streak: 0,
@@ -187,7 +199,7 @@ export default function AdminLeaderboards() {
                           </button>
                         </td>
                         <td className="p-4 text-primary font-bold">
-                          {formatAmount(host.totalRevenue, host.tokenType)}
+                          {formatAmount(host.totalRevenue, host.tokenType, host.tokenAddress)}
                         </td>
                         <td className="p-4 text-muted-foreground">
                           {host.rafflesCount}
@@ -271,7 +283,7 @@ export default function AdminLeaderboards() {
                           </button>
                         </td>
                         <td className="p-4 text-accent font-bold">
-                          {formatAmount(buyer.spending, buyer.tokenType)}
+                          {formatAmount(buyer.spending, buyer.tokenType, buyer.tokenAddress)}
                         </td>
                         <td className="p-4 text-muted-foreground">
                           {buyer.tickets}

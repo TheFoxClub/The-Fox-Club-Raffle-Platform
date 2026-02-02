@@ -16,6 +16,7 @@ const {
   TOKEN_2022_PROGRAM_ID,
 } = require("@solana/spl-token");
 const redisClient = require("../util/redisClient");
+const { TOKEN_TYPE } = require("../config/data");
 
 const TOKENS_CACHE_TTL = process.env.TOKENS_CACHE_TTL || 300; // 5 minutes
 const METADATA_CACHE_TTL = process.env.METADATA_CACHE_TTL || 3600; // 1 hour
@@ -42,12 +43,12 @@ class TokenController {
             cached: true,
             timestamp: cachedTokens.timestamp,
           },
-          "SPL Tokens and Token2022 Tokens Fetched Successfully (Cached)"
+          "SPL Tokens and Token2022 Tokens Fetched Successfully (Cached)",
         );
       }
 
       logger.info(
-        `Cache miss for tokens: ${tokensCacheKey}, fetching from blockchain`
+        `Cache miss for tokens: ${tokensCacheKey}, fetching from blockchain`,
       );
 
       const connection = new Connection(SOLANA_RPC_HOST, "confirmed");
@@ -94,7 +95,7 @@ class TokenController {
                 await redisClient.set(
                   metadataCacheKey,
                   metadataToCache,
-                  METADATA_CACHE_TTL
+                  METADATA_CACHE_TTL,
                 );
                 logger.debug(`Cached metadata for mint: ${mint}`);
               } catch (err) {
@@ -108,7 +109,7 @@ class TokenController {
                 await redisClient.set(
                   metadataCacheKey,
                   notFoundMetadata,
-                  TOKENS_CACHE_TTL
+                  TOKENS_CACHE_TTL,
                 );
               }
             }
@@ -121,7 +122,7 @@ class TokenController {
                 uri,
               },
             };
-          })
+          }),
         );
       }
 
@@ -144,7 +145,7 @@ class TokenController {
           ...responseData,
           cached: false,
         },
-        "SPL Tokens and Token2022 Tokens Fetched Successfully"
+        "SPL Tokens and Token2022 Tokens Fetched Successfully",
       );
     } catch (error) {
       logger.error(error);
@@ -153,14 +154,14 @@ class TokenController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Invalid wallet address provided"
+          "Invalid wallet address provided",
         );
       }
 
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to Fetch SPL Tokens and Token2022 Tokens"
+        "Failed to Fetch SPL Tokens and Token2022 Tokens",
       );
     }
   }
@@ -194,7 +195,7 @@ class TokenController {
             cached: false,
             timestamp: new Date().toISOString(),
           },
-          "No verified tokens found"
+          "No verified tokens found",
         );
       }
 
@@ -217,12 +218,12 @@ class TokenController {
             ...cachedTokens,
             cached: true,
           },
-          "Verified Tokens Fetched Successfully (Cached)"
+          "Verified Tokens Fetched Successfully (Cached)",
         );
       }
 
       logger.info(
-        `Cache miss for tokens: ${tokensCacheKey}, fetching from blockchain`
+        `Cache miss for tokens: ${tokensCacheKey}, fetching from blockchain`,
       );
 
       const connection = new Connection(SOLANA_RPC_HOST, "confirmed");
@@ -239,7 +240,7 @@ class TokenController {
 
       const filterVerified = (accounts) =>
         accounts.value.filter((acc) =>
-          verifiedMintSet.has(acc.account.data.parsed.info.mint)
+          verifiedMintSet.has(acc.account.data.parsed.info.mint),
         );
 
       const verifiedSplAccounts = filterVerified(tokenAccounts);
@@ -271,13 +272,13 @@ class TokenController {
                 await redisClient.set(
                   metadataCacheKey,
                   { name, symbol, uri },
-                  METADATA_CACHE_TTL
+                  METADATA_CACHE_TTL,
                 );
               } catch {
                 await redisClient.set(
                   metadataCacheKey,
                   { name: null, symbol: null, uri: null },
-                  METADATA_CACHE_TTL
+                  METADATA_CACHE_TTL,
                 );
               }
             }
@@ -287,13 +288,13 @@ class TokenController {
               amount: acc.account.data.parsed.info.tokenAmount,
               metadata: { name, symbol, uri },
             };
-          })
+          }),
         );
       }
 
       const splTokens = await addMetadataForTokens(verifiedSplAccounts);
       const token2022Tokens = await addMetadataForTokens(
-        verifiedToken2022Accounts
+        verifiedToken2022Accounts,
       );
 
       const responseData = {
@@ -311,7 +312,7 @@ class TokenController {
           ...responseData,
           cached: false,
         },
-        "Verified Tokens Fetched Successfully"
+        "Verified Tokens Fetched Successfully",
       );
     } catch (error) {
       logger.error(error);
@@ -320,14 +321,14 @@ class TokenController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Invalid wallet address provided"
+          "Invalid wallet address provided",
         );
       }
 
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to fetch verified tokens"
+        "Failed to fetch verified tokens",
       );
     }
   }
@@ -352,12 +353,12 @@ class TokenController {
             cached: true,
             timestamp: cachedToken.timestamp,
           },
-          "Token fetched successfully (Cached)"
+          "Token fetched successfully (Cached)",
         );
       }
 
       logger.info(
-        `Cache miss for token: ${cacheKey}, fetching from blockchain`
+        `Cache miss for token: ${cacheKey}, fetching from blockchain`,
       );
 
       const connection = new Connection(SOLANA_RPC_HOST, "confirmed");
@@ -407,7 +408,7 @@ class TokenController {
             await redisClient.set(
               metadataCacheKey,
               { name, symbol, uri },
-              METADATA_CACHE_TTL
+              METADATA_CACHE_TTL,
             );
           } catch (err) {
             logger.debug(`Metadata not found for mint: ${mintAddress}`);
@@ -435,7 +436,9 @@ class TokenController {
           cached: false,
           exists: !!token,
         },
-        token ? "Token fetched successfully" : "Token not found for this wallet"
+        token
+          ? "Token fetched successfully"
+          : "Token not found for this wallet",
       );
     } catch (error) {
       logger.error(error);
@@ -444,14 +447,14 @@ class TokenController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Invalid wallet or mint address provided"
+          "Invalid wallet or mint address provided",
         );
       }
 
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to fetch token"
+        "Failed to fetch token",
       );
     }
   }
@@ -487,7 +490,7 @@ class TokenController {
         "Failed to clear token cache",
         {
           error: err.message,
-        }
+        },
       );
     }
   }
@@ -517,7 +520,7 @@ class TokenController {
         "Failed to clear metadata cache",
         {
           error: err.message,
-        }
+        },
       );
     }
   }
@@ -533,14 +536,99 @@ class TokenController {
           redisConnected: redisClient.isConnected,
           timestamp: new Date().toISOString(),
         },
-        "Token cache statistics"
+        "Token cache statistics",
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to get token cache stats"
+        "Failed to get token cache stats",
+      );
+    }
+  }
+
+  static async getVerifiedPaymentTokens(req, res) {
+    try {
+      const cacheKey = "verified:payment:tokens";
+
+      const cachedTokens = await redisClient.get(cacheKey);
+      if (cachedTokens) {
+        logger.info(`Cache hit for verified payment tokens`);
+        return respond(
+          res,
+          httpStatus.OK,
+          "Verified payment tokens fetched successfully (Cached)",
+          {
+            tokens: cachedTokens.tokens,
+            cached: true,
+            timestamp: cachedTokens.timestamp,
+          },
+        );
+      }
+
+      const verifiedTokens = await VerifiedToken.findAll({
+        where: {
+          isVerified: true,
+          isPaymentToken: true,
+        },
+        attributes: [
+          "id",
+          "address",
+          "name",
+          "symbol",
+          "decimals",
+          "tokenType",
+          "programId",
+          "conversionRate",
+        ],
+        order: [
+          ["tokenType", "ASC"],
+          ["name", "ASC"],
+        ],
+        raw: true,
+      });
+
+      // Always include SOL as the first token (built-in)
+      const allTokens = [
+        {
+          id: "sol-builtin",
+          address: "So11111111111111111111111111111111111111112",
+          name: "Solana",
+          symbol: "SOL",
+          decimals: 9,
+          tokenType: TOKEN_TYPE.SOLANA, // 0
+          programId: null,
+          conversionRate: "1.000000000",
+          isBuiltIn: true,
+        },
+        ...verifiedTokens,
+      ];
+
+      const responseData = {
+        tokens: allTokens,
+        timestamp: new Date().toISOString(),
+      };
+
+      await redisClient.set(cacheKey, responseData, 300);
+      logger.info("Cached verified payment tokens");
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Verified payment tokens fetched successfully",
+        {
+          tokens: allTokens,
+          cached: false,
+          timestamp: responseData.timestamp,
+        },
+      );
+    } catch (error) {
+      logger.error("Error fetching verified payment tokens:", error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to fetch verified payment tokens",
       );
     }
   }

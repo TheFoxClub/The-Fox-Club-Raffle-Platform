@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import socketService from "../../services/socket.service";
+import { getTokenSymbol } from "../../utils/tokenUtils";
 
 interface RaffleData {
   id: number;
@@ -22,6 +23,7 @@ interface RaffleData {
   ticketsSold: number;
   totalTickets: number;
   tokenType: string;
+  tokenAddress?: string;
   numberOfWinners: number;
   startDate: string;
   endDate: string;
@@ -75,8 +77,8 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
             tabStatus === "live"
               ? "/raffle/live"
               : tabStatus === "ended"
-              ? "/raffle/ended"
-              : "/raffle/upcoming";
+                ? "/raffle/ended"
+                : "/raffle/upcoming";
           response = await server.get(endpoint);
         } else {
           // Use filter endpoint with status
@@ -89,8 +91,8 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
         const data = Array.isArray(response.data.data?.formattedRaffles)
           ? response.data.data.formattedRaffles
           : Array.isArray(response.data.data?.raffles)
-          ? response.data.data.raffles
-          : [];
+            ? response.data.data.raffles
+            : [];
 
         // Update the appropriate state based on tab
         if (tabStatus === "live") SetRaffles(data);
@@ -112,7 +114,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
         toast.error(errorMessage);
       }
     },
-    [filters]
+    [filters],
   );
 
   // Initial load - fetch all tabs
@@ -140,7 +142,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     const updateRaffleInList = (
       raffleId: number,
       updateData: any,
-      setTargetList: React.Dispatch<React.SetStateAction<RaffleData[]>>
+      setTargetList: React.Dispatch<React.SetStateAction<RaffleData[]>>,
     ) => {
       setTargetList((prevRaffles) => {
         return prevRaffles.map((raffle) => {
@@ -295,8 +297,10 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
                 price: raffle.ticketPrice,
                 sold: Number(raffle.ticketsSold) || 0,
                 total: Number(raffle.totalTickets) || 0,
-                tokenType:
-                  raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
+                tokenType: getTokenSymbol(
+                  raffle.tokenType,
+                  raffle.tokenAddress,
+                ),
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
                 isVerified:
@@ -340,8 +344,10 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
                 price: raffle.ticketPrice,
                 sold: Number(raffle.ticketsSold) || 0,
                 total: Number(raffle.totalTickets) || 0,
-                tokenType:
-                  raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
+                tokenType: getTokenSymbol(
+                  raffle.tokenType,
+                  raffle.tokenAddress,
+                ),
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
                 isVerified:
@@ -385,11 +391,13 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
                 price: raffle.ticketPrice,
                 sold: Number(raffle.ticketsSold) || 0,
                 total: Number(raffle.totalTickets) || 0,
-                tokenType:
-                  raffle.tokenType === "SOLANA" ? "SOL" : raffle.tokenType,
+                tokenType: getTokenSymbol(
+                  raffle.tokenType,
+                  raffle.tokenAddress,
+                ),
                 winners: raffle.numberOfWinners,
                 endTime: formatCountdown(raffle.endDate),
-                 isVerified:
+                isVerified:
                   raffle.raffle_detail?.requiresNftVerification || false,
                 isFeatured: raffle.raffle_detail?.isFeatured || false,
               };

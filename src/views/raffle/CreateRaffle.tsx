@@ -26,6 +26,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, Connection, VersionedTransaction } from "@solana/web3.js";
+import { getVerifiedPaymentTokens } from "./api";
 
 // Constants for Token Program IDs
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -75,10 +76,17 @@ const CreateRaffle = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
+  const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+
+  // Dynamic token options state
+  const [tokenOptions, setTokenOptions] = useState<
+    { value: string; label: string; decimals: number; tokenType: number }[]
+  >([]);
+  const [tokenOptionsLoading, setTokenOptionsLoading] = useState(true);
 
   const [errors, setErrors] = useState<{
     [key: string]: string | undefined;
@@ -96,10 +104,72 @@ const CreateRaffle = () => {
   const endDateRef = useRef<HTMLInputElement>(null);
   const selectedTokenTypeRef = useRef<HTMLDivElement>(null);
 
-  const tokenOptions = [
-    { value: "SOLANA", label: "SOL" },
-    // { value: "USDT", label: "USDT" },,
-  ];
+  useEffect(() => {
+    const fetchPaymentTokens = async () => {
+      try {
+        setTokenOptionsLoading(true);
+        const response = await getVerifiedPaymentTokens();
+
+        if (response.success && response.data?.tokens) {
+          const tokens = response.data.tokens.map((token: any) => ({
+            value: token.address,
+            label: token.symbol || token.name,
+            decimals: token.decimals,
+            tokenType: token.tokenType,
+            name: token.name,
+          }));
+
+          setTokenOptions(tokens);
+
+          // Set default to SOL if available
+          const solToken = tokens.find((t: any) => t.tokenType === 0);
+          if (solToken && !selectedTokenType) {
+            setSelectedTokenType(solToken);
+            setSelectedTokenAddress(solToken.value);
+          }
+        } else {
+          // console.warn("No tokens found in API response, using fallback");
+          // Fallback to SOL only if API fails
+          const fallbackTokens = [
+            {
+              value: "So11111111111111111111111111111111111111112",
+              label: "SOL",
+              decimals: 9,
+              tokenType: 0,
+              name: "Solana",
+            },
+          ];
+          setTokenOptions(fallbackTokens);
+          if (!selectedTokenType) {
+            setSelectedTokenType(fallbackTokens[0]);
+            setSelectedTokenAddress(fallbackTokens[0].value);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch payment tokens:", error);
+        toast.error("Failed to load payment options");
+        // Fallback to SOL only
+        const fallbackTokens = [
+          {
+            value: "So11111111111111111111111111111111111111112",
+            label: "SOL",
+            decimals: 9,
+            tokenType: 0,
+            name: "Solana",
+          },
+        ];
+        setTokenOptions(fallbackTokens);
+        if (!selectedTokenType) {
+          setSelectedTokenType(fallbackTokens[0]);
+          setSelectedTokenAddress(fallbackTokens[0].value);
+        }
+      } finally {
+        setTokenOptionsLoading(false);
+      }
+    };
+
+    fetchPaymentTokens();
+  }, []);
 
   useEffect(() => {
     if (user.isAuthenticated) {
@@ -550,7 +620,8 @@ const CreateRaffle = () => {
         description: description.trim(),
         totalTickets,
         ticketPrice,
-        tokenType: selectedTokenType || "SOLANA",
+        tokenType: selectedTokenType?.tokenType || 0,
+        tokenAddress: selectedTokenType?.value || null,
         numberOfWinners,
         startDate: finalStartDate,
         endDate,
@@ -663,7 +734,29 @@ const CreateRaffle = () => {
               }
             }
 
-            const signedTx = await signTransaction(tx);
+            let signedTx;
+            try {
+              signedTx = await signTransaction(tx);
+            } catch (signError) {
+              console.error("Transaction signing failed:", signError);
+
+              // Try to provide more specific error messages
+              if (signError.message?.includes("insufficient")) {
+                throw new Error(
+                  "Insufficient balance to transfer rewards. Please check your token balance.",
+                );
+              } else if (signError.message?.includes("account")) {
+                throw new Error(
+                  "Token account not found. Please ensure you own the tokens you're trying to transfer.",
+                );
+              } else if (signError.message?.includes("rejected")) {
+                throw new Error("Transaction was rejected by wallet.");
+              } else {
+                throw new Error(
+                  `Transaction signing failed: ${signError.message || "Unknown error"}`,
+                );
+              }
+            }
 
             let serializedTransaction;
             if (isVersioned) {
@@ -925,6 +1018,7 @@ const CreateRaffle = () => {
         setStartDate("");
         setEndDate("");
         setSelectedTokenType(null);
+        setSelectedTokenAddress("");
         setSelectedNFTs([]);
         setSelectedTokens([]);
         setRaffleImage(null);
@@ -1491,19 +1585,34 @@ const CreateRaffle = () => {
               <label className="text-sm font-medium">Token Type *</label>
               <Select
                 options={tokenOptions}
-                value={selectedTokenType}
-                onValueChange={(val) => {
-                  setSelectedTokenType(val);
+                value={selectedTokenAddress}
+                onValueChange={(tokenAddress) => {
+                  const selectedToken = tokenOptions.find(
+                    (t) => t.value === tokenAddress,
+                  );
+                  setSelectedTokenType(selectedToken);
+                  setSelectedTokenAddress(tokenAddress);
                   setErrors((prev) => ({
                     ...prev,
                     selectedTokenType: undefined,
                   }));
                 }}
                 className="bg-background-50 mt-2"
+                disabled={tokenOptionsLoading}
+                placeholder={
+                  tokenOptionsLoading
+                    ? "Loading payment options..."
+                    : "Select payment token"
+                }
               />
               {errors.selectedTokenType && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.selectedTokenType}
+                </p>
+              )}
+              {tokenOptionsLoading && (
+                <p className="text-muted-foreground text-sm mt-1">
+                  Loading available payment tokens...
                 </p>
               )}
             </div>

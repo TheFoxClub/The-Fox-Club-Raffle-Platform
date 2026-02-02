@@ -51,25 +51,32 @@ const getAverageTicketPrice = async (startDate, endDate) => {
     const result = await sequelize.query(
       `
       SELECT 
-        AVG(COALESCE(rt.commissionRate, 0) + COALESCE(rt.creatorAmount, 0)) as avgTicketPrice,
-        COUNT(rt.id) as totalTickets
+        AVG(COALESCE(st.commissionAmount, 0) + COALESCE(st.creatorAmount, 0)) as avgTicketPrice,
+        COUNT(rt.id) as totalTickets,
+        st.type as tokenType
       FROM spl_token_send_transactions st
       INNER JOIN raffle_tickets rt ON rt.splTokenSendTxId = st.id
       WHERE st.status = ?
         AND st.createdAt BETWEEN ? AND ?
+        AND st.type = 0
+      GROUP BY st.type
       `,
       {
         replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, startDate, endDate],
         type: sequelize.QueryTypes.SELECT,
       }
     );
+    
+    const solResult = result.find(r => r.tokenType === 0) || { avgTicketPrice: 0, totalTickets: 0, tokenType: 0 };
+    
     return {
-      average: parseFloat(result[0]?.avgTicketPrice || 0),
-      totalTickets: parseInt(result[0]?.totalTickets || 0, 10),
+      average: parseFloat(solResult.avgTicketPrice || 0),
+      totalTickets: parseInt(solResult.totalTickets || 0, 10),
+      tokenType: solResult.tokenType,
     };
   } catch (error) {
     logger.error("Error getting average ticket price:", error);
-    return { average: 0, totalTickets: 0 };
+    return { average: 0, totalTickets: 0, tokenType: 0 };
   }
 };
 
@@ -213,6 +220,7 @@ const getVolumeByTokenType = async (startDate, endDate) => {
       `
       SELECT 
         st.type as tokenType,
+        st.tokenAddress,
         COUNT(st.id) as transactionsCount,
         SUM(COALESCE(st.commissionAmount, 0) + COALESCE(st.creatorAmount, 0)) as totalVolume,
         SUM(COALESCE(st.commissionAmount, 0)) as commissionVolume,
@@ -224,7 +232,7 @@ const getVolumeByTokenType = async (startDate, endDate) => {
       LEFT JOIN raffle_tickets rt ON rt.splTokenSendTxId = st.id
       WHERE st.status = ?
         AND st.createdAt BETWEEN ? AND ?
-      GROUP BY st.type
+      GROUP BY st.type, st.tokenAddress
       ORDER BY totalVolume DESC
       `,
       {
@@ -242,6 +250,7 @@ const getVolumeByTokenType = async (startDate, endDate) => {
     return result.map((item) => ({
       tokenType: mapEnumValue(TOKEN_TYPE, item.tokenType),
       tokenTypeRaw: item.tokenType,
+      tokenAddress: item.tokenAddress,
       totalVolume: parseFloat(item.totalVolume || 0),
       percentage:
         totalVolume > 0

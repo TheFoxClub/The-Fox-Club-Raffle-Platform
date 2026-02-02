@@ -16,6 +16,7 @@ import { Label } from "../../components/ui/Label";
 import { useState, useEffect, useRef } from "react";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { getTokenSymbol } from "../../utils/tokenUtils";
 
 type EligibleWallet = {
   id: number;
@@ -61,15 +62,24 @@ export default function AdminRewards() {
   const shortWallet = (wallet: string) =>
     wallet.slice(0, 4) + "..." + wallet.slice(-4);
 
-  const formatAmount = (amount: number, tokenType: string) => {
-    if (amount === null || amount === undefined) return `0 ${tokenType}`;
+  const mapNumericTokenType = (numericTokenType: number): string => {
+    switch (numericTokenType) {
+      case 0:
+        return "SOLANA";
+      case 1:
+        return "SPL_TOKEN";
+      case 2:
+        return "SPL_TOKEN_2022";
+      case 3:
+        return "USDC";
+      default:
+        return "SOLANA";
+    }
+  };
 
-    const TOKEN_LABELS: Record<string, string> = {
-      SOLANA: "SOL",
-      USDC: "USDC",
-    };
-
-    return `${amount} ${TOKEN_LABELS[tokenType] ?? tokenType}`;
+  const formatAmount = (amount: number, tokenType: string, tokenAddress?: string) => {
+    if (amount === null || amount === undefined) return `0 ${getTokenSymbol(tokenType, tokenAddress)}`;
+    return `${amount} ${getTokenSymbol(tokenType, tokenAddress)}`;
   };
 
   const handleExport = (type: string) => {
@@ -174,8 +184,14 @@ export default function AdminRewards() {
         server.get("/pool"),
       ]);
 
-      setTopHosts(leaderboardRes.data.data.topHosts);
-      setTopBuyers(leaderboardRes.data.data.topBuyers);
+      setTopHosts(leaderboardRes.data.data.topHosts.map((host: any) => ({
+        ...host,
+        tokenType: mapNumericTokenType(host.tokenType || 0)
+      })));
+      setTopBuyers(leaderboardRes.data.data.topBuyers.map((buyer: any) => ({
+        ...buyer,
+        tokenType: mapNumericTokenType(buyer.tokenType || 0)
+      })));
       setEligibleWallets(walletRes.data.data.rows);
     } catch (error) {
       toast.error("Failed to refresh dashboard");
@@ -235,7 +251,7 @@ export default function AdminRewards() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-gradient">{rewardPool} SOL</p>
+            <p className="text-3xl font-bold text-gradient">{rewardPool} {getTokenSymbol("SOLANA")}</p>
             <p className="text-sm text-muted-foreground">
               Available for distribution
             </p>
@@ -451,7 +467,7 @@ export default function AdminRewards() {
                     </p>
                   </div>
                   <p className="font-bold text-primary">
-                    {formatAmount(host.totalRevenue, host.tokenType)}
+                    {formatAmount(host.totalRevenue, host.tokenType, host.tokenAddress)}
                   </p>
                 </div>
               ))
@@ -511,7 +527,7 @@ export default function AdminRewards() {
                     </p>
                   </div>
                   <p className="font-bold text-accent">
-                    {formatAmount(buyer.totalSpent, buyer.tokenType)}
+                    {formatAmount(buyer.totalSpent, buyer.tokenType, buyer.tokenAddress)}
                   </p>
                 </div>
               ))

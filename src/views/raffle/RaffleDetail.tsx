@@ -18,8 +18,6 @@ import {
   AlertCircle,
   Copy,
 } from "lucide-react";
-// import { allRaffle } from "../../dummydata/mockRaffleDetail";
-// import type { RaffleType } from "../../dummydata/mockRaffleDetail";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -27,6 +25,22 @@ import { Connection, Transaction } from "@solana/web3.js";
 import { storeSignature, cancelReservation } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
+import { getTokenSymbol } from "../../utils/tokenUtils";
+
+const mapNumericTokenType = (numericTokenType: number): string => {
+  switch (numericTokenType) {
+    case 0:
+      return "SOLANA";
+    case 1:
+      return "SPL_TOKEN";
+    case 2:
+      return "SPL_TOKEN_2022";
+    case 3:
+      return "USDC";
+    default:
+      return "SOLANA";
+  }
+};
 
 export interface Winner {
   rewardId: number;
@@ -80,6 +94,8 @@ export interface RaffleType {
   winnersSelected?: boolean;
   participants?: string[];
   status?: number;
+  tokenTypeNumber?: number;
+  tokenAddress?: string;
 }
 
 // Reward types mapping
@@ -158,13 +174,6 @@ const RaffleDetail = () => {
   const [nftImages, setNftImages] = useState<Record<string, string>>({});
   const [isBuying, setIsBuying] = useState(false);
 
-  const TOKEN_MAP: Record<number, string> = {
-    0: "SOL",
-    1: "USDT",
-    2: "BONK",
-    3: "USDC",
-  };
-
   const isNFTReward = (rewardType: number) =>
     rewardType === RAFFLE_REWARD_TYPES.NFT;
 
@@ -206,6 +215,30 @@ const RaffleDetail = () => {
     return DEFAULT_IMAGES.TOKEN;
   };
 
+  const getTokenTypeForAPI = (
+    tokenTypeNumber: number,
+    tokenAddress?: string,
+  ): string => {
+    switch (tokenTypeNumber) {
+      case 0:
+        return "solana";
+      case 3: // USDC
+        return "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+      case 1: // SPL_TOKEN
+      case 2: // SPL_TOKEN_2022
+        if (tokenAddress) {
+          return tokenAddress;
+        }
+        console.warn(
+          `Token type ${tokenTypeNumber} requires token address but none provided`,
+        );
+        return "solana"; // Fallback to prevent errors
+      default:
+        console.warn(`Unknown token type: ${tokenTypeNumber}`);
+        return "solana";
+    }
+  };
+
   const handleBuyTickets = useCallback(async () => {
     if (isBuying) return;
     if (!raffle) {
@@ -234,17 +267,14 @@ const RaffleDetail = () => {
       toast.error("Not enough tickets available");
       return;
     }
-    
     setIsBuying(true);
     let reservationId: string | null = null;
-    
     try {
       toast.info("Reserving tickets. Please wait...");
-      
       // Step 1: Reserve tickets (this prevents race conditions)
       const transactionResponse = await server.post("/ticket/buy", {
         senderPubkey: publicKey.toBase58(),
-        type: "solana",
+        type: getTokenTypeForAPI(raffle.tokenTypeNumber, raffle.tokenAddress),
         raffleId: raffle.id,
         ticketCount: ticketCount,
       });
@@ -255,17 +285,19 @@ const RaffleDetail = () => {
         );
       }
 
-      const { 
-        transaction, 
-        reservationId: resId, 
+      const {
+        transaction,
+        reservationId: resId,
         reservationExpiresAt,
-        reservationTimeoutSeconds 
+        reservationTimeoutSeconds,
       } = transactionResponse.data.data;
-      
+
       reservationId = resId;
 
       // Show reservation countdown
-      toast.info(`Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`);
+      toast.info(
+        `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
+      );
 
       // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(
@@ -294,7 +326,7 @@ const RaffleDetail = () => {
         "sol",
         ticketCount,
         raffle.id,
-        reservationId // Pass reservation ID
+        reservationId, // Pass reservation ID
       );
 
       if (confirmResponse.success) {
@@ -305,7 +337,6 @@ const RaffleDetail = () => {
           confirmResponse.data.message || "Failed to confirm purchase",
         );
       }
-
     } catch (error: any) {
       console.error("Transaction error:", error);
 
@@ -351,8 +382,12 @@ const RaffleDetail = () => {
           description: data.description,
           image: data.imageUrl,
           price: Number(data.ticketPrice),
-          tokenType: TOKEN_MAP[data.tokenType] || "UNKNOWN",
-          // tokenTypeNumber: data.tokenType,
+          tokenType: getTokenSymbol(
+            mapNumericTokenType(data.tokenType),
+            data.tokenAddress,
+          ),
+          tokenTypeNumber: data.tokenType,
+          tokenAddress: data.tokenAddress,
           total: data.totalTickets,
           sold: data.ticketsSold,
           winners: data.numberOfWinners,

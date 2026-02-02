@@ -42,6 +42,7 @@ module.exports = (sequelize, DataTypes) => {
       ticketPrice: DataTypes.DECIMAL(10, 2),
       ticketsSold: DataTypes.INTEGER,
       tokenType: DataTypes.INTEGER,
+      tokenAddress: DataTypes.STRING,
       numberOfWinners: DataTypes.INTEGER,
       status: DataTypes.INTEGER,
       startDate: DataTypes.DATE,

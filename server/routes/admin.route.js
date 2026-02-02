@@ -166,4 +166,12 @@ router.patch(
   AdminController.toggleTokenVerification
 );
 
+// Toggle payment token status
+router.patch(
+  "/verified-token/:id/toggle-payment",
+  auth.bearer,
+  isAdmin,
+  AdminController.togglePaymentToken
+);
+
 module.exports = router;
