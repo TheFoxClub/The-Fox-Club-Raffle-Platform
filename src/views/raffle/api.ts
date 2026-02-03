@@ -89,3 +89,10 @@ export const getVerifiedPaymentTokens = async (): Promise<ResponseDataType> => {
     url: "tokens/payment-tokens",
   });
 };
+
+export const getAllVerifiedTokens = async (): Promise<ResponseDataType> => {
+  return apiRequest({
+    method: "get",
+    url: "tokens/all-verified",
+  });
+};

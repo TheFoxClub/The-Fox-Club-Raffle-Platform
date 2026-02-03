@@ -632,6 +632,88 @@ class TokenController {
       );
     }
   }
+
+  static async getAllVerifiedTokens(req, res) {
+    try {
+      const cacheKey = "verified:all:tokens";
+
+      const cachedTokens = await redisClient.get(cacheKey);
+      if (cachedTokens) {
+        logger.info(`Cache hit for all verified tokens`);
+        return respond(
+          res,
+          httpStatus.OK,
+          "All verified tokens fetched successfully (Cached)",
+          {
+            tokens: cachedTokens.tokens,
+            cached: true,
+            timestamp: cachedTokens.timestamp,
+          },
+        );
+      }
+
+      const verifiedTokens = await VerifiedToken.findAll({
+        where: {
+          isVerified: true,
+        },
+        attributes: [
+          "id",
+          "address",
+          "name",
+          "symbol",
+          "decimals",
+          "tokenType",
+          "programId",
+        ],
+        order: [
+          ["tokenType", "ASC"],
+          ["name", "ASC"],
+        ],
+        raw: true,
+      });
+
+      // Always include SOL as the first token (built-in)
+      const allTokens = [
+        {
+          id: "sol-builtin",
+          address: "So11111111111111111111111111111111111111112",
+          name: "Solana",
+          symbol: "SOL",
+          decimals: 9,
+          tokenType: TOKEN_TYPE.SOLANA, // 0
+          programId: null,
+          isBuiltIn: true,
+        },
+        ...verifiedTokens,
+      ];
+
+      const responseData = {
+        tokens: allTokens,
+        timestamp: new Date().toISOString(),
+      };
+
+      await redisClient.set(cacheKey, responseData, 300);
+      logger.info("Cached all verified tokens");
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "All verified tokens fetched successfully",
+        {
+          tokens: allTokens,
+          cached: false,
+          timestamp: responseData.timestamp,
+        },
+      );
+    } catch (error) {
+      logger.error("Error fetching all verified tokens:", error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to fetch all verified tokens",
+      );
+    }
+  }
 }
 
 module.exports = TokenController;

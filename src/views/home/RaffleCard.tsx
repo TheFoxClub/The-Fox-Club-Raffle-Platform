@@ -3,6 +3,7 @@ import { Progress } from "../../components/ui/Progress";
 import { CheckCircle, Clock, Users, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatPrice } from "../../helpers/formatPrice";
+import { useTokenSymbol } from "../../hooks/useTokenDisplay";
 
 export interface RaffleCardProps {
   id: number;
@@ -13,6 +14,7 @@ export interface RaffleCardProps {
   total: number;
   endTime: string;
   tokenType: string;
+  tokenAddress?: string;
   isVerified: boolean;
   isFeatured: boolean;
 }
@@ -26,11 +28,13 @@ export const RaffleCard = ({
   total,
   endTime,
   tokenType,
+  tokenAddress,
   isVerified = false,
   isFeatured = false,
 }: RaffleCardProps) => {
   const ticketsLeft = Math.max(total - sold, 0);
   const progress = Math.min((sold / total) * 100, 100);
+  const { symbol: enhancedTokenSymbol, loading: tokenLoading } = useTokenSymbol(tokenType, tokenAddress);
 
   return (
     <Link to={`/raffle/raffle-${id}`}>
@@ -61,7 +65,7 @@ export const RaffleCard = ({
               <div className="flex items-center gap-1">
                 <Coins className="h-4 w-4" />
                 <span>
-                  {formatPrice(price)} {tokenType}
+                  {formatPrice(price)} {tokenLoading ? "..." : enhancedTokenSymbol}
                 </span>
               </div>
               <div className="flex items-center gap-1">

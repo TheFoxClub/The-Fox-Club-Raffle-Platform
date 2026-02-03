@@ -9,6 +9,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { StatCard } from "../../components/admin/StatCard";
+import { TopRaffleItem } from "../../components/admin/TopRaffleItem";
+import { TopCreatorItem } from "../../components/admin/TopCreatorItem";
 import Button from "../../components/ui/Button";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -29,44 +31,6 @@ export default function AdminDashboard() {
 
   const [topRaffles, setTopRaffles] = useState<any[]>([]);
   const [topCreators, setTopCreators] = useState<any[]>([]);
-
-  const shortWallet = (address: string) => {
-    if (!address) return "";
-    return address.slice(0, 6) + "..." + address.slice(-6);
-  };
-
-  const mapNumericTokenType = (numericTokenType: number): string => {
-    switch (numericTokenType) {
-      case 0:
-        return "SOLANA";
-      case 1:
-        return "SPL_TOKEN";
-      case 2:
-        return "SPL_TOKEN_2022";
-      case 3:
-        return "USDC";
-      default:
-        return "SOLANA";
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Wallet address copied!", {
-        position: "top-right",
-        autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
-    } catch (err) {
-      toast.error("Failed to copy wallet address", {
-        position: "top-right",
-      });
-    }
-  };
 
   const fetchDashboardData = async () => {
     try {
@@ -201,46 +165,7 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             {topRaffles.length > 0 ? (
               topRaffles.map((raffle, index) => (
-                <div
-                  key={index}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-card/50 border border-border/30 hover:border-primary/50 transition-all gap-3"
-                >
-                  <div className="flex-1 min-w-[200px]">
-                    <h3 className="font-semibold mb-1">{raffle.raffleName}</h3>
-                    <button
-                      onClick={() => copyToClipboard(raffle.creatorAddress)}
-                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition"
-                    >
-                      {shortWallet(raffle.creatorAddress)}
-                      <Copy className="h-3 w-3 opacity-50" />
-                    </button>
-                  </div>
-                  <div className="flex justify-between sm:flex-col sm:items-end gap-2 w-full sm:w-auto">
-                    <p className="font-bold text-primary">
-                      {raffle.revenue}{" "}
-                      {getTokenSymbol(
-                        mapNumericTokenType(raffle.tokenTypeRaw || 0),
-                        raffle.tokenAddress,
-                      )}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {raffle.totalTicketsSold} tickets
-                    </p>
-                  </div>
-                  <div className="w-24 text-center">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                        raffle.status === "LIVE"
-                          ? "bg-green-500/20 text-green-500"
-                          : raffle.status == "UPCOMING"
-                            ? "bg-secondary/20 text-secondary"
-                            : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {raffle.status}
-                    </span>
-                  </div>
-                </div>
+                <TopRaffleItem key={index} raffle={raffle} />
               ))
             ) : (
               <p className="text-muted-foreground mt-20 text-center">
@@ -294,38 +219,7 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               {topCreators.length > 0 ? (
                 topCreators.map((creator) => (
-                  <div
-                    key={creator.walletAddress}
-                    className="flex items-center gap-3"
-                  >
-                    <div
-                      className={`h-10 w-10 rounded-full flex items-center justify-center font-bold ${
-                        creator.rank === 1
-                          ? "bg-gradient-primary text-white"
-                          : creator.rank === 2
-                            ? "bg-secondary/20 text-secondary"
-                            : "bg-accent/20 text-accent"
-                      }`}
-                    >
-                      {creator.rank}
-                    </div>
-                    <div className="flex-1">
-                      <button
-                        onClick={() => copyToClipboard(creator.walletAddress)}
-                        className="flex items-center gap-1 text-sm font-medium hover:text-primary transition"
-                      >
-                        {shortWallet(creator.walletAddress)}
-                        <Copy className="h-3 w-3 opacity-50" />
-                      </button>
-                      <p className="text-xs text-muted-foreground">
-                        {creator.totalRevenue}{" "}
-                        {getTokenSymbol(
-                          creator.tokenType || "SOLANA",
-                          creator.tokenAddress,
-                        )}
-                      </p>
-                    </div>
-                  </div>
+                  <TopCreatorItem key={creator.walletAddress} creator={creator} />
                 ))
               ) : (
                 <p className="text-muted-foreground">
