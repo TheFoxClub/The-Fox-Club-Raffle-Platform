@@ -155,6 +155,21 @@ function formatCountdown(targetDateStr: string) {
   return `${seconds}s`;
 }
 
+const isInsufficientFundsError = (error: any) => {
+  const message =
+    error?.message ||
+    error?.toString?.() ||
+    error?.response?.data?.message ||
+    "";
+
+  return (
+    message.includes("insufficient") ||
+    message.includes("Attempt to debit") ||
+    message.includes("InsufficientFunds") ||
+    message.includes("0 lamports")
+  );
+};
+
 const RaffleDetail = () => {
   const { publicKey, signTransaction, connected } = useWallet();
   const { slug } = useParams<{ slug: string }>();
@@ -173,6 +188,24 @@ const RaffleDetail = () => {
   const winners = raffle?.winnersData ?? [];
   const [nftImages, setNftImages] = useState<Record<string, string>>({});
   const [isBuying, setIsBuying] = useState(false);
+
+  const extractErrorMessage = (error: any): string => {
+    if (!error) return "";
+
+    if (typeof error === "string") return error;
+
+    if (error.message) return error.message;
+
+    if (error.error?.message) return error.error.message;
+
+    if (error.error?.data?.err) return error.error.data.err;
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "";
+    }
+  };
 
   const isNFTReward = (rewardType: number) =>
     rewardType === RAFFLE_REWARD_TYPES.NFT;
@@ -267,6 +300,18 @@ const RaffleDetail = () => {
       toast.error("Not enough tickets available");
       return;
     }
+
+    const connection = new Connection(SOLANA_RPC_HOST);
+    const balance = await connection.getBalance(publicKey);
+
+    if (balance === 0) {
+      toast.error(
+        "Insufficient balance. Please add SOL to your wallet to buy tickets.",
+      );
+      setIsBuying(false);
+      return;
+    }
+
     setIsBuying(true);
     let reservationId: string | null = null;
     try {
@@ -351,6 +396,8 @@ const RaffleDetail = () => {
 
       if (error.message.includes("rejected")) {
         toast.error("Transaction was rejected by wallet");
+      } else if (error.message.includes("blockhash")) {
+        toast.error("Transaction Expired. Please try again.");
       } else if (error.message.includes("insufficient")) {
         toast.error("Insufficient balance");
       } else if (error.message.includes("EXISTING_RESERVATION")) {
@@ -873,7 +920,7 @@ const RaffleDetail = () => {
                       key={winner.rewardId}
                       className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
                     >
-                      <div className="flex items-center gap-3 sm:gap-4">
+                      {/* <div className="flex items-center gap-3 sm:gap-4">
                         {winner.imageUrl && (
                           <img
                             src={winner.imageUrl}
@@ -882,46 +929,57 @@ const RaffleDetail = () => {
                           />
                         )}
 
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-xs sm:text-sm">
-                            Winner #{index + 1}
+                        <div className="flex flex-col"> */}
+                      <div className="flex flex-col sm:flex-col gap-1 min-w-[160px]">
+                        <span className="font-semibold text-xs sm:text-sm">
+                          Winner #{index + 1}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(winner.winnerPubkey)}
+                          className="flex items-center gap-1 text-left text-xs text-muted-foreground hover:text-primary transition group"
+                        >
+                          {/* Mobile (short) */}
+                          <span className="sm:hidden">
+                            {winner.winnerPubkey.slice(0, 4)}…
+                            {winner.winnerPubkey.slice(-4)}
                           </span>
-                          <button
-                            onClick={() => copyToClipboard(winner.winnerPubkey)}
-                            className="flex items-center gap-1 text-left text-xs text-muted-foreground hover:text-primary transition group"
-                          >
-                            {/* Mobile (short) */}
-                            <span className="sm:hidden">
-                              {winner.winnerPubkey.slice(0, 4)}…
-                              {winner.winnerPubkey.slice(-4)}
-                            </span>
 
-                            {/* Desktop (full) */}
-                            <span className="hidden sm:block break-all">
-                              {winner.winnerPubkey}
-                            </span>
-
-                            <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
-                          </button>
-
-                          <span className="text-xs text-muted-foreground">
-                            Ticket #{winner.ticketNumber}
+                          {/* Desktop (full) */}
+                          <span className="hidden sm:block break-all">
+                            {winner.winnerPubkey}
                           </span>
-                        </div>
+
+                          <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                        </button>
+
+                        <span className="text-xs text-muted-foreground">
+                          Ticket #{winner.ticketNumber}
+                        </span>
                       </div>
 
-                      <div className="text-left sm:text-right">
-                        <span className="text-sm font-medium block">
-                          {winner.rewardName}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Amount: {parseFloat(winner.amount)}
-                        </span>
-                        {winner.isClaimed && (
-                          <div className="text-xs text-green-500 mt-1">
-                            ✓ Claimed
-                          </div>
+                      {/* <div className="text-left sm:text-right"> */}
+                      <div className="flex items-center justify-end gap-3 flex-1 min-w-0">
+                        {winner.imageUrl && (
+                          <img
+                            src={winner.imageUrl}
+                            alt={winner.rewardName}
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover shrink-0"
+                          />
                         )}
+                        {/* Reward details */}
+                        <div className="flex flex-col text-left min-w-0">
+                          <span className="text-sm font-medium block">
+                            {winner.rewardName}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Amount: {parseFloat(winner.amount)}
+                          </span>
+                          {winner.isClaimed && (
+                            <div className="text-xs text-green-500 mt-1">
+                              ✓ Claimed
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

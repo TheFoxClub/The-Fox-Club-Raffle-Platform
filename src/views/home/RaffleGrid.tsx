@@ -281,144 +281,172 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       </TabsList>
 
       <TabsContent value="live" className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Live Raffles</h2>
-          <span className="text-sm text-muted-foreground">
-            {Array.isArray(raffles) ? raffles.length : 0} live raffles
-          </span>
-        </div>
-        {Array.isArray(raffles) && raffles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {raffles.map((raffle) => {
-              const mappedRaffle = {
-                id: raffle.id,
-                title: raffle.title,
-                image: raffle.imageUrl || "/placeholder-raffle.png",
-                price: raffle.ticketPrice,
-                sold: Number(raffle.ticketsSold) || 0,
-                total: Number(raffle.totalTickets) || 0,
-                tokenType: getTokenSymbol(
-                  raffle.tokenType,
-                  raffle.tokenAddress,
-                ),
-                winners: raffle.numberOfWinners,
-                endTime: formatCountdown(raffle.endDate),
-                isVerified:
-                  raffle.raffle_detail?.requiresNftVerification || false,
-                isFeatured: raffle.raffle_detail?.isFeatured || false,
-              };
-
-              return (
-                <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
-                  <RaffleCard {...mappedRaffle} />
-                </Link>
-              );
-            })}
+        {loading && activeTab === "live" ? (
+          <div className="py-16 text-center text-muted-foreground">
+            Loading live raffles...
           </div>
         ) : (
-          <div className="text-center py-16 ">
-            <Flame className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-semibold mb-2">No Live Raffles Yet</h3>
-            <p className="text-muted-foreground">
-              Completed raffles will appear here
-            </p>
-          </div>
+          <>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Live Raffles</h2>
+              <span className="text-sm text-muted-foreground">
+                {Array.isArray(raffles) ? raffles.length : 0} live raffles
+              </span>
+            </div>
+            {Array.isArray(raffles) && raffles.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {raffles.map((raffle) => {
+                  const mappedRaffle = {
+                    id: raffle.id,
+                    title: raffle.title,
+                    image: raffle.imageUrl || "/placeholder-raffle.png",
+                    price: raffle.ticketPrice,
+                    sold: Number(raffle.ticketsSold) || 0,
+                    total: Number(raffle.totalTickets) || 0,
+                    tokenType: getTokenSymbol(
+                      raffle.tokenType,
+                      raffle.tokenAddress,
+                    ),
+                    winners: raffle.numberOfWinners,
+                    endTime: formatCountdown(raffle.endDate),
+                    isVerified:
+                      raffle.raffle_detail?.requiresNftVerification || false,
+                    isFeatured: raffle.raffle_detail?.isFeatured || false,
+                  };
+
+                  return (
+                    <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
+                      <RaffleCard {...mappedRaffle} />
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-16 ">
+                <Flame className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-semibold mb-2">
+                  No Live Raffles Yet
+                </h3>
+                <p className="text-muted-foreground">
+                  Completed raffles will appear here
+                </p>
+              </div>
+            )}
+          </>
         )}
       </TabsContent>
 
       <TabsContent value="ended" className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Ended Raffles</h2>
-          <span className="text-sm text-muted-foreground">
-            {Array.isArray(endedRaffles) ? endedRaffles.length : 0} ended
-            raffles
-          </span>
-        </div>
-        {Array.isArray(endedRaffles) && endedRaffles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ">
-            {endedRaffles.map((raffle) => {
-              const mappedRaffle = {
-                id: raffle.id,
-                title: raffle.title,
-                image: raffle.imageUrl || "/placeholder-raffle.png",
-                price: raffle.ticketPrice,
-                sold: Number(raffle.ticketsSold) || 0,
-                total: Number(raffle.totalTickets) || 0,
-                tokenType: getTokenSymbol(
-                  raffle.tokenType,
-                  raffle.tokenAddress,
-                ),
-                winners: raffle.numberOfWinners,
-                endTime: formatCountdown(raffle.endDate),
-                isVerified:
-                  raffle.raffle_detail?.requiresNftVerification || false,
-                isFeatured: raffle.raffle_detail?.isFeatured || false,
-              };
-
-              return (
-                <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
-                  <RaffleCard {...mappedRaffle} />
-                </Link>
-              );
-            })}
+        {loading && activeTab === "ended" ? (
+          <div className="py-16 text-center text-muted-foreground">
+            Loading ended raffles...
           </div>
         ) : (
-          <div className="text-center py-16 ">
-            <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-semibold mb-2">No Ended Raffles Yet</h3>
-            <p className="text-muted-foreground">
-              Completed raffles will appear here
-            </p>
-          </div>
+          <>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Ended Raffles</h2>
+              <span className="text-sm text-muted-foreground">
+                {Array.isArray(endedRaffles) ? endedRaffles.length : 0} ended
+                raffles
+              </span>
+            </div>
+            {Array.isArray(endedRaffles) && endedRaffles.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ">
+                {endedRaffles.map((raffle) => {
+                  const mappedRaffle = {
+                    id: raffle.id,
+                    title: raffle.title,
+                    image: raffle.imageUrl || "/placeholder-raffle.png",
+                    price: raffle.ticketPrice,
+                    sold: Number(raffle.ticketsSold) || 0,
+                    total: Number(raffle.totalTickets) || 0,
+                    tokenType: getTokenSymbol(
+                      raffle.tokenType,
+                      raffle.tokenAddress,
+                    ),
+                    winners: raffle.numberOfWinners,
+                    endTime: formatCountdown(raffle.endDate),
+                    isVerified:
+                      raffle.raffle_detail?.requiresNftVerification || false,
+                    isFeatured: raffle.raffle_detail?.isFeatured || false,
+                  };
+
+                  return (
+                    <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
+                      <RaffleCard {...mappedRaffle} />
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-16 ">
+                <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-semibold mb-2">
+                  No Ended Raffles Yet
+                </h3>
+                <p className="text-muted-foreground">
+                  Completed raffles will appear here
+                </p>
+              </div>
+            )}
+          </>
         )}
       </TabsContent>
 
       <TabsContent value="upcoming" className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Upcoming Raffles</h2>
-          <span className="text-sm text-muted-foreground">
-            {Array.isArray(upcomingRaffles) ? upcomingRaffles.length : 0}{" "}
-            upcoming raffles
-          </span>
-        </div>
-        {Array.isArray(upcomingRaffles) && upcomingRaffles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcomingRaffles.map((raffle) => {
-              const mappedRaffle = {
-                id: raffle.id,
-                title: raffle.title,
-                image: raffle.imageUrl || "/placeholder-raffle.png",
-                price: raffle.ticketPrice,
-                sold: Number(raffle.ticketsSold) || 0,
-                total: Number(raffle.totalTickets) || 0,
-                tokenType: getTokenSymbol(
-                  raffle.tokenType,
-                  raffle.tokenAddress,
-                ),
-                winners: raffle.numberOfWinners,
-                endTime: formatCountdown(raffle.endDate),
-                isVerified:
-                  raffle.raffle_detail?.requiresNftVerification || false,
-                isFeatured: raffle.raffle_detail?.isFeatured || false,
-              };
-
-              return (
-                <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
-                  <RaffleCard {...mappedRaffle} />
-                </Link>
-              );
-            })}
+        {loading && activeTab === "upcoming" ? (
+          <div className="py-16 text-center text-muted-foreground">
+            Loading upcoming raffles...
           </div>
         ) : (
-          <div className="text-center py-16 ">
-            <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-semibold mb-2">
-              No Upcoming Raffles Yet
-            </h3>
-            <p className="text-muted-foreground">
-              Upcoming raffles will appear here
-            </p>
-          </div>
+          <>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Upcoming Raffles</h2>
+              <span className="text-sm text-muted-foreground">
+                {Array.isArray(upcomingRaffles) ? upcomingRaffles.length : 0}{" "}
+                upcoming raffles
+              </span>
+            </div>
+            {Array.isArray(upcomingRaffles) && upcomingRaffles.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {upcomingRaffles.map((raffle) => {
+                  const mappedRaffle = {
+                    id: raffle.id,
+                    title: raffle.title,
+                    image: raffle.imageUrl || "/placeholder-raffle.png",
+                    price: raffle.ticketPrice,
+                    sold: Number(raffle.ticketsSold) || 0,
+                    total: Number(raffle.totalTickets) || 0,
+                    tokenType: getTokenSymbol(
+                      raffle.tokenType,
+                      raffle.tokenAddress,
+                    ),
+                    winners: raffle.numberOfWinners,
+                    endTime: formatCountdown(raffle.endDate),
+                    isVerified:
+                      raffle.raffle_detail?.requiresNftVerification || false,
+                    isFeatured: raffle.raffle_detail?.isFeatured || false,
+                  };
+
+                  return (
+                    <Link to={`/raffle/raffle-${raffle.id}`} key={raffle.id}>
+                      <RaffleCard {...mappedRaffle} />
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-16 ">
+                <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-semibold mb-2">
+                  No Upcoming Raffles Yet
+                </h3>
+                <p className="text-muted-foreground">
+                  Upcoming raffles will appear here
+                </p>
+              </div>
+            )}
+          </>
         )}
       </TabsContent>
     </Tabs>
