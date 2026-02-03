@@ -26,10 +26,11 @@ import {
 } from "../../components/ui/Dialog";
 import { Switch } from "../../components/ui/Switch";
 import Pagination from "../../components/ui/Pagination";
+import { RaffleTokenBadge } from "../../components/admin/RaffleTokenBadge";
+import { RaffleRevenueDisplay } from "../../components/admin/RaffleRevenueDisplay";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import { formatPrice } from "../../helpers/formatPrice";
-import { getTokenSymbol } from "../../utils/tokenUtils";
 
 interface RaffleDetail {
   id: number;
@@ -89,7 +90,7 @@ const mapRaffle = (r: any): Raffle => ({
   id: r.id,
   name: r.title,
   creator: r.user?.pubkey || "Unknown",
-  token: getTokenSymbol(mapNumericTokenType(r.tokenType), r.tokenAddress),
+  token: mapNumericTokenType(r.tokenType), // Store the mapped token type instead of symbol
   price: r.ticketPrice,
   sold: r.ticketsSold,
   total: r.totalTickets,
@@ -508,9 +509,10 @@ export default function AdminRaffles() {
                       </button>
                     </td>
                     <td className="p-4">
-                      <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
-                        {raffle.token}
-                      </span>
+                      <RaffleTokenBadge 
+                        tokenType={raffle.tokenType || 0}
+                        tokenAddress={raffle.tokenAddress}
+                      />
                     </td>
                     <td className="p-4">{formatPrice(raffle.price)}</td>
                     <td className="p-4">
@@ -518,8 +520,12 @@ export default function AdminRaffles() {
                         {raffle.sold}/{raffle.total}
                       </span>
                     </td>
-                    <td className="p-4 font-semibold text-primary">
-                      {raffle.totalRevenue} {raffle.token}
+                    <td className="p-4">
+                      <RaffleRevenueDisplay 
+                        revenue={raffle.totalRevenue}
+                        tokenType={raffle.tokenType || 0}
+                        tokenAddress={raffle.tokenAddress}
+                      />
                     </td>
 
                     <td className="p-4">
