@@ -4,6 +4,8 @@ import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
 import Button from "../../components/ui/Button";
 import HostProfilePopover from "../../components/ui/HostProfilePopover";
+import { TokenDisplay } from "../../components/ui/TokenDisplay";
+import { RewardAmountDisplay } from "../../components/ui/RewardAmountDisplay";
 import socketService from "../../services/socket.service";
 
 import {
@@ -25,7 +27,6 @@ import { Connection, Transaction } from "@solana/web3.js";
 import { storeSignature, cancelReservation } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
-import { getTokenSymbol } from "../../utils/tokenUtils";
 
 const mapNumericTokenType = (numericTokenType: number): string => {
   switch (numericTokenType) {
@@ -439,10 +440,7 @@ const RaffleDetail = () => {
           description: data.description,
           image: data.imageUrl,
           price: Number(data.ticketPrice),
-          tokenType: getTokenSymbol(
-            mapNumericTokenType(data.tokenType),
-            data.tokenAddress,
-          ),
+          tokenType: mapNumericTokenType(data.tokenType),
           tokenTypeNumber: data.tokenType,
           tokenAddress: data.tokenAddress,
           total: data.totalTickets,
@@ -870,7 +868,11 @@ const RaffleDetail = () => {
                           {reward.rewardName}
                         </p>
                         <p className="text-xs sm:text-sm text-muted-foreground">
-                          Amount: {parseFloat(reward.amount)}
+                          <RewardAmountDisplay 
+                            amount={reward.amount}
+                            rewardType={reward.rewardType}
+                            mintAddress={reward.mintAddress}
+                          />
                         </p>
                         <p className="text-xs text-muted-foreground">
                           <span className="sm:hidden">
@@ -1070,7 +1072,11 @@ const RaffleDetail = () => {
                 </span>
               </div>
               <span className="text-lg sm:text-xl font-bold">
-                {raffle.price} {raffle.tokenType}
+                <TokenDisplay 
+                  amount={raffle.price} 
+                  tokenType={raffle.tokenType} 
+                  tokenAddress={raffle.tokenAddress}
+                />
               </span>
             </div>
 
@@ -1146,7 +1152,12 @@ const RaffleDetail = () => {
                   Total Cost
                 </span>
                 <span className="text-xl sm:text-2xl font-bold text-primary">
-                  {totalCost} {raffle.tokenType}
+                  <TokenDisplay 
+                    amount={totalCost} 
+                    tokenType={raffle.tokenType} 
+                    tokenAddress={raffle.tokenAddress}
+                    className="text-xl sm:text-2xl font-bold text-primary"
+                  />
                 </span>
               </div>
             )}

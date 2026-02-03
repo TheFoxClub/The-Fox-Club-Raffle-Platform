@@ -293,10 +293,8 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
                     price: raffle.ticketPrice,
                     sold: Number(raffle.ticketsSold) || 0,
                     total: Number(raffle.totalTickets) || 0,
-                    tokenType: getTokenSymbol(
-                      raffle.tokenType,
-                      raffle.tokenAddress,
-                    ),
+                    tokenType: raffle.tokenType,
+                    tokenAddress: raffle.tokenAddress,
                     winners: raffle.numberOfWinners,
                     endTime: formatCountdown(raffle.endDate),
                     isVerified:
