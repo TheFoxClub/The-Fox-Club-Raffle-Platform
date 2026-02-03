@@ -182,106 +182,160 @@ export default function RaffleCarousel() {
   const prev = () =>
     setIndex((prev) => (prev - 1 + raffles.length) % raffles.length);
 
+  // **3D carousel style helper**
+  const getCardStyle = (cardIndex: number) => {
+    const diff = cardIndex - index;
+    const normalized = (diff + raffles.length) % raffles.length;
+    const adjusted =
+      normalized > raffles.length / 2
+        ? normalized - raffles.length
+        : normalized;
+
+    const rotateY = adjusted * 45;
+    const translateX = adjusted * 280;
+    const translateZ = Math.abs(adjusted) * -150;
+    const scale = adjusted === 0 ? 1 : 0.78;
+    const opacity = Math.abs(adjusted) > 2 ? 0 : 1 - Math.abs(adjusted) * 0.3;
+    const zIndex = 10 - Math.abs(adjusted);
+
+    return {
+      transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+      opacity,
+      zIndex,
+    };
+  };
+
   return (
-    <Card
-      className="overflow-hidden glow-primary border-primary/30 max-w-4xl mx-auto"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="relative flex flex-col">
-        {/* Image */}
-        <div className="relative w-full h-60">
-          <img
-            src={data.image}
-            alt={data.title}
-            className="w-full h-full object-cover"
-          />
-          {/* Verified Badge */}
-          {data.isVerified && (
-            <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
-              <CheckCircle size={16} /> Verified
-            </div>
-          )}
+    <div className="relative py-4">
+      <div
+        className="overflow-hidden glow-primary border-primary/30 max-w-4xl mx-auto"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={prev}
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border-primary/30 hover:bg-primary/20"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={next}
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border-primary/30 hover:bg-primary/20"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </Button>
+        {/* 3D Carousel Container */}
+        <div
+          className="relative h-[430px] mx-auto overflow-hidden"
+          style={{ perspective: "1200px" }}
+        >
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ transformStyle: "preserve-3d" }}
+          >
+            {raffles.map((raffle, cardIndex) => {
+              const style = getCardStyle(cardIndex);
+              const isActive = cardIndex === index;
 
-          <button
-            onClick={prev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-background/80 border-input rounded-xl hover:bg-[#262626] translate-colors"
-          >
-            <ChevronLeft />
-          </button>
-          <button
-            onClick={next}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-background/60 border-input rounded-xl hover:bg-[#262626] translate-colors"
-          >
-            <ChevronRight />
-          </button>
+              return (
+                <Card
+                  key={raffle.id}
+                  className={`absolute w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
+                    isActive ? "glow-primary" : ""
+                  }`}
+                  style={{
+                    ...style,
+                    transformStyle: "preserve-3d",
+                  }}
+                  onClick={() => setIndex(cardIndex)}
+                >
+                  <div className="relative aspect-[16/8] overflow-hidden">
+                    <img
+                      src={raffle.image}
+                      alt={raffle.title}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Verified Badge */}
+                    {raffle.isVerified && (
+                      <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
+                        <CheckCircle size={16} /> Verified
+                      </div>
+                    )}
+                    <div className="absolute top-4 left-4 rounded-full px-2.5 py-0.5 mb-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
+                      Featured
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div className="p-4 flex flex-col justify-between space-y-2 relative">
+                    {/* Featured Raffle Badge */}
+                    <div className="flex flex-col">
+                      <h2 className="text-xl font-bold text-gradient">
+                        {raffle.title}
+                      </h2>
+                      <p className="text-muted-foreground mt-1 text-sm">
+                        {raffle.description}
+                      </p>
+                    </div>
+
+                    {/* Ticket Info */}
+                    <div className="flex gap-10 text-sm justify-between">
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4 text-accent" />
+                        <div>
+                          <span className="text-muted-foreground text-sm mt-1">
+                            Ticket Price
+                          </span>
+                          <p className="font-semibold">
+                            {formatPrice(raffle.price)} {raffle.tokenType}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-primary" />
+                        <div>
+                          <p className="text-gray-400">Tickets Sold</p>
+                          <span className="font-bold">
+                            {raffle.sold} / {raffle.total}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Button + Arrows */}
+                    {isActive && (
+                      <Button
+                        className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
+                        onClick={() => navigate(`/raffle/raffle-${raffle.id}`)}
+                      >
+                        Enter Raffle
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+        {/* Carousel Dots */}
+        <div className="flex gap-2 justify-center mt-4">
+          {raffles.map((_, i) => (
+            <div
+              key={i}
+              onClick={() => setIndex(i)}
+              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                index === i ? "w-8 bg-primary" : "w-2 bg-gray-600"
+              }`}
+            ></div>
+          ))}
         </div>
 
-        {/* Details */}
-        <div className="p-4 md:p-8 flex flex-col justify-between space-y-2 relative">
-          {/* Featured Raffle Badge */}
-          <div className="flex flex-col items-center text-center">
-            <div className="inline-flex items-center rounded-full px-2.5 py-0.5 mb-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
-              Featured Raffle
-            </div>
-
-            <h2 className="text-xl md:text-2xl font-bold mb-2 text-gradient">
-              {data.title}
-            </h2>
-            <p className="text-muted-foreground text-base">
-              {data.description}
-            </p>
-          </div>
-
-          {/* Ticket Info */}
-          <div className="flex items-center gap-10 text-sm justify-center">
-            <div className="flex items-center gap-2">
-              <Coins className="h-5 w-5 text-accent" />
-              <div>
-                <p className="text-muted-foreground">Ticket Price</p>
-                <p className="font-bold">
-                  {formatPrice(data.price)} {data.tokenType}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-gray-400">Tickets Sold</p>
-                <p className="font-bold">
-                  {data.sold} / {data.total}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Button + Arrows */}
-          <div className="flex items-center mt-2">
-            <Button
-              className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
-              onClick={() => navigate(`/raffle/raffle-${data.id}`)}
-            >
-              Enter Raffle
-            </Button>
-          </div>
-
-          {/* Carousel Dots */}
-          <div className="flex gap-2 justify-center">
-            {raffles.map((_, i) => (
-              <div
-                key={i}
-                onClick={() => setIndex(i)}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                  index === i ? "w-8 bg-primary" : "w-2 bg-gray-600"
-                }`}
-              ></div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* <div className="relative">
+        {/* <div className="relative">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
           
           <div className="relative aspect-video md:aspect-auto">
@@ -376,6 +430,7 @@ export default function RaffleCarousel() {
           </div>
         </div>
       </div> */}
-    </Card>
+      </div>
+    </div>
   );
 }
