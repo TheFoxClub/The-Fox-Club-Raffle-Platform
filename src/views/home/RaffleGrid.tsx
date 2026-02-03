@@ -119,23 +119,14 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
 
   // Initial load - fetch all tabs
   useEffect(() => {
-    const fetchAllRaffles = async () => {
-      try {
-        setLoading(true);
-
-        // Fetch data for all tabs
-        await Promise.all([
-          fetchRafflesForTab("live"),
-          fetchRafflesForTab("ended"),
-          fetchRafflesForTab("upcoming"),
-        ]);
-      } finally {
-        setLoading(false);
-      }
+    const fetchInitial = async () => {
+      setLoading(true);
+      await fetchRafflesForTab(activeTab);
+      setLoading(false);
     };
 
-    fetchAllRaffles();
-  }, [filters, fetchRafflesForTab]);
+    fetchInitial();
+  }, [filters]);
 
   // Socket.IO integration for real-time updates (separate useEffect to avoid dependency issues)
   useEffect(() => {
@@ -201,13 +192,13 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     const handleRaffleStatusChange = (data: any) => {
       // console.log("Raffle grid - raffle status change received:", data);
 
-      if (data.raffleId) {
-        // For now, just refresh the data to ensure consistency
-        if (data.newStatus === "ENDED") {
-          // Raffle moved from live to ended
-          fetchRafflesForTab("live");
-          fetchRafflesForTab("ended");
-        }
+      // if (data.raffleId) {
+      // For now, just refresh the data to ensure consistency
+      if (data.newStatus === "ENDED") {
+        // Raffle moved from live to ended
+        fetchRafflesForTab("live");
+        fetchRafflesForTab("ended");
+        //      }
       }
     };
 
@@ -234,7 +225,6 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       (newTab === "ended" && endedRaffles.length > 0) ||
       (newTab === "upcoming" && upcomingRaffles.length > 0);
 
-    // Only fetch if no data or if this is the first load
     if (!hasData) {
       setLoading(true);
       await fetchRafflesForTab(newTab);
@@ -242,13 +232,13 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading raffles...
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       Loading raffles...
+  //     </div>
+  //   );
+  // }
 
   return (
     <Tabs

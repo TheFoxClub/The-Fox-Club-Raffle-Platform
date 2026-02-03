@@ -56,7 +56,7 @@ export default function AdminLeaderboards() {
           tokenAddress: host.tokenAddress,
           rafflesCount: host.rafflesCount,
           xp: 0,
-          streak: 0,
+          //  streak: 0,
         })),
       );
 
@@ -68,7 +68,7 @@ export default function AdminLeaderboards() {
           tokenAddress: buyer.tokenAddress,
           tickets: buyer.ticketsBought,
           xp: 0,
-          streak: 0,
+          //  streak: 0,
         })),
       );
     } catch (error) {

@@ -15,8 +15,8 @@ type FormData = {
   username: string;
   email: string;
   bio: string;
-  twitter: string;
-  discord: string;
+  // twitter: string;
+  // discord: string;
   photoUrl: string;
 };
 
@@ -32,8 +32,8 @@ const EditProfile = () => {
     username: "",
     email: "",
     bio: "",
-    twitter: "",
-    discord: "",
+    // twitter: "",
+    // discord: "",
     photoUrl: "",
   });
 
@@ -78,8 +78,8 @@ const EditProfile = () => {
         username: user_info.username || "",
         email: user_info.email || "",
         bio: user_info.description || "",
-        twitter: user_info.twitter || "",
-        discord: user_info.discord || "",
+        // twitter: user_info.twitter || "",
+        // discord: user_info.discord || "",
         photoUrl: user_info.photoUrl || "",
       });
 
@@ -369,7 +369,7 @@ const EditProfile = () => {
           </Card>
 
           {/* Social Links */}
-          <Card className="bg-card p-6 space-y-6">
+          {/* <Card className="bg-card p-6 space-y-6">
             <h2 className="text-2xl font-bold">Social Links</h2>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -406,7 +406,7 @@ const EditProfile = () => {
                 />
               </div>
             </div>
-          </Card>
+          </Card> */}
 
           <div className="flex flex-col sm:flex-row gap-4 items-center">
             <Button

@@ -101,6 +101,8 @@ const CreateRaffle = () => {
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [awaitingWallet, setAwaitingWallet] = useState(false);
+  const [walletTimedOut, setWalletTimedOut] = useState(false);
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
@@ -250,6 +252,7 @@ const CreateRaffle = () => {
   const handleRemoveImage = () => {
     setRaffleImage(null);
     setRaffleImagePreview(null);
+    setExistingImageUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -266,8 +269,8 @@ const CreateRaffle = () => {
       }
       try {
         setNftLoading(true);
-        // const res = await server.get(`/nfts/${user.pubkey}`);
-        const res = await server.get(`/nfts/onCollection`);
+        const res = await server.get(`/nfts/${user.pubkey}`);
+        // const res = await server.get(`/nfts/onCollection`);
         const nftsFromApi: any[] = res.data?.data?.nfts || [];
 
         const mapped = await Promise.all(
@@ -487,6 +490,7 @@ const CreateRaffle = () => {
     name: string;
     amount: number;
     programId: string;
+    image?: string | null;
   }) => {
     if (!selectedTokens.some((t) => t.mint === token.mint)) {
       setSelectedTokens((prev) => [...prev, { ...token, amountToUse: 0 }]);
@@ -526,6 +530,7 @@ const CreateRaffle = () => {
     name: string;
     amount: number;
     programId: string;
+    image?: string | null;
   }) => {
     setSelectedTokens((prev) => {
       const exists = prev.some((t) => t.mint === token.mint);
@@ -613,7 +618,7 @@ const CreateRaffle = () => {
     }
 
     // Only require image for non-draft submissions
-    if (!raffleImage) {
+    if (!raffleImage && !existingImageUrl) {
       newErrors.raffleImage = "Please upload a raffle image.";
     }
 
@@ -684,6 +689,42 @@ const CreateRaffle = () => {
     setDisclaimerOpen(true);
   };
 
+  const isBlockheightExceededError = (error: any) => {
+    const msg =
+      error?.message?.toLowerCase?.() ||
+      error?.toString?.().toLowerCase?.() ||
+      "";
+
+    return (
+      msg.includes("blockheight exceeded") ||
+      msg.includes("block height exceeded") ||
+      msg.includes("transactionexpired") ||
+      msg.includes("blockhash not found")
+    );
+  };
+
+  const withTimeout = <T,>(
+    promise: Promise<T>,
+    ms: number,
+    message = "Wallet approval timed out",
+  ): Promise<T> => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(message));
+      }, ms);
+
+      promise
+        .then((res) => {
+          clearTimeout(timer);
+          resolve(res);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+  };
+
   // ----------------- FINAL SUBMIT AFTER DISCLAIMER -----------------
   const handleDisclaimerConfirm = () => {
     if (!disclaimerAccepted) {
@@ -742,11 +783,15 @@ const CreateRaffle = () => {
         } finally {
           setImageUploading(false);
         }
-      } else if (status !== "DRAFT") {
+      } else if (status !== "DRAFT" && !existingImageUrl) {
         // Only require image for non-draft raffles
         toast.error("Please upload a raffle image");
         setLoading(false);
         return;
+      }
+
+      if (!uploadedImageUrl && existingImageUrl) {
+        uploadedImageUrl = existingImageUrl;
       }
 
       const finalStartDate = startNow ? new Date().toISOString() : startDate;
@@ -937,6 +982,12 @@ const CreateRaffle = () => {
                 );
               }
             } catch (submitError: any) {
+              console.error("Transaction submission failed:", submitError);
+
+              if (isBlockheightExceededError(submitError)) {
+                toast.error("Blockheight Exceeded. Please try again.");
+                return;
+              }
               if (submitError.getLogs) {
                 try {
                   const logs = await submitError.getLogs();
@@ -1069,6 +1120,7 @@ const CreateRaffle = () => {
       setSelectedTokenType(draft.tokenType || null);
 
       if (draft.imageUrl) {
+        setExistingImageUrl(draft.imageUrl);
         setRaffleImagePreview(draft.imageUrl);
       }
     } catch (err) {
@@ -1090,23 +1142,20 @@ const CreateRaffle = () => {
         }
 
         // Handle rewardType as both string and number (based on your response)
-        const rewardType =
-          typeof reward.rewardType === "number"
-            ? reward.rewardType === 0
-              ? "NFT"
-              : "SPL_TOKEN"
-            : reward.rewardType;
+        const type = normalizeRewardType(reward.rewardType);
 
-        if (rewardType === "NFT" || rewardType === 0) {
+        if (type === "NFT") {
           loadedNFTs.push({
             id: reward.mintAddress, // UI uses 'id'
             mint: reward.mintAddress,
             name: reward.rewardName,
             image: reward.imageUrl,
             collection: metadata.collection || "",
-            raw: {}, // Raw data might be missing, but that's okay for display
+            raw: {},
           });
-        } else if (rewardType.includes("SPL_TOKEN") || rewardType === 1) {
+        }
+
+        if (type === "SPL_TOKEN") {
           loadedTokens.push({
             mint: reward.mintAddress,
             name: reward.rewardName,
@@ -1411,9 +1460,9 @@ const CreateRaffle = () => {
                         })}
                       </div>
                     )}
-                    <div className="flex justify-end mt-4">
+                    <div className="sticky bottom-0 pb-2 flex justify-end">
                       <Button
-                        className="gradient-primary"
+                        className="gradient-primary shadow-lg shadow-black/80"
                         onClick={() => setIsNFTDialogOpen(false)}
                       >
                         Done
@@ -1563,10 +1612,10 @@ const CreateRaffle = () => {
                       </div>
                     )}
 
-                    <div className="flex justify-end mt-4">
+                    <div className="sticky bottom-0 pb-2 flex justify-end">
                       <Button
-                        className="gradient-primary"
-                        onClick={() => setIsTokenDialogOpen(false)}
+                        className="gradient-primary shadow-lg shadow-black/80"
+                        onClick={() => setIsNFTDialogOpen(false)}
                       >
                         Done
                       </Button>
@@ -1885,10 +1934,14 @@ const CreateRaffle = () => {
             onClick={handleCreateRaffleClick}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
-            disabled={loading}
+            disabled={loading || awaitingWallet}
           >
             <PlusCircle className="h-4 w-4" />
-            {loading ? "Creating..." : "Create Raffle"}
+            {awaitingWallet
+              ? "Waiting for wallet approval…"
+              : loading
+                ? "Creating…"
+                : "Create Raffle"}
           </Button>
         </div>
       </div>

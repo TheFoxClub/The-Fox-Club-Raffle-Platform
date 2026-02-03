@@ -84,7 +84,7 @@ export interface RaffleType {
   // hostReputation: number;
   isVerified: boolean;
   isFeatured: boolean;
-  prizeValue: string;
+  //prizeValue: string;
   startDate?: string;
   endDate?: string;
   endedAt?: string;
@@ -154,6 +154,21 @@ function formatCountdown(targetDateStr: string) {
   if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
 }
+
+const isInsufficientFundsError = (error: any) => {
+  const message =
+    error?.message ||
+    error?.toString?.() ||
+    error?.response?.data?.message ||
+    "";
+
+  return (
+    message.includes("insufficient") ||
+    message.includes("Attempt to debit") ||
+    message.includes("InsufficientFunds") ||
+    message.includes("0 lamports")
+  );
+};
 
 const isInsufficientFundsError = (error: any) => {
   const message =
@@ -312,6 +327,18 @@ const RaffleDetail = () => {
       return;
     }
 
+
+    const connection = new Connection(SOLANA_RPC_HOST);
+    const balance = await connection.getBalance(publicKey);
+
+    if (balance === 0) {
+      toast.error(
+        "Insufficient balance. Please add SOL to your wallet to buy tickets.",
+      );
+      setIsBuying(false);
+      return;
+    }
+
     setIsBuying(true);
     let reservationId: string | null = null;
     try {
@@ -333,13 +360,21 @@ const RaffleDetail = () => {
       const {
         transaction,
         reservationId: resId,
+      const {
+        transaction,
+        reservationId: resId,
         reservationExpiresAt,
         reservationTimeoutSeconds,
+        reservationTimeoutSeconds,
       } = transactionResponse.data.data;
+
 
       reservationId = resId;
 
       // Show reservation countdown
+      toast.info(
+        `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
+      );
       toast.info(
         `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
       );
@@ -372,6 +407,7 @@ const RaffleDetail = () => {
         ticketCount,
         raffle.id,
         reservationId, // Pass reservation ID
+        reservationId, // Pass reservation ID
       );
 
       if (confirmResponse.success) {
@@ -402,13 +438,20 @@ const RaffleDetail = () => {
         toast.error("Insufficient balance");
       } else if (error.message.includes("EXISTING_RESERVATION")) {
         toast.error("You already have an active reservation for this raffle");
-      } else if (error.message.includes("INSUFFICIENT_TICKETS")) {
-        toast.error("Not enough tickets available");
-        await fetchRaffle(); // Refresh raffle data
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error(error.message || "Transaction failed");
+
+        if (isInsufficientFundsError(error)) {
+          toast.error(
+            "Insufficient balance. Please add funds to your wallet and try again.",
+          );
+          return;
+        }
+
+        if (error?.response?.data?.message) {
+          toast.error(error.response.data.message);
+          return;
+        }
+
+        toast.error("Transaction failed. Please try again.");
       }
     } finally {
       setIsBuying(false);
@@ -444,7 +487,7 @@ const RaffleDetail = () => {
           // hostReputation: data.userReputation || 100,
           isVerified: data.raffle_detail?.requiresNftVerification || false,
           isFeatured: data.raffle_detail?.isFeatured || false,
-          prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
+          // prizeValue: (data.ticketPrice * data.totalTickets).toFixed(2),
           // tokenMint: data.tokenMint,
           startDate: data.startDate,
           endDate: data.endDate,
@@ -794,8 +837,8 @@ const RaffleDetail = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-3 sm:pt-4 border-t border-border/50">
-              <div className="space-y-1">
+            <div className="grid grid-cols-2 sm:grid-cols-2 pt-3 sm:pt-4 border-t border-border/50">
+              {/* <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                   <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="truncate">Prize Value</span>
@@ -803,7 +846,7 @@ const RaffleDetail = () => {
                 <p className="font-bold text-base sm:text-lg truncate">
                   ~{raffle.prizeValue}
                 </p>
-              </div>
+              </div> */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                   <Users className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -918,7 +961,7 @@ const RaffleDetail = () => {
                   {winners.map((winner, index) => (
                     <div
                       key={winner.rewardId}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
+                      className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
                     >
                       {/* <div className="flex items-center gap-3 sm:gap-4">
                         {winner.imageUrl && (
@@ -945,13 +988,22 @@ const RaffleDetail = () => {
                           </span>
 
                           {/* Desktop (full) */}
+                          <span className="hidden sm:block">
+                            {winner.winnerPubkey}
+                          </span>
+                          {/* Desktop (full) */}
                           <span className="hidden sm:block break-all">
                             {winner.winnerPubkey}
                           </span>
 
                           <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
                         </button>
+                          <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                        </button>
 
+                        <span className="text-xs text-muted-foreground">
+                          Ticket #{winner.ticketNumber}
+                        </span>
                         <span className="text-xs text-muted-foreground">
                           Ticket #{winner.ticketNumber}
                         </span>
