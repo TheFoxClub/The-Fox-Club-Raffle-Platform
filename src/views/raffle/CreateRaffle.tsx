@@ -1,11 +1,4 @@
-import {
-  AlertCircle,
-  Calendar,
-  PlusCircle,
-  Wallet,
-  X,
-  Upload,
-} from "lucide-react";
+import { AlertCircle, Calendar, PlusCircle, Wallet, X } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
@@ -82,11 +75,11 @@ const CreateRaffle = () => {
   >([]);
   const [tokenLoading, setTokenLoading] = useState(false);
 
-  const [raffleImage, setRaffleImage] = useState<File | null>(null);
-  const [raffleImagePreview, setRaffleImagePreview] = useState<string | null>(
-    null,
-  );
-  const [imageUploading, setImageUploading] = useState(false);
+  // const [raffleImage, setRaffleImage] = useState<File | null>(null);
+  // const [raffleImagePreview, setRaffleImagePreview] = useState<string | null>(
+  //   null,
+  // );
+  // const [imageUploading, setImageUploading] = useState(false);
 
   const [savedDraft, setSavedDraft] = useState<any>(null);
   const [isResumingDraft, setIsResumingDraft] = useState(false);
@@ -101,12 +94,11 @@ const CreateRaffle = () => {
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [awaitingWallet, setAwaitingWallet] = useState(false);
-  const [walletTimedOut, setWalletTimedOut] = useState(false);
+
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
-  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+
   // Dynamic token options state
   const [tokenOptions, setTokenOptions] = useState<
     { value: string; label: string; decimals: number; tokenType: number }[]
@@ -119,7 +111,7 @@ const CreateRaffle = () => {
 
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLDivElement>(null);
-  const raffleImageRef = useRef<HTMLInputElement>(null);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const prizeRef = useRef<HTMLDivElement | null>(null);
   const ticketPriceRef = useRef<HTMLInputElement>(null);
@@ -220,43 +212,6 @@ const CreateRaffle = () => {
       return prev;
     });
   }, [selectedNFTs.length, selectedTokens.length]);
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const validTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "image/jpg",
-    ];
-    if (!validTypes.includes(file.type)) {
-      toast.error("Please upload a valid image file (JPEG, PNG, GIF, WebP)");
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-
-    setRaffleImage(file);
-    setRaffleImagePreview(URL.createObjectURL(file));
-    setErrors((prev) => ({ ...prev, raffleImage: "" }));
-  };
-
-  const handleRemoveImage = () => {
-    setRaffleImage(null);
-    setRaffleImagePreview(null);
-    setExistingImageUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
 
   //fetch NFTs when NFT dialog opens
   useEffect(() => {
@@ -617,11 +572,6 @@ const CreateRaffle = () => {
       }
     }
 
-    // Only require image for non-draft submissions
-    if (!raffleImage && !existingImageUrl) {
-      newErrors.raffleImage = "Please upload a raffle image.";
-    }
-
     setErrors(newErrors);
     // Scroll to first error
     if (Object.keys(newErrors).length > 0) {
@@ -637,11 +587,6 @@ const CreateRaffle = () => {
         });
       else if (newErrors.prize)
         prizeRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      else if (newErrors.raffleImage)
-        raffleImageRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
@@ -725,6 +670,18 @@ const CreateRaffle = () => {
     });
   };
 
+  const getRaffleImageFromRewards = () => {
+    if (selectedNFTs.length > 0) {
+      return selectedNFTs[0].image || NFT_PLACEHOLDER;
+    }
+
+    if (selectedTokens.length > 0) {
+      return selectedTokens[0].image || TOKEN_PLACEHOLDER;
+    }
+
+    return null;
+  };
+
   // ----------------- FINAL SUBMIT AFTER DISCLAIMER -----------------
   const handleDisclaimerConfirm = () => {
     if (!disclaimerAccepted) {
@@ -750,49 +707,7 @@ const CreateRaffle = () => {
 
     try {
       setLoading(true);
-
-      let uploadedImageUrl = "";
-
-      // Upload image if provided
-      if (raffleImage) {
-        try {
-          setImageUploading(true);
-          const formData = new FormData();
-          formData.append("file", raffleImage);
-
-          const uploadRes = await server.post(
-            "/upload/raffle-image",
-            formData,
-            {
-              headers: {
-                "Content-Type": "multipart/form-data",
-              },
-            },
-          );
-
-          if (uploadRes.data.success) {
-            uploadedImageUrl = uploadRes.data.url;
-          } else {
-            throw new Error(uploadRes.data.message || "Image upload failed");
-          }
-        } catch (uploadError: any) {
-          toast.error(`Image upload failed: ${uploadError.message}`);
-          setLoading(false);
-          setImageUploading(false);
-          return;
-        } finally {
-          setImageUploading(false);
-        }
-      } else if (status !== "DRAFT" && !existingImageUrl) {
-        // Only require image for non-draft raffles
-        toast.error("Please upload a raffle image");
-        setLoading(false);
-        return;
-      }
-
-      if (!uploadedImageUrl && existingImageUrl) {
-        uploadedImageUrl = existingImageUrl;
-      }
+      const raffleImageUrl = getRaffleImageFromRewards();
 
       const finalStartDate = startNow ? new Date().toISOString() : startDate;
 
@@ -808,7 +723,7 @@ const CreateRaffle = () => {
         endDate,
         status,
         requiresNftVerification: false,
-        imageUrl: uploadedImageUrl,
+        imageUrl: raffleImageUrl,
         rewards: [
           ...selectedNFTs.map((nft) => ({
             rewardType: "NFT",
@@ -1118,11 +1033,6 @@ const CreateRaffle = () => {
       setStartDate(draft.startDate || "");
       setEndDate(draft.endDate || "");
       setSelectedTokenType(draft.tokenType || null);
-
-      if (draft.imageUrl) {
-        setExistingImageUrl(draft.imageUrl);
-        setRaffleImagePreview(draft.imageUrl);
-      }
     } catch (err) {
       console.error("Failed to load draft", err);
     }
@@ -1213,8 +1123,7 @@ const CreateRaffle = () => {
         setSelectedTokenAddress("");
         setSelectedNFTs([]);
         setSelectedTokens([]);
-        setRaffleImage(null);
-        setRaffleImagePreview(null);
+
         setErrors({});
         // setRewardDisclaimerShown({ nft: false, token: false });
 
@@ -1694,54 +1603,6 @@ const CreateRaffle = () => {
               )}
             </div>
           </div>
-
-          <div ref={raffleImageRef} className="flex flex-col gap-2">
-            <label className="font-medium">Raffle Image *</label>
-
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-
-            {raffleImagePreview ? (
-              <div className="relative w-full max-w-md">
-                <img
-                  src={raffleImagePreview}
-                  alt="Preview"
-                  className="w-full h-64 object-cover rounded-lg border-2 border-primary/50"
-                />
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="absolute top-2 right-2 bg-red-500 text-white text-xs p-2 rounded-full hover:bg-red-600 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed cursor-pointer rounded-xl p-6 flex flex-col items-center justify-center gap-3 border-input transition hover:border-primary/50 hover:bg-background-50"
-              >
-                <Upload className="w-8 h-8 text-muted-foreground" />
-                <p className="text-sm font-medium">Click to upload an image</p>
-                <p className="text-xs text-muted-foreground">
-                  JPEG, PNG, GIF, WebP (max 5MB)
-                </p>
-              </div>
-            )}
-
-            {imageUploading && (
-              <p className="text-sm text-blue-500">Uploading image...</p>
-            )}
-
-            {errors.raffleImage && (
-              <p className="text-red-500 text-sm">{errors.raffleImage}</p>
-            )}
-          </div>
         </div>
 
         <div className=" bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
@@ -1934,14 +1795,10 @@ const CreateRaffle = () => {
             onClick={handleCreateRaffleClick}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
-            disabled={loading || awaitingWallet}
+            disabled={loading}
           >
             <PlusCircle className="h-4 w-4" />
-            {awaitingWallet
-              ? "Waiting for wallet approval…"
-              : loading
-                ? "Creating…"
-                : "Create Raffle"}
+            {loading ? "Creating Raffle.." : "Create Raffle"}
           </Button>
         </div>
       </div>
