@@ -184,20 +184,113 @@ export default function RaffleCarousel() {
 
   return (
     <Card
-      className="overflow-hidden glow-primary border-primary/30"
+      className="overflow-hidden glow-primary border-primary/30 max-w-4xl mx-auto"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative">
+      <div className="relative flex flex-col">
+        {/* Image */}
+        <div className="relative w-full h-60">
+          <img
+            src={data.image}
+            alt={data.title}
+            className="w-full h-full object-cover"
+          />
+          {/* Verified Badge */}
+          {data.isVerified && (
+            <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
+              <CheckCircle size={16} /> Verified
+            </div>
+          )}
+
+          <button
+            onClick={prev}
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-background/80 border-input rounded-xl hover:bg-[#262626] translate-colors"
+          >
+            <ChevronLeft />
+          </button>
+          <button
+            onClick={next}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-background/60 border-input rounded-xl hover:bg-[#262626] translate-colors"
+          >
+            <ChevronRight />
+          </button>
+        </div>
+
+        {/* Details */}
+        <div className="p-4 md:p-8 flex flex-col justify-between space-y-2 relative">
+          {/* Featured Raffle Badge */}
+          <div className="flex flex-col items-center text-center">
+            <div className="inline-flex items-center rounded-full px-2.5 py-0.5 mb-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
+              Featured Raffle
+            </div>
+
+            <h2 className="text-xl md:text-2xl font-bold mb-2 text-gradient">
+              {data.title}
+            </h2>
+            <p className="text-muted-foreground text-base">
+              {data.description}
+            </p>
+          </div>
+
+          {/* Ticket Info */}
+          <div className="flex items-center gap-10 text-sm justify-center">
+            <div className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-accent" />
+              <div>
+                <p className="text-muted-foreground">Ticket Price</p>
+                <p className="font-bold">
+                  {formatPrice(data.price)} {data.tokenType}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-gray-400">Tickets Sold</p>
+                <p className="font-bold">
+                  {data.sold} / {data.total}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Button + Arrows */}
+          <div className="flex items-center mt-2">
+            <Button
+              className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
+              onClick={() => navigate(`/raffle/raffle-${data.id}`)}
+            >
+              Enter Raffle
+            </Button>
+          </div>
+
+          {/* Carousel Dots */}
+          <div className="flex gap-2 justify-center">
+            {raffles.map((_, i) => (
+              <div
+                key={i}
+                onClick={() => setIndex(i)}
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  index === i ? "w-8 bg-primary" : "w-2 bg-gray-600"
+                }`}
+              ></div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* <div className="relative">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-          {/* Image */}
+          
           <div className="relative aspect-video md:aspect-auto">
             <img
               src={data.image}
               alt={data.title}
               className="w-full h-90 object-cover"
             />
-            {/* Verified Badge */}
+            
             {data.isVerified && (
               <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
                 <CheckCircle size={16} /> Verified
@@ -205,9 +298,9 @@ export default function RaffleCarousel() {
             )}
           </div>
 
-          {/* Details */}
+          
           <div className="p-4 md:p-8 flex flex-col justify-between space-y-6 relative">
-            {/* Featured Raffle Badge */}
+          
             <div>
               <div className="inline-flex items-center rounded-full px-2.5 py-0.5 mb-4 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
                 Featured Raffle
@@ -221,7 +314,6 @@ export default function RaffleCarousel() {
               </p>
             </div>
 
-            {/* Ticket Info */}
             <div className="flex items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
                 <Coins className="h-5 w-5 text-accent" />
@@ -244,7 +336,7 @@ export default function RaffleCarousel() {
               </div>
             </div>
 
-            {/* Button + Arrows */}
+         
             <div className="flex items-center gap-3">
               <Button
                 className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
@@ -269,7 +361,7 @@ export default function RaffleCarousel() {
               </div>
             </div>
 
-            {/* Carousel Dots */}
+        
             <div className="flex gap-2 justify-center">
               {raffles.map((_, i) => (
                 <div
@@ -283,7 +375,7 @@ export default function RaffleCarousel() {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
     </Card>
   );
 }

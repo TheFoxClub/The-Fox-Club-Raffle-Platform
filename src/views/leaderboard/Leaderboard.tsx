@@ -160,7 +160,7 @@ const Leaderboard = () => {
                 </p>
               ) : topHosts.length === 0 ? (
                 <p className="text-center text-muted-foreground py-10">
-                  Leaderboard data not available yet — coming soon.
+                  No data available.
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -221,7 +221,7 @@ const Leaderboard = () => {
                 </p>
               ) : topBuyers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-10">
-                  Buyer leaderboard coming soon — stay tuned!
+                  No data available.
                 </p>
               ) : (
                 <div className="space-y-3">

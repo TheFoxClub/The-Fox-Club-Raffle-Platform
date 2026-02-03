@@ -27,10 +27,26 @@ import type { RootState } from "../../redux/store";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, Connection, VersionedTransaction } from "@solana/web3.js";
 import { getVerifiedPaymentTokens } from "./api";
+import { formatPrice } from "../../helpers/formatPrice";
+import { normalizeIpfs } from "../../helpers/ipfs";
+import TOKEN_PLACEHOLDER from "../../../public/uploads/token-placeholder.png";
+import NFT_PLACEHOLDER from "../../../public/uploads/nft-placeholder.svg";
 
 // Constants for Token Program IDs
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+
+const normalizeRewardType = (rewardType: any) => {
+  if (rewardType === 0 || rewardType === "NFT") return "NFT";
+  if (
+    rewardType === 1 ||
+    rewardType === "SPL_TOKEN" ||
+    rewardType === "SPL_TOKEN_2022"
+  )
+    return "SPL_TOKEN";
+
+  return null;
+};
 
 const CreateRaffle = () => {
   const navigate = useNavigate();
@@ -45,6 +61,7 @@ const CreateRaffle = () => {
       amount: number;
       amountToUse: number;
       programId: string;
+      image?: string | null;
     }[]
   >([]);
 
@@ -55,7 +72,13 @@ const CreateRaffle = () => {
   const [nftLoading, setNftLoading] = useState(false);
 
   const [tokenCandidates, setTokenCandidates] = useState<
-    { mint: string; name: string; programId: string; amount: number }[]
+    {
+      mint: string;
+      name: string;
+      programId: string;
+      amount: number;
+      image?: string | null;
+    }[]
   >([]);
   const [tokenLoading, setTokenLoading] = useState(false);
 
@@ -78,10 +101,12 @@ const CreateRaffle = () => {
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [awaitingWallet, setAwaitingWallet] = useState(false);
+  const [walletTimedOut, setWalletTimedOut] = useState(false);
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
-
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   // Dynamic token options state
   const [tokenOptions, setTokenOptions] = useState<
     { value: string; label: string; decimals: number; tokenType: number }[]
@@ -227,6 +252,7 @@ const CreateRaffle = () => {
   const handleRemoveImage = () => {
     setRaffleImage(null);
     setRaffleImagePreview(null);
+    setExistingImageUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -243,8 +269,8 @@ const CreateRaffle = () => {
       }
       try {
         setNftLoading(true);
-        // const res = await server.get(`/nfts/${user.pubkey}`);
-        const res = await server.get(`/nfts/onCollection`);
+        const res = await server.get(`/nfts/${user.pubkey}`);
+        // const res = await server.get(`/nfts/onCollection`);
         const nftsFromApi: any[] = res.data?.data?.nfts || [];
 
         const mapped = await Promise.all(
@@ -304,20 +330,51 @@ const CreateRaffle = () => {
         // const res = await server.get(`/tokens/${user.pubkey}`);
         const res = await server.get(`/tokens/verified`);
         const spl = res.data?.message?.splTokens || [];
-        const mapped = spl.map((t: any, idx: number) => {
-          const info = t.account?.data?.parsed?.info;
-          // const mint = info?.mint || `unknown-${idx}`;
-          const mint = t.mint;
-          // const amount = info?.tokenAmount?.uiAmount ?? 0;
-          const amount = t?.amount?.uiAmount ?? 0;
-          const programId = t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
-          const name = t.metadata?.name || `Token ${mint.slice(0, 6)}...`;
-          // const name = info?.tokenAmount?.decimals
-          //   ? `Token ${mint.slice(0, 6)}...`
-          //   : "Unknown Token";
-          return { mint, name, amount, programId };
-        });
+        // const mapped = spl.map((t: any) => {
+        //   const info = t.account?.data?.parsed?.info;
+        // const mint = info?.mint || `unknown-${idx}`;
+        const mapped = await Promise.all(
+          spl.map(async (t: any, idx: number) => {
+            const mint = t.mint;
+            // const amount = info?.tokenAmount?.uiAmount ?? 0;
+            const amount = t?.amount?.uiAmount ?? 0;
+            const programId =
+              t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
+            let name =
+              t.metadata?.name ||
+              t.metadata?.symbol ||
+              `Token ${mint.slice(0, 6)}...`;
+            let image: string | null = null;
+            const uri = t.metadata?.uri;
+            if (uri) {
+              try {
+                const res = await fetch(normalizeIpfs(uri)!);
+                if (res.ok) {
+                  const meta = await res.json();
+                  if (meta?.image) {
+                    image = normalizeIpfs(meta.image);
+                  }
+                  if (!t.metadata?.name && meta?.name) {
+                    name = meta.name;
+                  }
+                }
+              } catch (err) {
+                console.warn("Failed to fetch token metadata:", uri);
+              }
+            }
+
+            return {
+              mint,
+              name,
+              image,
+              amount,
+              programId,
+            };
+          }),
+        );
+
         setTokenCandidates(mapped);
+        console.log("Token candidates:", mapped);
       } catch (err) {
         console.error("Failed to fetch tokens", err);
         setTokenCandidates([]);
@@ -328,6 +385,88 @@ const CreateRaffle = () => {
 
     fetchTokens();
   }, [isTokenDialogOpen, user?.pubkey]);
+
+  useEffect(() => {
+    if (selectedTokens.length === 0 || tokenCandidates.length === 0) return;
+
+    setSelectedTokens((prev) =>
+      prev.map((selected) => {
+        const walletToken = tokenCandidates.find(
+          (t) => t.mint === selected.mint,
+        );
+
+        return walletToken
+          ? {
+              ...selected,
+              amount: walletToken.amount,
+            }
+          : selected;
+      }),
+    );
+  }, [tokenCandidates]);
+
+  useEffect(() => {
+    if (!isResumingDraft) return;
+    if (selectedTokens.length === 0) return;
+
+    // reuse the same fetch logic
+    (async () => {
+      if (!user?.pubkey) return;
+
+      try {
+        setTokenLoading(true);
+        const res = await server.get(`/tokens/verified`);
+        const spl = res.data?.message?.splTokens || [];
+
+        const mapped = await Promise.all(
+          spl.map(async (t: any, idx: number) => {
+            const mint = t.mint;
+            // const amount = info?.tokenAmount?.uiAmount ?? 0;
+            const amount = t?.amount?.uiAmount ?? 0;
+            const programId =
+              t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
+            let name =
+              t.metadata?.name ||
+              t.metadata?.symbol ||
+              `Token ${mint.slice(0, 6)}...`;
+            let image: string | null = null;
+            const uri = t.metadata?.uri;
+            if (uri) {
+              try {
+                const res = await fetch(normalizeIpfs(uri)!);
+                if (res.ok) {
+                  const meta = await res.json();
+                  if (meta?.image) {
+                    image = normalizeIpfs(meta.image);
+                  }
+                  if (!t.metadata?.name && meta?.name) {
+                    name = meta.name;
+                  }
+                }
+              } catch (err) {
+                console.warn("Failed to fetch token metadata:", uri);
+              }
+            }
+
+            return {
+              mint,
+              name,
+              image,
+              amount,
+              programId,
+            };
+          }),
+        );
+
+        setTokenCandidates(mapped);
+      } catch (err) {
+        console.error("Failed to fetch tokens", err);
+        setTokenCandidates([]);
+      } finally {
+        setTokenLoading(false);
+      }
+    })();
+  }, [isResumingDraft, selectedTokens.length, user?.pubkey]);
 
   const handleSelectNFT = (nft: any) => {
     if (!selectedNFTs.some((item) => item.id === nft.id)) {
@@ -351,6 +490,7 @@ const CreateRaffle = () => {
     name: string;
     amount: number;
     programId: string;
+    image?: string | null;
   }) => {
     if (!selectedTokens.some((t) => t.mint === token.mint)) {
       setSelectedTokens((prev) => [...prev, { ...token, amountToUse: 0 }]);
@@ -390,6 +530,7 @@ const CreateRaffle = () => {
     name: string;
     amount: number;
     programId: string;
+    image?: string | null;
   }) => {
     setSelectedTokens((prev) => {
       const exists = prev.some((t) => t.mint === token.mint);
@@ -477,7 +618,7 @@ const CreateRaffle = () => {
     }
 
     // Only require image for non-draft submissions
-    if (!raffleImage) {
+    if (!raffleImage && !existingImageUrl) {
       newErrors.raffleImage = "Please upload a raffle image.";
     }
 
@@ -548,6 +689,42 @@ const CreateRaffle = () => {
     setDisclaimerOpen(true);
   };
 
+  const isBlockheightExceededError = (error: any) => {
+    const msg =
+      error?.message?.toLowerCase?.() ||
+      error?.toString?.().toLowerCase?.() ||
+      "";
+
+    return (
+      msg.includes("blockheight exceeded") ||
+      msg.includes("block height exceeded") ||
+      msg.includes("transactionexpired") ||
+      msg.includes("blockhash not found")
+    );
+  };
+
+  const withTimeout = <T,>(
+    promise: Promise<T>,
+    ms: number,
+    message = "Wallet approval timed out",
+  ): Promise<T> => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(message));
+      }, ms);
+
+      promise
+        .then((res) => {
+          clearTimeout(timer);
+          resolve(res);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+  };
+
   // ----------------- FINAL SUBMIT AFTER DISCLAIMER -----------------
   const handleDisclaimerConfirm = () => {
     if (!disclaimerAccepted) {
@@ -606,11 +783,15 @@ const CreateRaffle = () => {
         } finally {
           setImageUploading(false);
         }
-      } else if (status !== "DRAFT") {
+      } else if (status !== "DRAFT" && !existingImageUrl) {
         // Only require image for non-draft raffles
         toast.error("Please upload a raffle image");
         setLoading(false);
         return;
+      }
+
+      if (!uploadedImageUrl && existingImageUrl) {
+        uploadedImageUrl = existingImageUrl;
       }
 
       const finalStartDate = startNow ? new Date().toISOString() : startDate;
@@ -634,7 +815,7 @@ const CreateRaffle = () => {
             rewardName: nft.name,
             mintAddress: nft.mint,
             amount: 1,
-            imageUrl: uploadedImageUrl,
+            imageUrl: nft.image || NFT_PLACEHOLDER,
             metadataJson: JSON.stringify({ collection: nft.collection }),
           })),
 
@@ -646,7 +827,7 @@ const CreateRaffle = () => {
             rewardName: token.name,
             mintAddress: token.mint,
             amount: token.amountToUse,
-            imageUrl: uploadedImageUrl,
+            imageUrl: token.image || TOKEN_PLACEHOLDER,
             metadataJson: JSON.stringify({ programId: token.programId }),
           })),
         ],
@@ -801,6 +982,12 @@ const CreateRaffle = () => {
                 );
               }
             } catch (submitError: any) {
+              console.error("Transaction submission failed:", submitError);
+
+              if (isBlockheightExceededError(submitError)) {
+                toast.error("Blockheight Exceeded. Please try again.");
+                return;
+              }
               if (submitError.getLogs) {
                 try {
                   const logs = await submitError.getLogs();
@@ -920,7 +1107,12 @@ const CreateRaffle = () => {
     try {
       setTitle(draft.title || "");
       setDescription(draft.description || "");
-      setTicketPrice(draft.ticketPrice ?? "");
+      // setTicketPrice(draft.ticketPrice ?? "");
+      setTicketPrice(
+        draft.ticketPrice !== undefined && draft.ticketPrice !== null
+          ? Number(formatPrice(draft.ticketPrice))
+          : "",
+      );
       setTotalTickets(draft.totalTickets ?? "");
       setNumberOfWinners(draft.numberOfWinners ?? 1);
       setStartDate(draft.startDate || "");
@@ -928,6 +1120,7 @@ const CreateRaffle = () => {
       setSelectedTokenType(draft.tokenType || null);
 
       if (draft.imageUrl) {
+        setExistingImageUrl(draft.imageUrl);
         setRaffleImagePreview(draft.imageUrl);
       }
     } catch (err) {
@@ -949,28 +1142,27 @@ const CreateRaffle = () => {
         }
 
         // Handle rewardType as both string and number (based on your response)
-        const rewardType =
-          typeof reward.rewardType === "number"
-            ? reward.rewardType === 0
-              ? "NFT"
-              : "SPL_TOKEN"
-            : reward.rewardType;
+        const type = normalizeRewardType(reward.rewardType);
 
-        if (rewardType === "NFT" || rewardType === 0) {
+        if (type === "NFT") {
           loadedNFTs.push({
             id: reward.mintAddress, // UI uses 'id'
             mint: reward.mintAddress,
             name: reward.rewardName,
             image: reward.imageUrl,
             collection: metadata.collection || "",
-            raw: {}, // Raw data might be missing, but that's okay for display
+            raw: {},
           });
-        } else if (rewardType.includes("SPL_TOKEN") || rewardType === 1) {
+        }
+
+        if (type === "SPL_TOKEN") {
           loadedTokens.push({
             mint: reward.mintAddress,
             name: reward.rewardName,
             amountToUse: Number(reward.amount),
-            amount: Number(reward.amount),
+            image: reward.imageUrl,
+            // amount: Number(reward.amount),
+            amount: 0,
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
         }
@@ -1268,9 +1460,9 @@ const CreateRaffle = () => {
                         })}
                       </div>
                     )}
-                    <div className="flex justify-end mt-4">
+                    <div className="sticky bottom-0 pb-2 flex justify-end">
                       <Button
-                        className="gradient-primary"
+                        className="gradient-primary shadow-lg shadow-black/80"
                         onClick={() => setIsNFTDialogOpen(false)}
                       >
                         Done
@@ -1420,9 +1612,9 @@ const CreateRaffle = () => {
                       </div>
                     )}
 
-                    <div className="flex justify-end mt-4">
+                    <div className="sticky bottom-0 pb-2 flex justify-end">
                       <Button
-                        className="gradient-primary"
+                        className="gradient-primary shadow-lg shadow-black/80"
                         onClick={() => setIsTokenDialogOpen(false)}
                       >
                         Done
@@ -1742,10 +1934,14 @@ const CreateRaffle = () => {
             onClick={handleCreateRaffleClick}
             variant="default"
             className="w-full gradient-primary glow-primary gap-2"
-            disabled={loading}
+            disabled={loading || awaitingWallet}
           >
             <PlusCircle className="h-4 w-4" />
-            {loading ? "Creating..." : "Create Raffle"}
+            {awaitingWallet
+              ? "Waiting for wallet approval…"
+              : loading
+                ? "Creating…"
+                : "Create Raffle"}
           </Button>
         </div>
       </div>
