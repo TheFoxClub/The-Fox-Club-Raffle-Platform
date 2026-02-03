@@ -170,21 +170,6 @@ const isInsufficientFundsError = (error: any) => {
   );
 };
 
-const isInsufficientFundsError = (error: any) => {
-  const message =
-    error?.message ||
-    error?.toString?.() ||
-    error?.response?.data?.message ||
-    "";
-
-  return (
-    message.includes("insufficient") ||
-    message.includes("Attempt to debit") ||
-    message.includes("InsufficientFunds") ||
-    message.includes("0 lamports")
-  );
-};
-
 const RaffleDetail = () => {
   const { publicKey, signTransaction, connected } = useWallet();
   const { slug } = useParams<{ slug: string }>();
@@ -315,19 +300,6 @@ const RaffleDetail = () => {
       toast.error("Not enough tickets available");
       return;
     }
-
-    const connection = new Connection(SOLANA_RPC_HOST);
-    const balance = await connection.getBalance(publicKey);
-
-    if (balance === 0) {
-      toast.error(
-        "Insufficient balance. Please add SOL to your wallet to buy tickets.",
-      );
-      setIsBuying(false);
-      return;
-    }
-
-
     const connection = new Connection(SOLANA_RPC_HOST);
     const balance = await connection.getBalance(publicKey);
 
@@ -360,14 +332,9 @@ const RaffleDetail = () => {
       const {
         transaction,
         reservationId: resId,
-      const {
-        transaction,
-        reservationId: resId,
         reservationExpiresAt,
         reservationTimeoutSeconds,
-        reservationTimeoutSeconds,
       } = transactionResponse.data.data;
-
 
       reservationId = resId;
 
@@ -979,7 +946,7 @@ const RaffleDetail = () => {
                         </span>
                         <button
                           onClick={() => copyToClipboard(winner.winnerPubkey)}
-                          className="flex items-center gap-1 text-left text-xs text-muted-foreground hover:text-primary transition group"
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition group"
                         >
                           {/* Mobile (short) */}
                           <span className="sm:hidden">
@@ -991,19 +958,10 @@ const RaffleDetail = () => {
                           <span className="hidden sm:block">
                             {winner.winnerPubkey}
                           </span>
-                          {/* Desktop (full) */}
-                          <span className="hidden sm:block break-all">
-                            {winner.winnerPubkey}
-                          </span>
 
                           <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
                         </button>
-                          <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
-                        </button>
 
-                        <span className="text-xs text-muted-foreground">
-                          Ticket #{winner.ticketNumber}
-                        </span>
                         <span className="text-xs text-muted-foreground">
                           Ticket #{winner.ticketNumber}
                         </span>

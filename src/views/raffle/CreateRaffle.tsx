@@ -1615,7 +1615,7 @@ const CreateRaffle = () => {
                     <div className="sticky bottom-0 pb-2 flex justify-end">
                       <Button
                         className="gradient-primary shadow-lg shadow-black/80"
-                        onClick={() => setIsNFTDialogOpen(false)}
+                        onClick={() => setIsTokenDialogOpen(false)}
                       >
                         Done
                       </Button>
