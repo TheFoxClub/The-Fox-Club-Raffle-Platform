@@ -165,8 +165,7 @@ class TicketController {
       const creatorAmount = totalSolAmount * (1 - commissionRate);
 
       const senderPublicKey = new PublicKey(senderPubkey);
-      // const receiverPubkey = BET_RECEIVER_WALLET;
-      const receiverPubkey = "Wb6y4gcdLSxwh3cSyEs32y4tCyf8uCG8T2LwvJfBz2s";
+      const receiverPubkey = BET_RECEIVER_WALLET;
       const receiverPublicKey = new PublicKey(receiverPubkey);
 
       const umi = getUmi();
