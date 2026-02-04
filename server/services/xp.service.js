@@ -1,8 +1,8 @@
-const { XpTable, XpConfig, User, VerifiedToken, SplTokenSendTransaction, Raffle } = require("../models");
-const { TOKEN_TYPE, SPL_TOKEN_ADDRESS } = require("../config/data");
-const { Op } = require("sequelize");
+const { XpTable, XpConfig, User, VerifiedToken } = require("../models");
+const { SPL_TOKEN_ADDRESS } = require("../config/data");
 const logger = require("../util/logger");
 const redisClient = require("../util/redisClient");
+const PriceService = require("./price.service");
 
 class XpService {
   /**
@@ -109,19 +109,30 @@ class XpService {
       
       logger.info(`Converting token amount: raw=${amount}, decimals=${decimals}, actual=${actualTokenAmount}`);
 
-      // USDC is 1:1 with USD
-      if (tokenType === TOKEN_TYPE.USDC || tokenAddress === SPL_TOKEN_ADDRESS.USDC) {
-        return actualTokenAmount;
+      // Get token symbol for better logging
+      let tokenSymbol = 'Unknown';
+      try {
+        const token = await VerifiedToken.findOne({
+          where: { address: tokenAddress },
+          attributes: ['symbol', 'name']
+        });
+        tokenSymbol = token ? (token.symbol || token.name || 'Unknown') : 'Unknown';
+      } catch (error) {
+        // Continue with 'Unknown' symbol
       }
 
-      // Check verified tokens table for conversion rate
-      const token = await VerifiedToken.findOne({
-        where: { 
-          address: tokenAddress, 
-          isVerified: true,
-          conversionRate: { [Op.ne]: null }
-        }
-      });
+      // Get real-time USD price using PriceService
+      const realTimePrice = await PriceService.getTokenUsdPrice(tokenAddress, tokenSymbol);
+      
+      if (realTimePrice <= 0) {
+        logger.warn(`No valid price found for ${tokenSymbol} (${tokenAddress}), USD value = 0`);
+        return 0;
+      }
+
+      const usdValue = actualTokenAmount * realTimePrice;
+      logger.info(`Converted ${actualTokenAmount} ${tokenSymbol} to $${usdValue} USD using real-time rate $${realTimePrice}`);
+      
+      return usdValue;
 
       if (token && token.conversionRate) {
         const usdValue = actualTokenAmount * parseFloat(token.conversionRate);
@@ -145,21 +156,6 @@ class XpService {
     } catch (error) {
       logger.error(`Error converting token to USD: ${error.message}`);
       return 0;
-    }
-  }
-
-  /**
-   * Fetch SOL price from external API (placeholder implementation)
-   * @returns {Promise<number>} SOL price in USD
-   */
-  static async fetchSolPrice() {
-    try {
-      // In production, integrate with CoinGecko, Jupiter, or other price API
-      // For now, return a placeholder rate
-      return 100; // $100 per SOL (placeholder)
-    } catch (error) {
-      logger.error(`Error fetching SOL price: ${error.message}`);
-      return 100; // Fallback rate
     }
   }
 
