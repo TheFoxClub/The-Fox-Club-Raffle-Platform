@@ -26,6 +26,7 @@ import AdminDashboard from "./views/admin/AdminDashboard";
 import AdminRaffles from "./views/admin/AdminRaffles";
 import AdminCollections from "./views/admin/AdminCollections";
 import AdminTokens from "./views/admin/AdminTokens";
+import AdminXP from "./views/admin/AdminXP";
 // import AdminFees from "./views/admin/AdminFees";
 //import AdminRewards from "./views/admin/AdminRewards";
 import AdminLeaderboards from "./views/admin/AdminLeaderboards";
@@ -157,6 +158,14 @@ function App() {
                 element={
                   <AdminLayout>
                     <AdminTokens />
+                  </AdminLayout>
+                }
+              />
+              <Route
+                path="/admin/xp"
+                element={
+                  <AdminLayout>
+                    <AdminXP />
                   </AdminLayout>
                 }
               />

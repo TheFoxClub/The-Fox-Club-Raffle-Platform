@@ -1479,6 +1479,15 @@ class RaffleController {
         `Reward transfer signature stored for raffle ${raffleId} by user ${user.pubkey}, signature: ${signature}`,
       );
 
+      // Award XP for raffle creation
+      try {
+        const XpProcessor = require("../services/xp-processor");
+        await XpProcessor.processRaffleCreationXp(raffleId);
+      } catch (xpError) {
+        logger.error(`Error awarding creation XP for raffle ${raffleId}: ${xpError.message}`);
+        // Don't fail the raffle creation if XP fails
+      }
+
       return respond(
         res,
         httpStatus.OK,

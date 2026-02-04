@@ -7,6 +7,7 @@ import {
   Award,
   Crown,
   Medal,
+  Star,
 } from "lucide-react";
 import Select from "../../components/ui/Select";
 import {
@@ -18,6 +19,7 @@ import {
 //import { topHosts, topBuyers } from "../../dummydata/topHostsBuyers";
 import { useState, useEffect } from "react";
 import server from "../../config/server";
+import XPLeaderboard from "./XPLeaderboard";
 
 const Leaderboard = () => {
   const [selectedTime, setSelectedTime] = useState("monthly");
@@ -145,6 +147,10 @@ const Leaderboard = () => {
               <User className="h-4 w-4" />
               Top Buyers
             </TabsTrigger>
+            <TabsTrigger value="xp" className="gap-2 flex-1 sm:flex-none">
+              <Star className="h-4 w-4" />
+              XP Leaders
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="hosts" className="space-y-4">
@@ -264,6 +270,10 @@ const Leaderboard = () => {
                 </div>
               )}
             </Card>
+          </TabsContent>
+
+          <TabsContent value="xp" className="space-y-4">
+            <XPLeaderboard />
           </TabsContent>
         </Tabs>
       </div>

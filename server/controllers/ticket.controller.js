@@ -491,6 +491,8 @@ class TicketController {
         creatorAmount,
         commissionAmount,
         isNFTHolder,
+        raffleId: raffleId, 
+        rewardTransferType: 'ticket_purchase', // Mark as ticket purchase for XP processing
       };
 
       const splTokenSendTxDb =

@@ -7,6 +7,7 @@ import {
   Users,
   Copy,
   RefreshCw,
+  Star,
 } from "lucide-react";
 import { StatCard } from "../../components/admin/StatCard";
 import { TopRaffleItem } from "../../components/admin/TopRaffleItem";
@@ -29,6 +30,11 @@ export default function AdminDashboard() {
     tokenType: "MIXED", // Indicates mixed token types -> show as "Total Volume" instead of specific token
   });
 
+  const [xpStats, setXpStats] = useState({
+    totalXpAwarded: 0,
+    uniqueUsers: 0,
+  });
+
   const [topRaffles, setTopRaffles] = useState<any[]>([]);
   const [topCreators, setTopCreators] = useState<any[]>([]);
 
@@ -36,10 +42,11 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
 
-      const [creatorsRes, rafflesRes, statsRes] = await Promise.all([
+      const [creatorsRes, rafflesRes, statsRes, xpRes] = await Promise.all([
         server.get("admin/top-creators"),
         server.get("/admin/top-raffles"),
         server.get("/admin/dashboard-stats"),
+        server.get("/admin/xp-analytics").catch(() => ({ data: { data: null } })), // XP might not be available yet
       ]);
       setTopCreators(creatorsRes.data.data);
       setTopRaffles(rafflesRes.data.data);
@@ -50,6 +57,14 @@ export default function AdminDashboard() {
         liveRaffleCount: statsRes.data.data.liveRaffleCount,
         tokenType: "MIXED", // contains mixed token types
       });
+      
+      // Set XP stats if available
+      if (xpRes.data.data?.totalStats) {
+        setXpStats({
+          totalXpAwarded: xpRes.data.data.totalStats.totalXpAwarded || 0,
+          uniqueUsers: xpRes.data.data.totalStats.uniqueUsers || 0,
+        });
+      }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast.error("Failed to refresh dashboard data");
@@ -107,12 +122,12 @@ export default function AdminDashboard() {
         </Button>
       </div>
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 sm:gap-6">
         <StatCard
           title="Total Volume"
           value={
             stats.tokenType === "MIXED"
-              ? `${stats.totalRevenue} (Mixed)`
+              ? `${stats.totalRevenue.toFixed(4)} (Mixed)`
               : `${stats.totalRevenue} ${getTokenSymbol(stats.tokenType)}`
           }
           //change={0}
@@ -137,12 +152,22 @@ export default function AdminDashboard() {
           title="Platform Fees Earned"
           value={
             stats.tokenType === "MIXED"
-              ? `${stats.totalPlatformRevenue} (Mixed)`
+              ? `${stats.totalPlatformRevenue.toFixed(4)} (Mixed)`
               : `${stats.totalPlatformRevenue} ${getTokenSymbol(stats.tokenType)}`
           }
           // change={0}
           // trend="up"
           icon={<Coins className="h-6 w-6" />}
+        />
+        <StatCard
+          title="Total XP Awarded"
+          value={xpStats.totalXpAwarded.toLocaleString()}
+          icon={<Star className="h-6 w-6" />}
+        />
+        <StatCard
+          title="XP Users"
+          value={xpStats.uniqueUsers}
+          icon={<Trophy className="h-6 w-6" />}
         />
       </div>
 
@@ -205,6 +230,15 @@ export default function AdminDashboard() {
                 >
                   <Coins className="h-4 w-4 mr-2" />
                   Add Token
+                </Button>
+              </Link>
+              <Link to="/admin/xp" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full text-sm sm:text-base"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  Manage XP
                 </Button>
               </Link>
             </div>
