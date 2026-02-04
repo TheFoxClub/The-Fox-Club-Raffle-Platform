@@ -1,5 +1,11 @@
 const { Op } = require("sequelize");
-const { SplTokenSendTransaction, Raffle, User, XpTable, VerifiedToken } = require("../models");
+const {
+  SplTokenSendTransaction,
+  Raffle,
+  User,
+  XpTable,
+  VerifiedToken,
+} = require("../models");
 const { SPL_TOKEN_SEND_TX_STATUS, RAFFLE_STATUS } = require("../config/data");
 const XpService = require("./xp.service");
 const logger = require("../util/logger");
@@ -20,22 +26,24 @@ class XpProcessor {
           [Op.or]: [
             { xpProcessed: { [Op.ne]: true } },
             { xpProcessed: { [Op.is]: null } },
-            { xpProcessed: false }
-          ]
+            { xpProcessed: false },
+          ],
         },
         include: [
           {
             model: Raffle,
-            as: 'raffle',
-            attributes: ['id', 'userId', 'title', 'tokenType', 'tokenAddress'],
-            required: false // Allow transactions without raffles
-          }
+            as: "raffle",
+            attributes: ["id", "userId", "title", "tokenType", "tokenAddress"],
+            required: false, // Allow transactions without raffles
+          },
         ],
         limit: 50,
-        order: [['createdAt', 'ASC']]
+        order: [["createdAt", "ASC"]],
       });
 
-      logger.info(`Found ${pendingTransactions.length} pending transactions to process for XP`);
+      logger.info(
+        `Found ${pendingTransactions.length} pending transactions to process for XP`,
+      );
 
       let processedCount = 0;
       let errorCount = 0;
@@ -43,15 +51,16 @@ class XpProcessor {
       for (const transaction of pendingTransactions) {
         try {
           await this.processTransactionXp(transaction);
-          
+
           // Mark as processed
           await transaction.update({ xpProcessed: true });
           processedCount++;
-
         } catch (error) {
-          logger.error(`Error processing XP for transaction ${transaction.id}: ${error.message}`);
+          logger.error(
+            `Error processing XP for transaction ${transaction.id}: ${error.message}`,
+          );
           errorCount++;
-          
+
           // Still mark as processed to avoid infinite retries
           await transaction.update({ xpProcessed: true });
         }
@@ -60,10 +69,11 @@ class XpProcessor {
       // Process ended raffles for revenue XP
       await this.processRaffleRevenueXp();
 
-      logger.info(`XP processing completed: ${processedCount} processed, ${errorCount} errors`);
-
+      logger.info(
+        `XP processing completed: ${processedCount} processed, ${errorCount} errors`,
+      );
     } catch (error) {
-      logger.error('XP processing error:', error);
+      logger.error("XP processing error:", error);
     }
   }
 
@@ -73,10 +83,15 @@ class XpProcessor {
    */
   static async processTransactionXp(transaction) {
     try {
-      logger.info(`Processing transaction ${transaction.id} for XP - Type: ${transaction.rewardTransferType}, RaffleId: ${transaction.raffleId}`);
+      logger.info(
+        `Processing transaction ${transaction.id} for XP - Type: ${transaction.rewardTransferType}, RaffleId: ${transaction.raffleId}`,
+      );
 
       // Handle raffle creation XP
-      if (transaction.rewardTransferType === 'raffle_creation' && transaction.raffleId) {
+      if (
+        transaction.rewardTransferType === "raffle_creation" &&
+        transaction.raffleId
+      ) {
         await this.processRaffleCreationXpFromTransaction(transaction);
         return;
       }
@@ -91,7 +106,9 @@ class XpProcessor {
             transaction.raffle = foundRaffle;
             await this.processTicketPurchaseXp(transaction, foundRaffle);
           } else {
-            logger.warn(`No raffle found for transaction ${transaction.id} with raffleId ${transaction.raffleId}`);
+            logger.warn(
+              `No raffle found for transaction ${transaction.id} with raffleId ${transaction.raffleId}`,
+            );
           }
         } else {
           await this.processTicketPurchaseXp(transaction, raffle);
@@ -99,10 +116,13 @@ class XpProcessor {
         return;
       }
 
-      logger.info(`Transaction ${transaction.id} does not qualify for XP processing`);
-
+      logger.info(
+        `Transaction ${transaction.id} does not qualify for XP processing`,
+      );
     } catch (error) {
-      logger.error(`Error processing transaction ${transaction.id} for XP: ${error.message}`);
+      logger.error(
+        `Error processing transaction ${transaction.id} for XP: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -115,13 +135,13 @@ class XpProcessor {
   static isTicketPurchaseTransaction(transaction) {
     // Check if this is a ticket purchase based on transaction properties
     return (
-      transaction.rewardTransferType === 'ticket_purchase' ||
+      transaction.rewardTransferType === "ticket_purchase" ||
       // For transactions without explicit rewardTransferType, check if it has raffleId and receiverPubkey
       // and is NOT a raffle_creation transaction
-      (!transaction.rewardTransferType && 
-       transaction.raffleId && 
-       transaction.receiverPubkey &&
-       transaction.rewardTransferType !== 'raffle_creation')
+      (!transaction.rewardTransferType &&
+        transaction.raffleId &&
+        transaction.receiverPubkey &&
+        transaction.rewardTransferType !== "raffle_creation")
     );
   }
 
@@ -135,11 +155,13 @@ class XpProcessor {
       // Find the user who made the purchase
       // In ticket purchases, the sender is the user buying tickets
       const user = await User.findOne({
-        where: { pubkey: transaction.senderPubkey }
+        where: { pubkey: transaction.senderPubkey },
       });
 
       if (!user) {
-        logger.warn(`User not found for pubkey ${transaction.senderPubkey} in transaction ${transaction.id}`);
+        logger.warn(
+          `User not found for pubkey ${transaction.senderPubkey} in transaction ${transaction.id}`,
+        );
         return;
       }
 
@@ -148,11 +170,13 @@ class XpProcessor {
         raffle.tokenType,
         raffle.tokenAddress,
         parseFloat(transaction.uiAmount),
-        transaction.decimals || 9
+        transaction.decimals || 9,
       );
 
       if (usdValue <= 0) {
-        logger.warn(`Invalid USD value ${usdValue} for transaction ${transaction.id}`);
+        logger.warn(
+          `Invalid USD value ${usdValue} for transaction ${transaction.id}`,
+        );
         return;
       }
 
@@ -165,11 +189,12 @@ class XpProcessor {
         rawTokenAmount: parseFloat(transaction.uiAmount),
         conversionRate: usdValue / parseFloat(transaction.uiAmount),
         transactionHash: transaction.txId,
-        ticketCount: transaction.additionalJson?.ticketCount || 1
+        ticketCount: transaction.additionalJson?.ticketCount || 1,
       });
-
     } catch (error) {
-      logger.error(`Error processing ticket purchase XP for transaction ${transaction.id}: ${error.message}`);
+      logger.error(
+        `Error processing ticket purchase XP for transaction ${transaction.id}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -186,33 +211,36 @@ class XpProcessor {
           [Op.or]: [
             { xpAwarded: { [Op.ne]: true } },
             { xpAwarded: { [Op.is]: null } },
-            { xpAwarded: false }
+            { xpAwarded: false },
           ],
-          claimableAmount: { [Op.gt]: 0 }
+          // Use totalRevenue instead of claimableAmount for filtering
+          totalRevenue: { [Op.gt]: 0 },
         },
         limit: 20,
-        order: [['endedAt', 'ASC']]
+        order: [["endedAt", "ASC"]],
       });
 
-      logger.info(`Found ${endedRaffles.length} ended raffles to process for revenue XP`);
+      logger.info(
+        `Found ${endedRaffles.length} ended raffles to process for revenue XP`,
+      );
 
       for (const raffle of endedRaffles) {
         try {
           await this.processRaffleRevenue(raffle);
-          
+
           // Mark as XP awarded
           await raffle.update({ xpAwarded: true });
-
         } catch (error) {
-          logger.error(`Error processing revenue XP for raffle ${raffle.id}: ${error.message}`);
-          
+          logger.error(
+            `Error processing revenue XP for raffle ${raffle.id}: ${error.message}`,
+          );
+
           // Still mark as processed to avoid infinite retries
           await raffle.update({ xpAwarded: true });
         }
       }
-
     } catch (error) {
-      logger.error('Error processing raffle revenue XP:', error);
+      logger.error("Error processing raffle revenue XP:", error);
     }
   }
 
@@ -222,37 +250,61 @@ class XpProcessor {
    */
   static async processRaffleRevenue(raffle) {
     try {
-      // Convert claimable amount to USD
-      // For raffle revenue, we need to look up token decimals from verified_tokens
-      const token = await VerifiedToken.findOne({
-        where: { address: raffle.tokenAddress }
-      });
-      const decimals = token ? token.decimals : 9;
-      
-      const usdRevenue = await XpService.convertToUsd(
-        raffle.tokenType,
-        raffle.tokenAddress,
-        parseFloat(raffle.claimableAmount),
-        decimals
+      logger.info(
+        `Processing raffle ${raffle.id} for revenue XP - totalRevenue: ${raffle.totalRevenue}, claimableAmount: ${raffle.claimableAmount}`,
       );
 
-      if (usdRevenue <= 0) {
-        logger.warn(`Invalid USD revenue ${usdRevenue} for raffle ${raffle.id}`);
+      // For raffle revenue, we need to look up token decimals from verified_tokens
+      const token = await VerifiedToken.findOne({
+        where: { address: raffle.tokenAddress },
+      });
+      const decimals = token ? token.decimals : 9;
+
+      const revenueAmount = parseFloat(raffle.totalRevenue || 0);
+
+      if (revenueAmount <= 0) {
+        logger.warn(
+          `No revenue to process for raffle ${raffle.id} - totalRevenue: ${raffle.totalRevenue}`,
+        );
         return;
       }
 
-      // Award revenue XP to raffle creator
-      await XpService.awardRaffleRevenueXp(raffle.userId, raffle.id, usdRevenue, {
-        raffleTitle: raffle.title,
-        ticketsSold: raffle.ticketsSold,
-        totalRevenue: parseFloat(raffle.totalRevenue),
-        claimableAmount: parseFloat(raffle.claimableAmount),
-        tokenType: raffle.tokenType,
-        tokenAddress: raffle.tokenAddress
-      });
+      const usdRevenue = await XpService.convertToUsd(
+        raffle.tokenType,
+        raffle.tokenAddress,
+        revenueAmount,
+        0, // decimals = 0 since totalRevenue is already converted
+      );
 
+      if (usdRevenue <= 0) {
+        logger.warn(
+          `Invalid USD revenue ${usdRevenue} for raffle ${raffle.id} (totalRevenue: ${revenueAmount})`,
+        );
+        return;
+      }
+
+      logger.info(
+        `Calculated USD revenue: ${usdRevenue} for raffle ${raffle.id}`,
+      );
+
+      // Award revenue XP to raffle creator
+      await XpService.awardRaffleRevenueXp(
+        raffle.userId,
+        raffle.id,
+        usdRevenue,
+        {
+          raffleTitle: raffle.title,
+          ticketsSold: raffle.ticketsSold,
+          totalRevenue: parseFloat(raffle.totalRevenue),
+          claimableAmount: parseFloat(raffle.claimableAmount),
+          tokenType: raffle.tokenType,
+          tokenAddress: raffle.tokenAddress,
+        },
+      );
     } catch (error) {
-      logger.error(`Error processing revenue for raffle ${raffle.id}: ${error.message}`);
+      logger.error(
+        `Error processing revenue for raffle ${raffle.id}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -267,9 +319,9 @@ class XpProcessor {
 
       // Get all users who have XP records
       const usersWithXp = await XpTable.findAll({
-        attributes: ['userId'],
-        group: ['userId'],
-        raw: true
+        attributes: ["userId"],
+        group: ["userId"],
+        raw: true,
       });
 
       logger.info(`Recalculating XP for ${usersWithXp.length} users`);
@@ -282,15 +334,18 @@ class XpProcessor {
           await XpService.updateUserTotalXp(userRecord.userId);
           processedCount++;
         } catch (error) {
-          logger.error(`Error recalculating XP for user ${userRecord.userId}: ${error.message}`);
+          logger.error(
+            `Error recalculating XP for user ${userRecord.userId}: ${error.message}`,
+          );
           errorCount++;
         }
       }
 
-      logger.info(`XP recalculation completed: ${processedCount} users processed, ${errorCount} errors`);
-
+      logger.info(
+        `XP recalculation completed: ${processedCount} users processed, ${errorCount} errors`,
+      );
     } catch (error) {
-      logger.error('Error in XP recalculation:', error);
+      logger.error("Error in XP recalculation:", error);
     }
   }
 
@@ -302,7 +357,9 @@ class XpProcessor {
     try {
       const raffle = await Raffle.findByPk(transaction.raffleId);
       if (!raffle) {
-        logger.warn(`Raffle ${transaction.raffleId} not found for creation XP from transaction ${transaction.id}`);
+        logger.warn(
+          `Raffle ${transaction.raffleId} not found for creation XP from transaction ${transaction.id}`,
+        );
         return;
       }
 
@@ -314,13 +371,16 @@ class XpProcessor {
         tokenType: raffle.tokenType,
         tokenAddress: raffle.tokenAddress,
         transactionId: transaction.id,
-        transactionHash: transaction.txId
+        transactionHash: transaction.txId,
       });
 
-      logger.info(`Awarded raffle creation XP for raffle ${raffle.id} from transaction ${transaction.id}`);
-
+      logger.info(
+        `Awarded raffle creation XP for raffle ${raffle.id} from transaction ${transaction.id}`,
+      );
     } catch (error) {
-      logger.error(`Error processing creation XP from transaction ${transaction.id}: ${error.message}`);
+      logger.error(
+        `Error processing creation XP from transaction ${transaction.id}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -343,11 +403,12 @@ class XpProcessor {
         totalTickets: raffle.totalTickets,
         ticketPrice: parseFloat(raffle.ticketPrice),
         tokenType: raffle.tokenType,
-        tokenAddress: raffle.tokenAddress
+        tokenAddress: raffle.tokenAddress,
       });
-
     } catch (error) {
-      logger.error(`Error processing creation XP for raffle ${raffleId}: ${error.message}`);
+      logger.error(
+        `Error processing creation XP for raffle ${raffleId}: ${error.message}`,
+      );
     }
   }
 
@@ -363,9 +424,9 @@ class XpProcessor {
           [Op.or]: [
             { xpProcessed: { [Op.ne]: true } },
             { xpProcessed: { [Op.is]: null } },
-            { xpProcessed: false }
-          ]
-        }
+            { xpProcessed: false },
+          ],
+        },
       });
 
       const pendingRaffles = await Raffle.count({
@@ -374,29 +435,28 @@ class XpProcessor {
           [Op.or]: [
             { xpAwarded: { [Op.ne]: true } },
             { xpAwarded: { [Op.is]: null } },
-            { xpAwarded: false }
+            { xpAwarded: false },
           ],
-          claimableAmount: { [Op.gt]: 0 }
-        }
+          claimableAmount: { [Op.gt]: 0 },
+        },
       });
 
       const totalXpRecords = await XpTable.count();
-      const totalXpAwarded = await XpTable.sum('xpEarned');
+      const totalXpAwarded = await XpTable.sum("xpEarned");
 
       return {
         pendingTransactions,
         pendingRaffles,
         totalXpRecords,
-        totalXpAwarded: parseFloat(totalXpAwarded || 0)
+        totalXpAwarded: parseFloat(totalXpAwarded || 0),
       };
-
     } catch (error) {
-      logger.error('Error getting XP processing stats:', error);
+      logger.error("Error getting XP processing stats:", error);
       return {
         pendingTransactions: 0,
         pendingRaffles: 0,
         totalXpRecords: 0,
-        totalXpAwarded: 0
+        totalXpAwarded: 0,
       };
     }
   }
