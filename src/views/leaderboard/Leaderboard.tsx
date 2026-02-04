@@ -9,7 +9,7 @@ import {
   Medal,
   Star,
 } from "lucide-react";
-import Select from "../../components/ui/Select";
+//import Select from "../../components/ui/Select";
 import {
   Tabs,
   TabsContent,
@@ -20,18 +20,19 @@ import {
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import XPLeaderboard from "./XPLeaderboard";
+import { toast } from "react-toastify";
 
 const Leaderboard = () => {
-  const [selectedTime, setSelectedTime] = useState("monthly");
+  //const [selectedTime, setSelectedTime] = useState("monthly");
   const [topHosts, setTopHosts] = useState<any[]>([]);
   const [topBuyers, setTopBuyers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const timeOptions = [
-    { value: "weekly", label: "Weekly" },
-    { value: "monthly", label: "Monthly" },
-    { value: "alltime", label: "All Time" },
-  ];
+  // const timeOptions = [
+  //   { value: "weekly", label: "Weekly" },
+  //   { value: "monthly", label: "Monthly" },
+  //   { value: "alltime", label: "All Time" },
+  // ];
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -43,7 +44,7 @@ const Leaderboard = () => {
         if (json.success) {
           const formatToken = (token: string) => {
             if (token === "SOLANA") return "SOL";
-            if (token === "USDC") return "USDC"; // keep as is
+            //     if (token === "USDC") return "USDC";
             return token; // fallback
           };
 
@@ -54,7 +55,8 @@ const Leaderboard = () => {
 
           const mappedHosts = json.data.topHosts.map((host: any) => ({
             rank: host.rank,
-            wallet: shortenWallet(host.walletAddress),
+            walletAddress: host.walletAddress,
+            walletShort: shortenWallet(host.walletAddress),
             revenue: host.totalRevenue,
             raffles: host.rafflesCount,
             tokenType: formatToken(host.tokenType),
@@ -63,7 +65,8 @@ const Leaderboard = () => {
           }));
           const mappedBuyers = json.data.topBuyers.map((buyer: any) => ({
             rank: buyer.rank,
-            wallet: shortenWallet(buyer.walletAddress),
+            walletAddress: buyer.walletAddress,
+            walletShort: shortenWallet(buyer.walletAddress),
             spent: buyer.totalSpent,
             tickets: buyer.ticketsBought,
             wins: buyer.totalWins,
@@ -102,6 +105,15 @@ const Leaderboard = () => {
     if (rank === 2) return " border-slate-300/50";
     if (rank === 3) return " border-amber-600/50";
     return "";
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied");
+    } catch {
+      toast.error("Failed to copy wallet address");
+    }
   };
 
   return (
@@ -182,9 +194,16 @@ const Leaderboard = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="font-bold text-lg truncate">
-                                {host.wallet}
-                              </p>
+                              <button
+                                onClick={() =>
+                                  copyToClipboard(host.walletAddress)
+                                }
+                                className="font-bold text-lg truncate text-left hover:text-primary transition cursor-pointer"
+                                title="Click to copy wallet address"
+                              >
+                                {host.walletShort}
+                              </button>
+
                               {/* {host.reputation >= 97 && (
                                 <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
                                   {host.reputation}% rep
@@ -242,9 +261,18 @@ const Leaderboard = () => {
                             {getRankIcon(buyer.rank, buyer.badge)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-lg mb-1 truncate">
-                              {buyer.wallet}
-                            </p>
+                            <button
+                              onClick={() =>
+                                copyToClipboard(buyer.walletAddress)
+                              }
+                              className="font-bold text-lg mb-1 truncate text-left
+             hover:text-primary
+             transition cursor-pointer"
+                              title="Click to copy wallet address"
+                            >
+                              {buyer.walletShort}
+                            </button>
+
                             <div className="flex items-center gap-3 text-sm text-muted-foreground">
                               <span>{buyer.tickets} tickets</span>
                               <span>.</span>

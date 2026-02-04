@@ -39,7 +39,9 @@ export default function XPLeaderboard() {
         setRefreshing(true);
       }
 
-      const response = await server.get(`/user/xp/leaderboard?page=${page}&limit=50`);
+      const response = await server.get(
+        `/user/xp/leaderboard?page=${page}&limit=50`,
+      );
       setLeaderboard(response.data.data);
       setCurrentPage(page);
     } catch (error: any) {
@@ -84,6 +86,15 @@ export default function XPLeaderboard() {
     }
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied");
+    } catch {
+      toast.error("Failed to copy wallet address");
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -108,17 +119,21 @@ export default function XPLeaderboard() {
             </div>
             <div>
               <h1 className="text-3xl font-bold">XP Leaderboard</h1>
-              <p className="text-muted-foreground">Top XP earners on the platform</p>
+              <p className="text-muted-foreground">
+                Top XP earners on the platform
+              </p>
             </div>
           </div>
-          
+
           <Button
             variant="outline"
             onClick={() => fetchLeaderboard(currentPage)}
             disabled={refreshing}
             className="gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
         </div>
@@ -130,7 +145,9 @@ export default function XPLeaderboard() {
               {/* Top 3 Podium */}
               {leaderboard.users.slice(0, 3).length > 0 && (
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold mb-4 text-center">🏆 Top 3 Champions</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-center">
+                    🏆 Top 3 Champions
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {leaderboard.users.slice(0, 3).map((user) => (
                       <Card
@@ -139,14 +156,14 @@ export default function XPLeaderboard() {
                           user.rank === 1
                             ? "border-yellow-500 bg-gradient-to-br"
                             : user.rank === 2
-                            ? "border-gray-400 bg-gradient-to-br"
-                            : "border-orange-500 bg-gradient-to-br"
+                              ? "border-gray-400 bg-gradient-to-br"
+                              : "border-orange-500 bg-gradient-to-br"
                         }`}
                       >
                         <div className="flex justify-center">
                           {getRankIcon(user.rank)}
                         </div>
-                        <div>
+                        {/* <div>
                           <p className="font-bold text-lg">
                             {user.user_info?.username || shortenAddress(user.pubkey)}
                           </p>
@@ -155,14 +172,39 @@ export default function XPLeaderboard() {
                               {shortenAddress(user.pubkey)}
                             </p>
                           )}
+                        </div> */}
+                        <div>
+                          <button
+                            onClick={() => copyToClipboard(user.pubkey)}
+                            className="font-bold text-lg text-center
+               hover:text-primary
+               transition cursor-pointer"
+                            title="Click to copy wallet address"
+                          >
+                            {user.user_info?.username ||
+                              shortenAddress(user.pubkey)}
+                          </button>
+
+                          {user.user_info?.username && (
+                            <button
+                              onClick={() => copyToClipboard(user.pubkey)}
+                              className="block text-xs hover:text-primary transition"
+                              title="Click to copy wallet address"
+                            >
+                              {shortenAddress(user.pubkey)}
+                            </button>
+                          )}
                         </div>
+
                         <div className="flex items-center justify-center gap-1">
                           <Star className="h-5 w-5 text-primary" />
                           <span className="text-xl font-bold text-primary">
                             {user.totalXp.toLocaleString()} XP
                           </span>
                         </div>
-                        <div className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${getRankBadgeStyle(user.rank)}`}>
+                        <div
+                          className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${getRankBadgeStyle(user.rank)}`}
+                        >
                           #{user.rank}
                         </div>
                       </Card>
@@ -182,28 +224,52 @@ export default function XPLeaderboard() {
                         ? user.rank === 1
                           ? "bg-gradient-to-r border-yellow-200"
                           : user.rank === 2
-                          ? "bg-gradient-to-r border-gray-200"
-                          : "bg-gradient-to-r border-orange-200"
+                            ? "bg-gradient-to-r border-gray-200"
+                            : "bg-gradient-to-r border-orange-200"
                         : "bg-muted/20 border-border/30 hover:bg-muted/30"
                     }`}
                   >
                     <div className="flex items-center gap-4">
                       {/* Rank */}
-                      <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${getRankBadgeStyle(user.rank)}`}>
+                      <div
+                        className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${getRankBadgeStyle(user.rank)}`}
+                      >
                         {user.rank <= 3 ? getRankIcon(user.rank) : user.rank}
                       </div>
 
                       {/* User Info */}
                       <div className="flex items-center gap-3">
                         <User className="h-5 w-5 text-muted-foreground" />
-                        <div>
+                        {/* <div>
                           <p className="font-medium">
-                            {user.user_info?.username || shortenAddress(user.pubkey)}
+                            {user.user_info?.username ||
+                              shortenAddress(user.pubkey)}
                           </p>
                           {user.user_info?.username && (
                             <p className="text-xs text-muted-foreground">
                               {shortenAddress(user.pubkey)}
                             </p>
+                          )}
+                        </div> */}
+                        <div>
+                          <button
+                            onClick={() => copyToClipboard(user.pubkey)}
+                            className="font-medium text-left hover:text-primary
+               transition cursor-pointer"
+                            title="Click to copy wallet address"
+                          >
+                            {user.user_info?.username ||
+                              shortenAddress(user.pubkey)}
+                          </button>
+
+                          {user.user_info?.username && (
+                            <button
+                              onClick={() => copyToClipboard(user.pubkey)}
+                              className="block text-xs hover:text-primary transition"
+                              title="Click to copy wallet address"
+                            >
+                              {shortenAddress(user.pubkey)}
+                            </button>
                           )}
                         </div>
                       </div>
@@ -232,13 +298,17 @@ export default function XPLeaderboard() {
                     Previous
                   </Button>
                   <span className="text-sm text-muted-foreground px-4">
-                    Page {leaderboard.pagination.page} of {leaderboard.pagination.totalPages}
+                    Page {leaderboard.pagination.page} of{" "}
+                    {leaderboard.pagination.totalPages}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => fetchLeaderboard(currentPage + 1)}
-                    disabled={currentPage === leaderboard.pagination.totalPages || refreshing}
+                    disabled={
+                      currentPage === leaderboard.pagination.totalPages ||
+                      refreshing
+                    }
                   >
                     Next
                   </Button>
@@ -252,8 +322,9 @@ export default function XPLeaderboard() {
               <Star className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
               <h3 className="text-xl font-semibold">No XP Data Yet</h3>
               <p className="text-muted-foreground max-w-md mx-auto">
-                The XP leaderboard will populate as users start earning experience points through 
-                ticket purchases, raffle creation, and generating revenue.
+                The XP leaderboard will populate as users start earning
+                experience points through ticket purchases, raffle creation, and
+                generating revenue.
               </p>
             </div>
           </Card>

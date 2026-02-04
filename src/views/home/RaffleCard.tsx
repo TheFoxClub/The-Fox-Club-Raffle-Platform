@@ -34,7 +34,10 @@ export const RaffleCard = ({
 }: RaffleCardProps) => {
   const ticketsLeft = Math.max(total - sold, 0);
   const progress = Math.min((sold / total) * 100, 100);
-  const { symbol: enhancedTokenSymbol, loading: tokenLoading } = useTokenSymbol(tokenType, tokenAddress);
+  const { symbol: enhancedTokenSymbol, loading: tokenLoading } = useTokenSymbol(
+    tokenType,
+    tokenAddress,
+  );
 
   return (
     <Link to={`/raffle/raffle-${id}`}>
@@ -65,7 +68,8 @@ export const RaffleCard = ({
               <div className="flex items-center gap-1">
                 <Coins className="h-4 w-4" />
                 <span>
-                  {formatPrice(price)} {tokenLoading ? "..." : enhancedTokenSymbol}
+                  {formatPrice(price)}{" "}
+                  {tokenLoading ? "..." : enhancedTokenSymbol}
                 </span>
               </div>
               <div className="flex items-center gap-1">

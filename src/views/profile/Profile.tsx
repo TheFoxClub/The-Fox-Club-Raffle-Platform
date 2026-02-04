@@ -4,7 +4,7 @@ import { Card } from "../../components/ui/Card";
 import {
   User,
   Trophy,
-  Flame,
+  // Flame,
   // TrendingUp,
   Award,
   Ticket,
@@ -29,10 +29,11 @@ import { setUser, setLoading } from "../../redux/userSlice";
 import { Link } from "react-router-dom";
 import ClaimReward from "../claim/ClaimReward";
 import ClaimPayout from "../payout/ClaimPayout";
-import { getTokenSymbol } from "../../utils/tokenUtils";
+//import { getTokenSymbol } from "../../utils/tokenUtils";
 import socketService from "../../services/socket.service";
 import { toast } from "react-toastify";
 import { UserXPCard } from "../../components/profile/UserXPCard";
+import { TokenDisplay } from "../../components/ui/TokenDisplay";
 
 type HostedRaffle = {
   id: number;
@@ -209,7 +210,9 @@ const Profile = () => {
             raffleTitle: t.title ?? "Unknown Raffle",
             tickets: t.tickets,
             spent: t.spent,
-            token: getTokenSymbol(t.tokenType, t.tokenAddress),
+            tokenType: t.tokenType,
+            tokenAddress: t.tokenAddress,
+
             ticketNumbers: t.ticketNumbers ?? [],
             status:
               t.Raffle?.status === 2
@@ -622,9 +625,12 @@ const Profile = () => {
 
                         <div className="flex items-center gap-1">
                           <Coins className="h-4 w-4" />
-                          <span>
-                            {ticket.spent.toFixed(3)} {ticket.token} spent
-                          </span>
+                          <TokenDisplay
+                            amount={ticket.spent.toFixed(3)}
+                            tokenType={ticket.tokenType}
+                            tokenAddress={ticket.tokenAddress}
+                          />
+                          <span className="ml-1">spent</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
@@ -757,11 +763,13 @@ const Profile = () => {
                               Total Revenue
                             </p>
                             <p className="text-sm font-semibold">
-                              {raffle.payoutInfo.totalRevenue.toFixed(4)}{" "}
-                              {getTokenSymbol(
-                                raffle.tokenType,
-                                raffle.tokenAddress,
-                              )}
+                              <TokenDisplay
+                                amount={raffle.payoutInfo.totalRevenue.toFixed(
+                                  4,
+                                )}
+                                tokenType={raffle.tokenType}
+                                tokenAddress={raffle.tokenAddress}
+                              />
                             </p>
                           </div>
 
@@ -770,11 +778,13 @@ const Profile = () => {
                               Platform Commission
                             </p>
                             <p className="text-sm font-semibold text-orange-400">
-                              -{raffle.payoutInfo.totalCommission.toFixed(4)}{" "}
-                              {getTokenSymbol(
-                                raffle.tokenType,
-                                raffle.tokenAddress,
-                              )}
+                              <TokenDisplay
+                                amount={raffle.payoutInfo.totalCommission.toFixed(
+                                  4,
+                                )}
+                                tokenType={raffle.tokenType}
+                                tokenAddress={raffle.tokenAddress}
+                              />
                             </p>
                           </div>
 
@@ -783,11 +793,18 @@ const Profile = () => {
                               Your Revenue
                             </p>
                             <p className="text-sm font-semibold text-green-400">
-                              {raffle.payoutInfo.claimableAmount.toFixed(4)}{" "}
+                              {/* {raffle.payoutInfo.claimableAmount.toFixed(4)}{" "}
                               {getTokenSymbol(
                                 raffle.tokenType,
                                 raffle.tokenAddress,
-                              )}
+                              )} */}
+                              <TokenDisplay
+                                amount={raffle.payoutInfo.claimableAmount.toFixed(
+                                  4,
+                                )}
+                                tokenType={raffle.tokenType}
+                                tokenAddress={raffle.tokenAddress}
+                              />
                             </p>
                           </div>
 
@@ -804,9 +821,17 @@ const Profile = () => {
                                   : "text-green-400"
                               }`}
                             >
-                              {raffle.payoutInfo.unclaimedAmount > 0
-                                ? `${raffle.payoutInfo.unclaimedAmount.toFixed(4)} ${getTokenSymbol(raffle.tokenType, raffle.tokenAddress)}`
-                                : "All claimed"}
+                              {raffle.payoutInfo.unclaimedAmount > 0 ? (
+                                <TokenDisplay
+                                  amount={raffle.payoutInfo.unclaimedAmount.toFixed(
+                                    4,
+                                  )}
+                                  tokenType={raffle.tokenType}
+                                  tokenAddress={raffle.tokenAddress}
+                                />
+                              ) : (
+                                "All claimed"
+                              )}
                             </p>
                           </div>
                         </div>
@@ -820,19 +845,18 @@ const Profile = () => {
                                 <div>
                                   <p className="text-sm font-semibold">
                                     Ready to claim{" "}
-                                    {raffle.payoutInfo.unclaimedAmount.toFixed(
-                                      4,
-                                    )}{" "}
-                                    {getTokenSymbol(
-                                      raffle.tokenType,
-                                      raffle.tokenAddress,
-                                    )}
+                                    <TokenDisplay
+                                      amount={raffle.payoutInfo.unclaimedAmount.toFixed(
+                                        4,
+                                      )}
+                                      tokenType={raffle.tokenType}
+                                      tokenAddress={raffle.tokenAddress}
+                                    />
                                   </p>
                                   <p className="text-xs text-muted-foreground">
                                     Your share from this completed raffle
                                   </p>
                                 </div>
-                                ``
                               </div>
 
                               <ClaimPayout
@@ -881,13 +905,24 @@ const Profile = () => {
                               )}
                               <div>
                                 <p className="text-sm font-semibold">
-                                  {raffle.payoutInfo.claimStatus === "confirmed"
-                                    ? `Payout completed: ${raffle.payoutInfo.claimableAmount.toFixed(
-                                        4,
-                                      )} ${getTokenSymbol(raffle.tokenType, raffle.tokenAddress)}`
-                                    : raffle.payoutInfo.claimStatus === "failed"
-                                      ? "Payout failed - please try again"
-                                      : `Payout ${raffle.payoutInfo.claimStatus} - processing...`}
+                                  {raffle.payoutInfo.claimStatus ===
+                                  "confirmed" ? (
+                                    <>
+                                      Payout completed:{" "}
+                                      <TokenDisplay
+                                        amount={raffle.payoutInfo.claimableAmount.toFixed(
+                                          4,
+                                        )}
+                                        tokenType={raffle.tokenType}
+                                        tokenAddress={raffle.tokenAddress}
+                                      />
+                                    </>
+                                  ) : raffle.payoutInfo.claimStatus ===
+                                    "failed" ? (
+                                    "Payout failed - please try again"
+                                  ) : (
+                                    `Payout ${raffle.payoutInfo.claimStatus} - processing...`
+                                  )}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   {raffle.payoutInfo.message}
