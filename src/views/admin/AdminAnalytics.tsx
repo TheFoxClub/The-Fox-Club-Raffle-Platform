@@ -42,6 +42,36 @@ interface TopWallet {
   spending: string;
   raffles: number;
 }
+const renderCustomizedLabel = ({
+  cx,
+  cy,
+  midAngle,
+  outerRadius,
+  percent,
+  name,
+  value,
+  payload,
+}: any) => {
+  if (!value || percent <= 0) return null;
+
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 20;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill={payload.color}
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      fontSize={14}
+    >
+      {`${name} ${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
 
 export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
@@ -109,14 +139,16 @@ export default function AdminAnalytics() {
         ];
 
         setTokenData(
-          data.volumeByTokenType.map((t: any, index: number) => ({
-            name: getTokenSymbol(
-              mapNumericTokenType(t.tokenTypeRaw || 0),
-              t.tokenAddress,
-            ),
-            value: t.percentage,
-            color: colors[index % colors.length],
-          })),
+          data.volumeByTokenType
+            .filter((t: any) => t.percentage > 0)
+            .map((t: any, index: number) => ({
+              name: getTokenSymbol(
+                mapNumericTokenType(t.tokenTypeRaw || 0),
+                t.tokenAddress,
+              ),
+              value: t.percentage,
+              color: colors[index % colors.length],
+            })),
         );
       }
 
@@ -251,9 +283,11 @@ export default function AdminAnalytics() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}%`}
+                  //  label={({ name, value }) => `${name}: ${value}%`}
+                  label={renderCustomizedLabel}
                   outerRadius={100}
-                  fill="#8884d8"
+                  // fill="#8884d8"
+                  minAngle={10}
                   dataKey="value"
                 >
                   {tokenData.map((entry, index) => (

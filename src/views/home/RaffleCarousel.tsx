@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import socketService from "../../services/socket.service";
 // import { featuredRaffles } from "../../dummydata/featuredRaffles";
 import { formatPrice } from "../../helpers/formatPrice";
+import { useTokenSymbol } from "../../hooks/useTokenDisplay";
 
 interface Raffle {
   id: number;
@@ -23,7 +24,103 @@ interface Raffle {
   total: number;
   image: string;
   tokenType: string;
+  tokenAddress?: string;
   isVerified: boolean;
+}
+
+function RaffleCard({
+  raffle,
+  isActive,
+  style,
+  onClick,
+}: {
+  raffle: Raffle;
+  isActive: boolean;
+  style: React.CSSProperties;
+  onClick: () => void;
+}) {
+  const { symbol: enhancedTokenSymbol, loading } = useTokenSymbol(
+    raffle.tokenType,
+    raffle.tokenAddress,
+  );
+
+  return (
+    <Card
+      key={raffle.id}
+      className={`absolute w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
+        isActive ? "glow-primary" : ""
+      }`}
+      style={{
+        ...style,
+        transformStyle: "preserve-3d",
+      }}
+      onClick={onClick}
+    >
+      <div className="relative aspect-[16/8] overflow-hidden">
+        <img
+          src={raffle.image}
+          alt={raffle.title}
+          className="w-full h-full object-cover"
+        />
+        {/* Verified Badge */}
+        {raffle.isVerified && (
+          <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
+            <CheckCircle size={16} /> Verified
+          </div>
+        )}
+        <div className="absolute top-4 left-4 rounded-full px-2.5 py-0.5 mb-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
+          Featured
+        </div>
+      </div>
+
+      {/* Details */}
+      <div className="p-4 flex flex-col justify-between space-y-2 relative">
+        {/* Featured Raffle Badge */}
+        <div className="flex flex-col">
+          <h2 className="text-xl font-bold text-gradient">{raffle.title}</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {raffle.description}
+          </p>
+        </div>
+
+        {/* Ticket Info */}
+        <div className="flex gap-10 text-sm justify-between">
+          <div className="flex items-center gap-2">
+            <Coins className="h-4 w-4 text-accent" />
+            <div>
+              <span className="text-muted-foreground text-sm mt-1">
+                Ticket Price
+              </span>
+              <p className="font-semibold">
+                {formatPrice(raffle.price)}{" "}
+                {loading ? "..." : enhancedTokenSymbol || raffle.tokenType}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-gray-400">Tickets Sold</p>
+              <span className="font-bold">
+                {raffle.sold} / {raffle.total}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Button + Arrows */}
+        {isActive && (
+          <Button
+            className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
+            onClick={onClick}
+          >
+            Enter Raffle
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
 }
 
 export default function RaffleCarousel() {
@@ -50,6 +147,7 @@ export default function RaffleCarousel() {
             total: Number(r.totalTickets),
             image: r.imageUrl,
             tokenType: r.tokenType === "SOLANA" ? "SOL" : r.tokenType,
+            tokenAddress: r.tokenAddress,
             isVerified: r.raffle_detail?.requiresNftVerification ?? false,
           }));
 
@@ -89,6 +187,7 @@ export default function RaffleCarousel() {
                   total: Number(r.totalTickets),
                   image: r.imageUrl,
                   tokenType: r.tokenType === "SOLANA" ? "SOL" : r.tokenType,
+                  tokenAddress: r.tokenAddress,
                   isVerified: r.raffle_detail?.requiresNftVerification ?? false,
                 }));
                 setRaffles(mapped);
@@ -239,83 +338,92 @@ export default function RaffleCarousel() {
               const style = getCardStyle(cardIndex);
               const isActive = cardIndex === index;
 
+              // return (
+              //   <Card
+              //     key={raffle.id}
+              //     className={`absolute w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
+              //       isActive ? "glow-primary" : ""
+              //     }`}
+              //     style={{
+              //       ...style,
+              //       transformStyle: "preserve-3d",
+              //     }}
+              //     onClick={() => setIndex(cardIndex)}
+              //   >
+              //     <div className="relative aspect-[16/8] overflow-hidden">
+              //       <img
+              //         src={raffle.image}
+              //         alt={raffle.title}
+              //         className="w-full h-full object-cover"
+              //       />
+              //       {/* Verified Badge */}
+              //       {raffle.isVerified && (
+              //         <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
+              //           <CheckCircle size={16} /> Verified
+              //         </div>
+              //       )}
+              //       <div className="absolute top-4 left-4 rounded-full px-2.5 py-0.5 mb-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
+              //         Featured
+              //       </div>
+              //     </div>
+
+              //     {/* Details */}
+              //     <div className="p-4 flex flex-col justify-between space-y-2 relative">
+              //       {/* Featured Raffle Badge */}
+              //       <div className="flex flex-col">
+              //         <h2 className="text-xl font-bold text-gradient">
+              //           {raffle.title}
+              //         </h2>
+              //         <p className="text-muted-foreground mt-1 text-sm">
+              //           {raffle.description}
+              //         </p>
+              //       </div>
+
+              //       {/* Ticket Info */}
+              //       <div className="flex gap-10 text-sm justify-between">
+              //         <div className="flex items-center gap-2">
+              //           <Coins className="h-4 w-4 text-accent" />
+              //           <div>
+              //             <span className="text-muted-foreground text-sm mt-1">
+              //               Ticket Price
+              //             </span>
+              //             <p className="font-semibold">
+              //               {formatPrice(raffle.price)} {raffle.tokenType}
+              //             </p>
+              //           </div>
+              //         </div>
+
+              //         <div className="flex items-center gap-2">
+              //           <Users className="h-4 w-4 text-primary" />
+              //           <div>
+              //             <p className="text-gray-400">Tickets Sold</p>
+              //             <span className="font-bold">
+              //               {raffle.sold} / {raffle.total}
+              //             </span>
+              //           </div>
+              //         </div>
+              //       </div>
+
+              //       {/* Button + Arrows */}
+              //       {isActive && (
+              //         <Button
+              //           className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
+              //           onClick={() => navigate(`/raffle/raffle-${raffle.id}`)}
+              //         >
+              //           Enter Raffle
+              //         </Button>
+              //       )}
+              //     </div>
+              //   </Card>
+              // );
               return (
-                <Card
+                <RaffleCard
                   key={raffle.id}
-                  className={`absolute w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
-                    isActive ? "glow-primary" : ""
-                  }`}
-                  style={{
-                    ...style,
-                    transformStyle: "preserve-3d",
-                  }}
-                  onClick={() => setIndex(cardIndex)}
-                >
-                  <div className="relative aspect-[16/8] overflow-hidden">
-                    <img
-                      src={raffle.image}
-                      alt={raffle.title}
-                      className="w-full h-full object-cover"
-                    />
-                    {/* Verified Badge */}
-                    {raffle.isVerified && (
-                      <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
-                        <CheckCircle size={16} /> Verified
-                      </div>
-                    )}
-                    <div className="absolute top-4 left-4 rounded-full px-2.5 py-0.5 mb-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
-                      Featured
-                    </div>
-                  </div>
-
-                  {/* Details */}
-                  <div className="p-4 flex flex-col justify-between space-y-2 relative">
-                    {/* Featured Raffle Badge */}
-                    <div className="flex flex-col">
-                      <h2 className="text-xl font-bold text-gradient">
-                        {raffle.title}
-                      </h2>
-                      <p className="text-muted-foreground mt-1 text-sm">
-                        {raffle.description}
-                      </p>
-                    </div>
-
-                    {/* Ticket Info */}
-                    <div className="flex gap-10 text-sm justify-between">
-                      <div className="flex items-center gap-2">
-                        <Coins className="h-4 w-4 text-accent" />
-                        <div>
-                          <span className="text-muted-foreground text-sm mt-1">
-                            Ticket Price
-                          </span>
-                          <p className="font-semibold">
-                            {formatPrice(raffle.price)} {raffle.tokenType}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-primary" />
-                        <div>
-                          <p className="text-gray-400">Tickets Sold</p>
-                          <span className="font-bold">
-                            {raffle.sold} / {raffle.total}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Button + Arrows */}
-                    {isActive && (
-                      <Button
-                        className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
-                        onClick={() => navigate(`/raffle/raffle-${raffle.id}`)}
-                      >
-                        Enter Raffle
-                      </Button>
-                    )}
-                  </div>
-                </Card>
+                  raffle={raffle}
+                  isActive={isActive}
+                  style={style}
+                  onClick={() => navigate(`/raffle/raffle-${raffle.id}`)}
+                />
               );
             })}
           </div>

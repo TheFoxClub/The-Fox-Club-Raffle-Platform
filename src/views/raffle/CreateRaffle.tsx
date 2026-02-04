@@ -136,7 +136,13 @@ const CreateRaffle = () => {
             name: token.name,
           }));
 
-          setTokenOptions(tokens);
+          // setTokenOptions(tokens);
+
+          const uniqueTokens = Array.from(
+            new Map(tokens.map((t) => [t.value, t])).values(),
+          );
+
+          setTokenOptions(uniqueTokens);
 
           // Set default to SOL if available
           const solToken = tokens.find((t: any) => t.tokenType === 0);
