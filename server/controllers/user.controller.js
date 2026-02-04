@@ -215,14 +215,235 @@ class UserController {
         created
           ? "User info created successfully!"
           : "User info updated successfully!",
-        { data: updatedUserInfo }
+        { data: updatedUserInfo },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  // XP-related methods
+  static async getUserXp(req, res) {
+    try {
+      const userId = req.payload.id;
+      const XpService = require("../services/xp.service");
+
+      const xpSummary = await XpService.getUserXpSummary(userId);
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "User XP retrieved successfully",
+        xpSummary,
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  static async getUserXpHistory(req, res) {
+    try {
+      const userId = req.payload.id;
+      const {
+        page = 1,
+        limit = 20,
+        sourceType,
+        startDate,
+        endDate,
+      } = req.query;
+      const offset = (page - 1) * limit;
+      const { XpTable } = require("../models");
+      const { Op } = require("sequelize");
+
+      let whereClause = { userId };
+
+      if (sourceType) {
+        whereClause.sourceType = sourceType;
+      }
+
+      if (startDate || endDate) {
+        whereClause.createdAt = {};
+        if (startDate) {
+          whereClause.createdAt[Op.gte] = new Date(startDate);
+        }
+        if (endDate) {
+          whereClause.createdAt[Op.lte] = new Date(endDate);
+        }
+      }
+
+      const { count, rows: history } = await XpTable.findAndCountAll({
+        where: whereClause,
+        order: [["createdAt", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
+          {
+            model: Raffle,
+            as: "raffle",
+            attributes: ["id", "title", "imageUrl"],
+            required: false,
+          },
+          {
+            model: SplTokenSendTransaction,
+            as: "transaction",
+            attributes: ["id", "txId", "uiAmount"],
+            required: false,
+          },
+        ],
+      });
+
+      return respond(res, httpStatus.OK, "XP history retrieved successfully", {
+        history,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      });
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  static async getUserXpRank(req, res) {
+    try {
+      const userId = req.payload.id;
+      const { Op } = require("sequelize");
+
+      const user = await User.findByPk(userId, {
+        attributes: ["id", "pubkey", "totalXp"],
+      });
+
+      if (!user) {
+        return respond(res, httpStatus.NOT_FOUND, "User not found");
+      }
+
+      const rank =
+        (await User.count({
+          where: {
+            totalXp: { [Op.gt]: user.totalXp },
+          },
+        })) + 1;
+
+      const totalUsers = await User.count({
+        where: {
+          totalXp: { [Op.gt]: 0 },
+        },
+      });
+
+      // Get users around this user's rank (±5 positions)
+      const nearbyUsers = await User.findAll({
+        attributes: ["id", "pubkey", "totalXp"],
+        where: {
+          totalXp: { [Op.gt]: 0 },
+        },
+        order: [["totalXp", "DESC"]],
+        limit: 11,
+        offset: Math.max(0, rank - 6),
+        include: [
+          {
+            model: UserInfo,
+            attributes: ["username"],
+            required: false,
+          },
+        ],
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "User XP rank retrieved successfully",
+        {
+          user: {
+            id: user.id,
+            pubkey: user.pubkey,
+            totalXp: parseFloat(user.totalXp || 0),
+          },
+          rank,
+          totalUsers,
+          percentile:
+            totalUsers > 0
+              ? Math.round(((totalUsers - rank + 1) / totalUsers) * 100)
+              : 0,
+          nearbyUsers,
+        },
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  // for public endpoint
+  static async getXpLeaderboard(req, res) {
+    try {
+      const { page = 1, limit = 50 } = req.query;
+      const offset = (page - 1) * limit;
+      const { Op } = require("sequelize");
+
+      const { count, rows: users } = await User.findAndCountAll({
+        attributes: ["id", "pubkey", "totalXp"],
+        where: {
+          totalXp: { [Op.gt]: 0 },
+        },
+        order: [["totalXp", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
+          {
+            model: UserInfo,
+            attributes: ["username"],
+            required: false,
+          },
+        ],
+      });
+
+      const usersWithRank = users.map((user, index) => ({
+        ...user.toJSON(),
+        rank: offset + index + 1,
+        totalXp: parseFloat(user.totalXp || 0),
+      }));
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "XP leaderboard retrieved successfully",
+        {
+          users: usersWithRank,
+          pagination: {
+            total: count,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(count / limit),
+          },
+        },
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
       );
     }
   }

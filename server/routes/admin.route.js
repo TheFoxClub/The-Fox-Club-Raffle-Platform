@@ -174,4 +174,61 @@ router.patch(
   AdminController.togglePaymentToken
 );
 
+// XP Management Routes
+// Get XP configuration
+router.get(
+  "/xp-config",
+  auth.bearer,
+  isAdmin,
+  AdminController.getXpConfig
+);
+
+// Update XP configuration
+router.put(
+  "/xp-config",
+  auth.bearer,
+  isAdmin,
+  AdminController.updateXpConfig
+);
+
+// Get XP leaderboard
+router.get(
+  "/xp-leaderboard",
+  auth.bearer,
+  isAdmin,
+  AdminController.getXpLeaderboard
+);
+
+// Get XP analytics
+router.get(
+  "/xp-analytics",
+  auth.bearer,
+  isAdmin,
+  AdminController.getXpAnalytics
+);
+
+// Get XP processing status
+router.get(
+  "/xp-processing-status",
+  auth.bearer,
+  isAdmin,
+  AdminController.getXpProcessingStatus
+);
+
+// Get XP records with filtering
+router.get(
+  "/xp-records",
+  auth.bearer,
+  isAdmin,
+  AdminController.getXpRecords
+);
+
+// Manually recalculate user XP
+router.post(
+  "/xp-recalculate/:userId",
+  auth.bearer,
+  isAdmin,
+  AdminController.recalculateUserXp
+);
+
 module.exports = router;

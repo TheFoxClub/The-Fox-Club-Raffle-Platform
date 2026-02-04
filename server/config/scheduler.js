@@ -8,6 +8,7 @@ const {
   checkRaffleAndFeaturedStatus,
 } = require("../services/raffles/cron-job");
 const TicketReservationService = require("../services/ticket-reservation.service");
+const XpProcessor = require("../services/xp-processor");
 
 const SECONDS_1 = "0/1 * * * * *";
 const SECONDS_20 = "*/20 * * * * *";
@@ -20,6 +21,7 @@ const EVERY_HOUR = "20 */1 * * *";
 const TWICE_A_DAY_AT_12 = "0 */12 * * *";
 const EVERY_MINUTE = "*/1 * * * *";
 const EVERY_SIX_HOUR = "0 */6 * * *";
+const DAILY_AT_2AM = "0 2 * * *";
 
 schedule.scheduleJob(SECONDS_20, async () => {
   logger.info("Started Spl Token Send Transactions:");
@@ -33,11 +35,33 @@ schedule.scheduleJob(SECONDS_20, async () => {
 
 schedule.scheduleJob(EVERY_MINUTE, async () => {
   try {
-    const cleanedCount = await TicketReservationService.cleanupExpiredReservations();
+    const cleanedCount =
+      await TicketReservationService.cleanupExpiredReservations();
     if (cleanedCount > 0) {
-      logger.info(`Reservation cleanup: cleaned up ${cleanedCount} expired reservations`);
+      logger.info(
+        `Reservation cleanup: cleaned up ${cleanedCount} expired reservations`,
+      );
     }
   } catch (error) {
-    logger.error('Error in reservation cleanup job:', error);
+    logger.error("Error in reservation cleanup job:", error);
+  }
+});
+
+schedule.scheduleJob(EVERY_MINUTE, async () => {
+  try {
+    logger.info("Processing pending XP awards");
+    await XpProcessor.processPendingXp();
+  } catch (error) {
+    logger.error("Error in XP processing job:", error);
+  }
+});
+
+// Daily XP recalculation at 2 AM
+schedule.scheduleJob(DAILY_AT_2AM, async () => {
+  try {
+    logger.info("Starting daily XP recalculation");
+    await XpProcessor.recalculateUserXp();
+  } catch (error) {
+    logger.error("Error in daily XP recalculation:", error);
   }
 });

@@ -14,6 +14,7 @@ import {
   Gift,
   AlertCircle,
   Trash2,
+  Star,
 } from "lucide-react";
 import {
   Tabs,
@@ -31,6 +32,7 @@ import ClaimPayout from "../payout/ClaimPayout";
 //import { getTokenSymbol } from "../../utils/tokenUtils";
 import socketService from "../../services/socket.service";
 import { toast } from "react-toastify";
+import { UserXPCard } from "../../components/profile/UserXPCard";
 import { TokenDisplay } from "../../components/ui/TokenDisplay";
 
 type HostedRaffle = {
@@ -431,33 +433,9 @@ const Profile = () => {
                     <CheckCircle size={12} /> Verified
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center text-sm gap-6 mt-2">
-                  <div className="flex items-center gap-1">
-                    <Trophy className="h-4 w-4 text-accent" />
-                    <span className="text-muted-foreground">Level 1</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Award className="h-4 w-4 text-primary" />
-                    <span className="text-muted-foreground">#1 Ranked</span>
-                  </div>
-                  {/* <div className="flex items-center gap-1">
-                    <Flame className="h-4 w-4 text-orange-500" />
-                    <span className="text-muted-foreground">1 Day Streak</span>
-                  </div> */}
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm mb-2">
-                <span className="text-muted-foreground">XP Progress</span>
-                <span className="font-semibold mt-1 sm:mt-0">
-                  {xp} / {xpGoal} XP
-                </span>
-              </div>
-              <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full gradient-primary"
-                  style={{ width: `${(xp / xpGoal) * 100}%` }}
-                />
+                <h4 className="text-lg sm:text-lg font-bold break-all">
+                  {user_info?.username}
+                </h4>
               </div>
             </div>
 
@@ -494,6 +472,9 @@ const Profile = () => {
             <p className="text-sm text-muted-foreground">Reputation</p>
           </Card> */}
         </div>
+
+        {/* XP Card */}
+        <UserXPCard />
 
         {claimableRewards.length > 0 && (
           <Card className="bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 p-4">

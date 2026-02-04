@@ -74,6 +74,18 @@ const COLLECTION_ISVERIFIED = {
   FALSE: 0,
 };
 
+const XP_SOURCE_TYPES = {
+  TICKET_PURCHASE: "ticket_purchase",
+  RAFFLE_REVENUE: "raffle_revenue",
+  RAFFLE_CREATION: "raffle_creation",
+};
+
+const XP_CONFIG_KEYS = {
+  TICKET_PURCHASE_RATE: "ticket_purchase_rate",
+  RAFFLE_REVENUE_RATE: "raffle_revenue_rate",
+  RAFFLE_CREATION_REWARD: "raffle_creation_reward",
+};
+
 function mapEnumValue(enumObj, value) {
   return Object.keys(enumObj).find((key) => enumObj[key] === value) || value;
 }
@@ -91,5 +103,7 @@ module.exports = {
   COMMISSION_RATES,
   TICKET_RESERVATION_STATUS,
   COLLECTION_ISVERIFIED,
+  XP_SOURCE_TYPES,
+  XP_CONFIG_KEYS,
   mapEnumValue,
 };

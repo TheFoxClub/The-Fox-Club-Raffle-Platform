@@ -1076,6 +1076,412 @@ class AdminController {
       );
     }
   }
+
+  // XP Management Methods
+  static async getXpConfig(req, res) {
+    try {
+      const { XpConfig } = require("../models");
+
+      const config = await XpConfig.findAll({
+        where: { isActive: true },
+        order: [["configKey", "ASC"]],
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "XP configuration retrieved successfully",
+        {
+          config,
+        },
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  static async updateXpConfig(req, res) {
+    try {
+      const { configKey, configValue, description } = req.body;
+      const { XpConfig } = require("../models");
+
+      if (!configKey || configValue === undefined) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Config key and value are required",
+        );
+      }
+
+      if (configValue < 0) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Config value cannot be negative",
+        );
+      }
+
+      const [config, created] = await XpConfig.findOrCreate({
+        where: { configKey },
+        defaults: {
+          configKey,
+          configValue,
+          description: description || null,
+          isActive: true,
+        },
+      });
+
+      if (!created) {
+        await config.update({
+          configValue,
+          description:
+            description !== undefined ? description : config.description,
+          updatedAt: new Date(),
+        });
+      }
+
+      // Clear XP rates cache
+      const redisClient = require("../util/redisClient");
+      await redisClient.del("xp:rates");
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "XP configuration updated successfully",
+        {
+          config,
+        },
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  //  Get XP leaderboard
+  static async getXpLeaderboard(req, res) {
+    try {
+      const { page = 1, limit = 50 } = req.query;
+      const offset = (page - 1) * limit;
+
+      const { count, rows: users } = await User.findAndCountAll({
+        attributes: ["id", "pubkey", "totalXp", "xpLastUpdated"],
+        where: {
+          totalXp: { [Op.gt]: 0 },
+        },
+        order: [["totalXp", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
+          {
+            model: UserInfo,
+            attributes: ["username", "email"],
+            required: false,
+          },
+        ],
+      });
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "XP leaderboard retrieved successfully",
+        {
+          users,
+          pagination: {
+            total: count,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(count / limit),
+          },
+        },
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  // Get XP analytics and statistics
+  static async getXpAnalytics(req, res) {
+    try {
+      const { XpTable } = require("../models");
+
+      // XP breakdown by source type
+      const sourceBreakdown = await XpTable.findAll({
+        attributes: [
+          "sourceType",
+          [sequelize.fn("COUNT", sequelize.col("id")), "recordCount"],
+          [sequelize.fn("SUM", sequelize.col("xpEarned")), "totalXp"],
+          [sequelize.fn("SUM", sequelize.col("usdValue")), "totalUsdValue"],
+          [sequelize.fn("AVG", sequelize.col("xpEarned")), "avgXpPerRecord"],
+        ],
+        group: ["sourceType"],
+        raw: true,
+      });
+
+      const totalStats = await XpTable.findOne({
+        attributes: [
+          [sequelize.fn("COUNT", sequelize.col("id")), "totalRecords"],
+          [sequelize.fn("SUM", sequelize.col("xpEarned")), "totalXpAwarded"],
+          [sequelize.fn("SUM", sequelize.col("usdValue")), "totalUsdProcessed"],
+          [
+            sequelize.fn(
+              "COUNT",
+              sequelize.fn("DISTINCT", sequelize.col("userId")),
+            ),
+            "uniqueUsers",
+          ],
+        ],
+        raw: true,
+      });
+
+      // Recent XP activity (last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const recentActivity = await XpTable.findAll({
+        attributes: [
+          [sequelize.fn("DATE", sequelize.col("createdAt")), "date"],
+          [sequelize.fn("COUNT", sequelize.col("id")), "recordCount"],
+          [sequelize.fn("SUM", sequelize.col("xpEarned")), "dailyXp"],
+        ],
+        where: {
+          createdAt: { [Op.gte]: sevenDaysAgo },
+        },
+        group: [sequelize.fn("DATE", sequelize.col("createdAt"))],
+        order: [[sequelize.fn("DATE", sequelize.col("createdAt")), "DESC"]],
+        raw: true,
+      });
+
+      // Top XP earners this month
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+
+      const topEarnersThisMonth = await XpTable.findAll({
+        attributes: [
+          "userId",
+          [sequelize.fn("SUM", sequelize.col("xpEarned")), "monthlyXp"],
+        ],
+        where: {
+          createdAt: { [Op.gte]: monthStart },
+        },
+        group: ["userId"],
+        order: [[sequelize.fn("SUM", sequelize.col("xpEarned")), "DESC"]],
+        limit: 10,
+        raw: true,
+      });
+
+      // Get user details for top earners separately to avoid GROUP BY issues
+      const topEarnersWithDetails = await Promise.all(
+        topEarnersThisMonth.map(async (earner) => {
+          const user = await User.findByPk(earner.userId, {
+            attributes: ["pubkey"],
+            include: [
+              {
+                model: UserInfo,
+                attributes: ["username"],
+                required: false,
+              },
+            ],
+          });
+          
+          return {
+            userId: earner.userId,
+            monthlyXp: parseFloat(earner.monthlyXp || 0),
+            user: user ? {
+              pubkey: user.pubkey,
+              user_info: user.user_info
+            } : null
+          };
+        })
+      );
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "XP analytics retrieved successfully",
+        {
+          sourceBreakdown: sourceBreakdown.map((item) => ({
+            sourceType: item.sourceType,
+            recordCount: parseInt(item.recordCount),
+            totalXp: parseFloat(item.totalXp || 0),
+            totalUsdValue: parseFloat(item.totalUsdValue || 0),
+            avgXpPerRecord: parseFloat(item.avgXpPerRecord || 0),
+          })),
+          totalStats: {
+            totalRecords: parseInt(totalStats.totalRecords),
+            totalXpAwarded: parseFloat(totalStats.totalXpAwarded || 0),
+            totalUsdProcessed: parseFloat(totalStats.totalUsdProcessed || 0),
+            uniqueUsers: parseInt(totalStats.uniqueUsers),
+          },
+          recentActivity: recentActivity.map((item) => ({
+            date: item.date,
+            recordCount: parseInt(item.recordCount),
+            dailyXp: parseFloat(item.dailyXp || 0),
+          })),
+          topEarnersThisMonth: topEarnersWithDetails,
+        },
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  //  Get XP processing status
+  static async getXpProcessingStatus(req, res) {
+    try {
+      const XpProcessor = require("../services/xp-processor");
+      const stats = await XpProcessor.getProcessingStats();
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "XP processing status retrieved successfully",
+        {
+          stats,
+        },
+      );
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  static async getXpRecords(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 50,
+        sourceType,
+        userId,
+        startDate,
+        endDate,
+      } = req.query;
+      const offset = (page - 1) * limit;
+      const { XpTable } = require("../models");
+
+      let whereClause = {};
+
+      if (sourceType) {
+        whereClause.sourceType = sourceType;
+      }
+
+      if (userId) {
+        whereClause.userId = parseInt(userId);
+      }
+
+      if (startDate || endDate) {
+        whereClause.createdAt = {};
+        if (startDate) {
+          whereClause.createdAt[Op.gte] = new Date(startDate);
+        }
+        if (endDate) {
+          whereClause.createdAt[Op.lte] = new Date(endDate);
+        }
+      }
+
+      const { count, rows: records } = await XpTable.findAndCountAll({
+        where: whereClause,
+        order: [["createdAt", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["pubkey"],
+            include: [
+              {
+                model: UserInfo,
+                attributes: ["username"],
+                required: false,
+              },
+            ],
+          },
+          {
+            model: Raffle,
+            as: "raffle",
+            attributes: ["title"],
+            required: false,
+          },
+        ],
+      });
+
+      return respond(res, httpStatus.OK, "XP records retrieved successfully", {
+        records,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      });
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  //  Manually trigger XP recalculation for a user
+  static async recalculateUserXp(req, res) {
+    try {
+      const { userId } = req.params;
+      const XpService = require("../services/xp.service");
+
+      if (!userId) {
+        return respond(res, httpStatus.BAD_REQUEST, "User ID is required");
+      }
+
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return respond(res, httpStatus.NOT_FOUND, "User not found");
+      }
+
+      await XpService.updateUserTotalXp(parseInt(userId));
+
+      const updatedUser = await User.findByPk(userId, {
+        attributes: ["id", "pubkey", "totalXp", "xpLastUpdated"],
+      });
+
+      return respond(res, httpStatus.OK, "User XP recalculated successfully", {
+        user: updatedUser,
+      });
+    } catch (err) {
+      logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
 }
 
 module.exports = AdminController;

@@ -30,6 +30,11 @@ module.exports = (sequelize, DataTypes) => {
         targetKey: "id",
         as: "creatorClaimTransaction",
       });
+      this.hasMany(models.XpTable, {
+        sourceKey: "id",
+        foreignKey: "raffleId",
+        as: "xpRecords"
+      });
     }
   }
   raffle.init(
@@ -58,6 +63,11 @@ module.exports = (sequelize, DataTypes) => {
       winnerSelectionSeed: DataTypes.STRING,
       platformWallet: DataTypes.STRING,
       creatorClaimTxId: DataTypes.INTEGER,
+      xpAwarded: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false
+      }
     },
     {
       sequelize,
