@@ -1,20 +1,24 @@
 import { useState, useEffect } from "react";
-import { Star, TrendingUp, Trophy, Activity, RefreshCw } from "lucide-react";
+import { Star, Activity, RefreshCw } from "lucide-react";
 import Button from "../ui/Button";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { getSourceConfig, getActivityLabel } from "../../config/xpSources";
 
 interface XPSummary {
   user: {
     id: number;
     pubkey: string;
-    totalXp: number;
+    totalXp: string;
     xpLastUpdated: string;
   };
   breakdown: Array<{
-    sourceType: string;
     count: number;
-    totalXp: number;
+    totalXp: string;
+    config: {
+      configKey: string;
+      description: string;
+    };
   }>;
   totalXp: number;
 }
@@ -22,18 +26,6 @@ interface XPSummary {
 interface UserXPCardProps {
   className?: string;
 }
-
-const SOURCE_TYPE_LABELS = {
-  ticket_purchase: "Ticket Purchases",
-  raffle_revenue: "Raffle Revenue",
-  raffle_creation: "Raffle Creation"
-};
-
-const SOURCE_TYPE_ICONS = {
-  ticket_purchase: Activity,
-  raffle_revenue: TrendingUp,
-  raffle_creation: Trophy
-};
 
 export function UserXPCard({ className = "" }: UserXPCardProps) {
   const [xpData, setXpData] = useState<XPSummary | null>(null);
@@ -111,7 +103,7 @@ export function UserXPCard({ className = "" }: UserXPCardProps) {
       {/* Total XP */}
       <div className="text-center mb-6 p-4 rounded-lg bg-gradient-primary/5 border border-primary/20">
         <div className="text-3xl font-bold text-gradient mb-1">
-          {xpData.totalXp.toLocaleString()}
+          {Number(xpData.totalXp).toLocaleString()}
         </div>
         <div className="text-sm text-muted-foreground">Total XP Earned</div>
       </div>
@@ -120,26 +112,27 @@ export function UserXPCard({ className = "" }: UserXPCardProps) {
       {xpData.breakdown.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-muted-foreground">XP Sources</h4>
-          {xpData.breakdown.map((source) => {
-            const Icon = SOURCE_TYPE_ICONS[source.sourceType as keyof typeof SOURCE_TYPE_ICONS] || Activity;
-            const label = SOURCE_TYPE_LABELS[source.sourceType as keyof typeof SOURCE_TYPE_LABELS] || source.sourceType;
+          {xpData.breakdown.map((source, index) => {
+            const config = getSourceConfig(source.config.configKey);
+            const Icon = config.icon;
+            const activityLabel = getActivityLabel(source.config.configKey, source.count);
             
             return (
-              <div key={source.sourceType} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/30">
+              <div key={source.config.configKey || index} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/30">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-md bg-primary/10">
                     <Icon className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{label}</p>
+                    <p className="text-sm font-medium">{config.label}</p>
                     <p className="text-xs text-muted-foreground">
-                      {source.count} {source.count === 1 ? 'activity' : 'activities'}
+                      {source.count} {activityLabel}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-primary">
-                    +{source.totalXp.toLocaleString()} XP
+                    +{parseFloat(source.totalXp).toLocaleString()} XP
                   </p>
                 </div>
               </div>
