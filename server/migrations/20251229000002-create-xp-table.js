@@ -19,10 +19,6 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
       },
-      sourceType: {
-        type: Sequelize.ENUM('ticket_purchase', 'raffle_revenue', 'raffle_creation'),
-        allowNull: false
-      },
       splTokenSendTransactionId: {
         type: Sequelize.INTEGER,
         allowNull: true,
@@ -102,10 +98,6 @@ module.exports = {
       name: 'idx_xp_tables_user_id'
     });
     
-    await queryInterface.addIndex('xp_tables', ['sourceType'], {
-      name: 'idx_xp_tables_source_type'
-    });
-    
     await queryInterface.addIndex('xp_tables', ['splTokenSendTransactionId'], {
       name: 'idx_xp_tables_spl_transaction_id'
     });
@@ -119,7 +111,7 @@ module.exports = {
     });
 
     // Composite index for preventing duplicates
-    await queryInterface.addIndex('xp_tables', ['userId', 'sourceType', 'splTokenSendTransactionId'], {
+    await queryInterface.addIndex('xp_tables', ['userId', 'splTokenSendTransactionId'], {
       name: 'idx_xp_tables_unique_transaction',
       unique: true,
       where: {

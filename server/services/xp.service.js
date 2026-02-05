@@ -181,8 +181,7 @@ class XpService {
       // Check for duplicate transaction
       const existing = await XpTable.findOne({
         where: { 
-          splTokenSendTransactionId,
-          sourceType: 'ticket_purchase'
+          splTokenSendTransactionId
         }
       });
 
@@ -195,7 +194,6 @@ class XpService {
 
       const xpRecord = await XpTable.create({
         userId,
-        sourceType: 'ticket_purchase',
         splTokenSendTransactionId,
         raffleId: metadata.raffleId,
         configId: config?.id,
@@ -244,7 +242,7 @@ class XpService {
         where: { 
           userId,
           raffleId,
-          sourceType: 'raffle_revenue'
+          configId: config?.id
         }
       });
 
@@ -255,7 +253,6 @@ class XpService {
 
       const xpRecord = await XpTable.create({
         userId,
-        sourceType: 'raffle_revenue',
         raffleId,
         configId: config?.id,
         usdValue: usdRevenue,
@@ -297,7 +294,7 @@ class XpService {
         where: { 
           userId,
           raffleId,
-          sourceType: 'raffle_creation'
+          configId: config?.id
         }
       });
 
@@ -310,7 +307,6 @@ class XpService {
 
       const xpRecord = await XpTable.create({
         userId,
-        sourceType: 'raffle_creation',
         raffleId,
         configId: config?.id,
         usdValue: 0, // Fixed reward, not based on USD value
@@ -393,13 +389,18 @@ class XpService {
 
       const breakdown = await XpTable.findAll({
         where: { userId },
+        include: [{
+          model: XpConfig,
+          as: 'config',
+          attributes: ['configKey', 'description'],
+          required: false
+        }],
         attributes: [
-          'sourceType',
-          [XpTable.sequelize.fn('COUNT', XpTable.sequelize.col('id')), 'count'],
+          [XpTable.sequelize.fn('COUNT', XpTable.sequelize.col('XpTable.id')), 'count'],
           [XpTable.sequelize.fn('SUM', XpTable.sequelize.col('xpEarned')), 'totalXp']
         ],
-        group: ['sourceType'],
-        raw: true
+        group: ['config.id'],
+        raw: false
       });
 
       const summary = {

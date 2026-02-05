@@ -44,23 +44,6 @@ module.exports = (sequelize, DataTypes) => {
           },
         },
       },
-      sourceType: {
-        type: DataTypes.ENUM(
-          "ticket_purchase",
-          "raffle_revenue",
-          "raffle_creation",
-        ),
-        allowNull: false,
-        validate: {
-          notNull: {
-            msg: "Source type is required",
-          },
-          isIn: {
-            args: [["ticket_purchase", "raffle_revenue", "raffle_creation"]],
-            msg: "Invalid source type",
-          },
-        },
-      },
       splTokenSendTransactionId: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -175,9 +158,6 @@ module.exports = (sequelize, DataTypes) => {
           fields: ["userId"],
         },
         {
-          fields: ["sourceType"],
-        },
-        {
           fields: ["splTokenSendTransactionId"],
         },
         {
@@ -191,7 +171,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         {
           unique: true,
-          fields: ["userId", "sourceType", "splTokenSendTransactionId"],
+          fields: ["userId", "splTokenSendTransactionId"],
           where: {
             splTokenSendTransactionId: {
               [sequelize.Sequelize.Op.ne]: null,

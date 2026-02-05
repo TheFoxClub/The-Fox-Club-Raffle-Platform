@@ -257,18 +257,24 @@ class UserController {
       const {
         page = 1,
         limit = 20,
-        sourceType,
+        configKey,
         startDate,
         endDate,
       } = req.query;
       const offset = (page - 1) * limit;
-      const { XpTable } = require("../models");
+      const { XpTable, XpConfig, Raffle } = require("../models");
       const { Op } = require("sequelize");
 
       let whereClause = { userId };
+      let includeClause = [{
+        model: XpConfig,
+        as: 'config',
+        attributes: ['configKey', 'description'],
+        required: false
+      }];
 
-      if (sourceType) {
-        whereClause.sourceType = sourceType;
+      if (configKey) {
+        includeClause[0].where = { configKey };
       }
 
       if (startDate || endDate) {
@@ -287,6 +293,7 @@ class UserController {
         limit: parseInt(limit),
         offset: parseInt(offset),
         include: [
+          ...includeClause,
           {
             model: Raffle,
             as: "raffle",
