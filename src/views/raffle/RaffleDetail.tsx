@@ -868,7 +868,7 @@ const RaffleDetail = () => {
                           {reward.rewardName}
                         </p>
                         <p className="text-xs sm:text-sm text-muted-foreground">
-                          <RewardAmountDisplay 
+                          <RewardAmountDisplay
                             amount={reward.amount}
                             rewardType={reward.rewardType}
                             mintAddress={reward.mintAddress}
@@ -1017,12 +1017,20 @@ const RaffleDetail = () => {
                   </div>
                 )}
                 <div className="flex flex-col min-w-0">
-                  <span className="sm:hidden">
-                    {raffle.host.slice(0, 4)}…{raffle.host.slice(-4)}
-                  </span>
-                  <span className="hidden sm:inline break-all">
-                    {raffle.host}
-                  </span>
+                  <button
+                    onClick={() => copyToClipboard(raffle.host)}
+                    className="hover:text-primary transition cursor-pointer"
+                  >
+                    {/* Mobile (short) */}
+                    <span className="sm:hidden">
+                      {raffle.host.slice(0, 4)}…{raffle.host.slice(-4)}
+                    </span>
+
+                    {/* Desktop (full) */}
+                    <span className="hidden sm:inline break-all">
+                      {raffle.host}
+                    </span>
+                  </button>
                   {/* <p className="text-xs sm:text-sm text-muted-foreground">
                     {raffle.hostReputation}% positive rating
                   </p> */}
@@ -1072,9 +1080,9 @@ const RaffleDetail = () => {
                 </span>
               </div>
               <span className="text-lg sm:text-xl font-bold">
-                <TokenDisplay 
-                  amount={raffle.price} 
-                  tokenType={raffle.tokenType} 
+                <TokenDisplay
+                  amount={raffle.price}
+                  tokenType={raffle.tokenType}
                   tokenAddress={raffle.tokenAddress}
                 />
               </span>
@@ -1152,9 +1160,9 @@ const RaffleDetail = () => {
                   Total Cost
                 </span>
                 <span className="text-xl sm:text-2xl font-bold text-primary">
-                  <TokenDisplay 
-                    amount={totalCost} 
-                    tokenType={raffle.tokenType} 
+                  <TokenDisplay
+                    amount={totalCost}
+                    tokenType={raffle.tokenType}
                     tokenAddress={raffle.tokenAddress}
                     className="text-xl sm:text-2xl font-bold text-primary"
                   />
