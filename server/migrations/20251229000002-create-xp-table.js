@@ -43,6 +43,16 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
       },
+      configId: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'xp_configs',
+          key: 'id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+      },
       usdValue: {
         type: Sequelize.DECIMAL(18, 6),
         allowNull: false,
@@ -102,6 +112,10 @@ module.exports = {
     
     await queryInterface.addIndex('xp_tables', ['raffleId'], {
       name: 'idx_xp_tables_raffle_id'
+    });
+
+    await queryInterface.addIndex('xp_tables', ['configId'], {
+      name: 'idx_xp_tables_config_id'
     });
 
     // Composite index for preventing duplicates

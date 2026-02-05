@@ -21,6 +21,12 @@ module.exports = (sequelize, DataTypes) => {
         targetKey: "id",
         as: "raffle",
       });
+
+      this.belongsTo(models.XpConfig, {
+        foreignKey: "configId",
+        targetKey: "id",
+        as: "config",
+      });
     }
   }
 
@@ -70,6 +76,15 @@ module.exports = (sequelize, DataTypes) => {
         validate: {
           isInt: {
             msg: "Raffle ID must be an integer",
+          },
+        },
+      },
+      configId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        validate: {
+          isInt: {
+            msg: "Config ID must be an integer",
           },
         },
       },
@@ -167,6 +182,9 @@ module.exports = (sequelize, DataTypes) => {
         },
         {
           fields: ["raffleId"],
+        },
+        {
+          fields: ["configId"],
         },
         {
           fields: ["createdAt"],
