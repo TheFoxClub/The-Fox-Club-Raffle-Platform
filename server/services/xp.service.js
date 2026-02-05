@@ -174,6 +174,10 @@ class XpService {
       const rates = await this.getXpRates();
       const xpEarned = usdValue * (rates.ticket_purchase_rate || 1);
 
+      const config = await XpConfig.findOne({
+        where: { configKey: 'ticket_purchase_rate', isActive: true }
+      });
+
       // Check for duplicate transaction
       const existing = await XpTable.findOne({
         where: { 
@@ -194,6 +198,7 @@ class XpService {
         sourceType: 'ticket_purchase',
         splTokenSendTransactionId,
         raffleId: metadata.raffleId,
+        configId: config?.id,
         usdValue,
         xpEarned,
         tokenType: metadata.tokenType,
@@ -230,6 +235,10 @@ class XpService {
       const rates = await this.getXpRates();
       const xpEarned = usdRevenue * (rates.raffle_revenue_rate || 1);
 
+      const config = await XpConfig.findOne({
+        where: { configKey: 'raffle_revenue_rate', isActive: true }
+      });
+
       // Check for duplicate
       const existing = await XpTable.findOne({
         where: { 
@@ -248,6 +257,7 @@ class XpService {
         userId,
         sourceType: 'raffle_revenue',
         raffleId,
+        configId: config?.id,
         usdValue: usdRevenue,
         xpEarned,
         metadata
@@ -278,6 +288,10 @@ class XpService {
       const rates = await this.getXpRates();
       const xpEarned = rates.raffle_creation_reward || 10;
 
+      const config = await XpConfig.findOne({
+        where: { configKey: 'raffle_creation_reward', isActive: true }
+      });
+
       // Check for duplicate
       const existing = await XpTable.findOne({
         where: { 
@@ -298,6 +312,7 @@ class XpService {
         userId,
         sourceType: 'raffle_creation',
         raffleId,
+        configId: config?.id,
         usdValue: 0, // Fixed reward, not based on USD value
         xpEarned,
         metadata
