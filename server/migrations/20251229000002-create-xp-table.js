@@ -76,7 +76,15 @@ module.exports = {
         type: Sequelize.JSON,
         allowNull: true,
         comment: 'Additional context like ticket count, raffle title, etc.'
-      }
+      },
+      createdAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
+      updatedAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
     });
 
     // Add indexes for better query performance

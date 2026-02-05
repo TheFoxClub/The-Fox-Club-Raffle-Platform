@@ -19,6 +19,16 @@ module.exports = {
         defaultValue: 1,
         comment: "1 -> solana, 2 -> polygon",
       },
+      totalXp: {
+        type: Sequelize.DECIMAL(18, 6),
+        defaultValue: 0,
+        allowNull: false
+      },
+      xpLastUpdated: {
+        type: Sequelize.DATE,
+        allowNull: true,
+        defaultValue: null
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
@@ -27,6 +37,11 @@ module.exports = {
         allowNull: false,
         type: Sequelize.DATE,
       },
+    });
+
+    // Add index for XP leaderboard queries
+    await queryInterface.addIndex('users', ['totalXp'], {
+      name: 'idx_users_total_xp'
     });
   },
   async down(queryInterface, Sequelize) {
