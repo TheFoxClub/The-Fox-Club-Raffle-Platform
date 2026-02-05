@@ -64,7 +64,7 @@ type HostedRaffle = {
 
 type ExtendedUser = {
   id?: number;
-  username?: string;
+  // username?: string;
   email?: string;
   description?: string;
   photoUrl?: string;
@@ -114,11 +114,11 @@ const Profile = () => {
     (state: RootState) => state.user,
   );
 
-  const {
-    // reputation = 0,
-    xp = 0,
-    xpGoal = 15000,
-  } = (user_info ?? {}) as ExtendedUser;
+  // const {
+  //   // reputation = 0,
+  //   xp = 0,
+  //   xpGoal = 15000,
+  // } = (user_info ?? {}) as ExtendedUser;
 
   const [ticketsBought, setTicketsBought] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
@@ -429,13 +429,10 @@ const Profile = () => {
                   <h1 className="text-lg sm:text-lg font-bold break-all">
                     {pubkey}
                   </h1>
-                  <div className="mt-2 sm:mt-0 self-start sm:self-center bg-green-900/30 backdrop-blur-sm text-green-400 px-3 hover:bg-primary hover:text-white py-1 rounded-full flex items-center gap-2 text-sm">
-                    <CheckCircle size={12} /> Verified
-                  </div>
                 </div>
-                <h4 className="text-lg sm:text-lg font-bold break-all">
+                {/* <h4 className="text-lg sm:text-lg font-bold break-all">
                   {user_info?.username}
-                </h4>
+                </h4> */}
               </div>
             </div>
 

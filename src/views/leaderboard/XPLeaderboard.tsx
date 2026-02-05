@@ -163,32 +163,28 @@ export default function XPLeaderboard() {
                         <div className="flex justify-center">
                           {getRankIcon(user.rank)}
                         </div>
-                        {/* <div>
-                          <p className="font-bold text-lg">
-                            {user.user_info?.username || shortenAddress(user.pubkey)}
-                          </p>
-                          {user.user_info?.username && (
-                            <p className="text-xs text-muted-foreground">
-                              {shortenAddress(user.pubkey)}
-                            </p>
-                          )}
-                        </div> */}
-                        <div>
-                          <button
-                            onClick={() => copyToClipboard(user.pubkey)}
-                            className="font-bold text-lg text-center
-               hover:text-primary
-               transition cursor-pointer"
-                            title="Click to copy wallet address"
-                          >
-                            {user.user_info?.username ||
-                              shortenAddress(user.pubkey)}
-                          </button>
 
-                          {user.user_info?.username && (
+                        <div className="text-center">
+                          {user.user_info?.username ? (
+                            <>
+                              <p className="font-bold text-lg">
+                                {user.user_info.username}
+                              </p>
+
+                              <button
+                                onClick={() => copyToClipboard(user.pubkey)}
+                                className="block mx-auto mt-1 text-sm text-center
+                   hover:text-primary transition cursor-pointer"
+                                title="Click to copy wallet address"
+                              >
+                                {shortenAddress(user.pubkey)}
+                              </button>
+                            </>
+                          ) : (
                             <button
                               onClick={() => copyToClipboard(user.pubkey)}
-                              className="block text-xs hover:text-primary transition"
+                              className="font-bold text-lg text-center
+                 hover:text-primary transition cursor-pointer"
                               title="Click to copy wallet address"
                             >
                               {shortenAddress(user.pubkey)}
@@ -240,32 +236,26 @@ export default function XPLeaderboard() {
                       {/* User Info */}
                       <div className="flex items-center gap-3">
                         <User className="h-5 w-5 text-muted-foreground" />
-                        {/* <div>
-                          <p className="font-medium">
-                            {user.user_info?.username ||
-                              shortenAddress(user.pubkey)}
-                          </p>
-                          {user.user_info?.username && (
-                            <p className="text-xs text-muted-foreground">
-                              {shortenAddress(user.pubkey)}
-                            </p>
-                          )}
-                        </div> */}
-                        <div>
-                          <button
-                            onClick={() => copyToClipboard(user.pubkey)}
-                            className="font-medium text-left hover:text-primary
-               transition cursor-pointer"
-                            title="Click to copy wallet address"
-                          >
-                            {user.user_info?.username ||
-                              shortenAddress(user.pubkey)}
-                          </button>
 
-                          {user.user_info?.username && (
+                        <div>
+                          {user.user_info?.username ? (
+                            <>
+                              <p className="font-medium text-left">
+                                {user.user_info.username}
+                              </p>
+
+                              <button
+                                onClick={() => copyToClipboard(user.pubkey)}
+                                className="block text-xs mt-1 hover:text-primary transition cursor-pointer"
+                                title="Click to copy wallet address"
+                              >
+                                {shortenAddress(user.pubkey)}
+                              </button>
+                            </>
+                          ) : (
                             <button
                               onClick={() => copyToClipboard(user.pubkey)}
-                              className="block text-xs hover:text-primary transition"
+                              className="font-medium text-left hover:text-primary transition cursor-pointer"
                               title="Click to copy wallet address"
                             >
                               {shortenAddress(user.pubkey)}

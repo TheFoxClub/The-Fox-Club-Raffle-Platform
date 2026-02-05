@@ -47,7 +47,8 @@ function RaffleCard({
   return (
     <Card
       key={raffle.id}
-      className={`absolute w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
+      className={`absolute w-[90vw] sm:w-[420px] md:w-[480px]
+      lg:w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
         isActive ? "glow-primary" : ""
       }`}
       style={{
@@ -129,6 +130,15 @@ export default function RaffleCarousel() {
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [index, setIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     const fetchFeatured = async () => {
@@ -282,6 +292,16 @@ export default function RaffleCarousel() {
   // **3D carousel style helper**
   const getCardStyle = (cardIndex: number) => {
     const diff = cardIndex - index;
+
+    if (isMobile) {
+      return {
+        transform: `translateX(${diff * 100}%)`,
+        opacity: cardIndex === index ? 1 : 0,
+        zIndex: cardIndex === index ? 10 : 1,
+        transition: "transform 0.5s ease, opacity 0.5s ease",
+      };
+    }
+
     const normalized = (diff + raffles.length) % raffles.length;
     const adjusted =
       normalized > raffles.length / 2
@@ -309,26 +329,30 @@ export default function RaffleCarousel() {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={prev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border-primary/30 hover:bg-primary/20"
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={next}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border-primary/30 hover:bg-primary/20"
-        >
-          <ChevronRight className="h-6 w-6" />
-        </Button>
+        {!isMobile && (
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={prev}
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border-primary/30 hover:bg-primary/20"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={next}
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/80 backdrop-blur-sm border-primary/30 hover:bg-primary/20"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </Button>
+          </>
+        )}
         {/* 3D Carousel Container */}
         <div
-          className="relative h-[430px] mx-auto overflow-hidden"
-          style={{ perspective: "1200px" }}
+          className="relative h-[380px] sm:h-[430px] mx-auto overflow-hidden"
+          style={{ perspective: isMobile ? "none" : "1200px" }}
         >
           <div
             className="absolute inset-0 flex items-center justify-center"
@@ -338,84 +362,6 @@ export default function RaffleCarousel() {
               const style = getCardStyle(cardIndex);
               const isActive = cardIndex === index;
 
-              // return (
-              //   <Card
-              //     key={raffle.id}
-              //     className={`absolute w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
-              //       isActive ? "glow-primary" : ""
-              //     }`}
-              //     style={{
-              //       ...style,
-              //       transformStyle: "preserve-3d",
-              //     }}
-              //     onClick={() => setIndex(cardIndex)}
-              //   >
-              //     <div className="relative aspect-[16/8] overflow-hidden">
-              //       <img
-              //         src={raffle.image}
-              //         alt={raffle.title}
-              //         className="w-full h-full object-cover"
-              //       />
-              //       {/* Verified Badge */}
-              //       {raffle.isVerified && (
-              //         <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
-              //           <CheckCircle size={16} /> Verified
-              //         </div>
-              //       )}
-              //       <div className="absolute top-4 left-4 rounded-full px-2.5 py-0.5 mb-2 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
-              //         Featured
-              //       </div>
-              //     </div>
-
-              //     {/* Details */}
-              //     <div className="p-4 flex flex-col justify-between space-y-2 relative">
-              //       {/* Featured Raffle Badge */}
-              //       <div className="flex flex-col">
-              //         <h2 className="text-xl font-bold text-gradient">
-              //           {raffle.title}
-              //         </h2>
-              //         <p className="text-muted-foreground mt-1 text-sm">
-              //           {raffle.description}
-              //         </p>
-              //       </div>
-
-              //       {/* Ticket Info */}
-              //       <div className="flex gap-10 text-sm justify-between">
-              //         <div className="flex items-center gap-2">
-              //           <Coins className="h-4 w-4 text-accent" />
-              //           <div>
-              //             <span className="text-muted-foreground text-sm mt-1">
-              //               Ticket Price
-              //             </span>
-              //             <p className="font-semibold">
-              //               {formatPrice(raffle.price)} {raffle.tokenType}
-              //             </p>
-              //           </div>
-              //         </div>
-
-              //         <div className="flex items-center gap-2">
-              //           <Users className="h-4 w-4 text-primary" />
-              //           <div>
-              //             <p className="text-gray-400">Tickets Sold</p>
-              //             <span className="font-bold">
-              //               {raffle.sold} / {raffle.total}
-              //             </span>
-              //           </div>
-              //         </div>
-              //       </div>
-
-              //       {/* Button + Arrows */}
-              //       {isActive && (
-              //         <Button
-              //           className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
-              //           onClick={() => navigate(`/raffle/raffle-${raffle.id}`)}
-              //         >
-              //           Enter Raffle
-              //         </Button>
-              //       )}
-              //     </div>
-              //   </Card>
-              // );
               return (
                 <RaffleCard
                   key={raffle.id}

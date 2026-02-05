@@ -3,9 +3,9 @@ import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import {
   User,
-  Trophy,
-  Flame,
-  Award,
+  // Trophy,
+  //  Flame,
+  //  Award,
   Ticket,
   Calendar,
   Coins,
@@ -55,11 +55,11 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
         // For missing level/rank/streak, we set default 1
         const extended = {
           ...user,
-          level: 1,
-          rank: 1,
+          // level: 1,
+          //  rank: 1,
           // streak: 1,
-          xp: 0,
-          xpGoal: 15000,
+          // xp: 0,
+          // xpGoal: 15000,
           photoUrl: user.user_info?.photoUrl || "",
         };
         // Fetch hosted raffles if available
@@ -103,13 +103,11 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                     <User className="h-6 w-6 text-white" />
                   )}
                 </div>
-                <div className="break-all text-sm font-base">
-                  {hostData.pubkey}
-                </div>
+                <div className="break-all text-sm">{hostData.pubkey}</div>
               </div>
 
               {/* Level, Rank, Streak */}
-              <div className="flex items-center justify-start text-xs text-muted-foreground gap-10">
+              {/* <div className="flex items-center justify-start text-xs text-muted-foreground gap-10">
                 <div className="flex items-center gap-1">
                   <Trophy className="h-4 w-4 text-accent" /> Level{" "}
                   {hostData.level}
@@ -118,14 +116,14 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                   <Award className="h-4 w-4 text-primary" /> Rank #
                   {hostData.rank}
                 </div>
-                {/* <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1">
                   <Flame className="h-4 w-4 text-orange-500" />{" "}
                   {hostData.streak}-Day Streak
-                </div> */}
-              </div>
+                </div> 
+              </div> */}
 
               {/* XP Bar */}
-              <div className="flex flex-col gap-1">
+              {/* <div className="flex flex-col gap-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>XP Progress</span>
                   <span>
@@ -140,7 +138,7 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                     }}
                   />
                 </div>
-              </div>
+              </div> */}
 
               {/* Hosted Raffles */}
               <div className="space-y-2">
