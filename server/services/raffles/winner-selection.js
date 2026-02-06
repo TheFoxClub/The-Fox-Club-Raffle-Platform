@@ -87,16 +87,20 @@ class WinnerSelectionService {
       }
 
       // Assign rewards to winners
+      // If there are more rewards than winners, distribute all rewards among winners
       const winnerAssignments = [];
-      for (let i = 0; i < selectedTickets.length && i < rewards.length; i++) {
-        const ticket = selectedTickets[i];
+      for (let i = 0; i < rewards.length; i++) {
         const reward = rewards[i];
+        // Cycle through winners if there are more rewards than winners
+        const ticket = selectedTickets[i % selectedTickets.length];
 
-        // Update the ticket as winner
-        await RaffleTicket.update(
-          { isWinner: true },
-          { where: { id: ticket.id } }
-        );
+        // Update the ticket as winner (only once per ticket)
+        if (i < selectedTickets.length) {
+          await RaffleTicket.update(
+            { isWinner: true },
+            { where: { id: ticket.id } }
+          );
+        }
 
         // Update the reward with winner information
         await RaffleReward.update(
