@@ -88,7 +88,9 @@ const CreateRaffle = () => {
   const [description, setDescription] = useState("");
   const [ticketPrice, setTicketPrice] = useState<number | "">("");
   const [totalTickets, setTotalTickets] = useState<number | "">("");
-  const [numberOfWinners, setNumberOfWinners] = useState(1);
+  // const [numberOfWinners, setNumberOfWinners] = useState(1);
+  const [numberOfWinners, setNumberOfWinners] = useState<number | "">(1);
+
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
@@ -98,6 +100,7 @@ const CreateRaffle = () => {
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const maxWinners = selectedNFTs.length + selectedTokens.length;
 
   // Dynamic token options state
   const [tokenOptions, setTokenOptions] = useState<
@@ -200,24 +203,39 @@ const CreateRaffle = () => {
     }
   }, [user.isAuthenticated]);
 
-  useEffect(() => {
-    const totalPrizes = selectedNFTs.length + selectedTokens.length;
+  // useEffect(() => {
+  //   const totalPrizes = selectedNFTs.length + selectedTokens.length;
 
-    if (totalPrizes === 0) {
+  //   if (totalPrizes === 0) {
+  //     setNumberOfWinners(1);
+  //     return;
+  //   }
+
+  //   setNumberOfWinners((prev) => {
+  //     const prevValue = typeof prev === "number" ? prev : 1;
+  //     if (prevValue > totalPrizes) return totalPrizes;
+
+  //     // If rewards increased and winners matched old count, auto-increase
+  //     if (prevValue === totalPrizes - 1) return totalPrizes;
+
+  //     return prevValue;
+  //   });
+  // }, [selectedNFTs.length, selectedTokens.length]);
+  useEffect(() => {
+    if (maxWinners === 0) {
       setNumberOfWinners(1);
       return;
     }
 
     setNumberOfWinners((prev) => {
-      // If rewards were removed, clamp winners
-      if (prev > totalPrizes) return totalPrizes;
+      const prevValue = typeof prev === "number" ? prev : 1;
 
-      // If rewards increased and winners matched old count, auto-increase
-      if (prev === totalPrizes - 1) return totalPrizes;
+      if (prevValue > maxWinners) return maxWinners;
+      if (prevValue === maxWinners - 1) return maxWinners;
 
-      return prev;
+      return prevValue;
     });
-  }, [selectedNFTs.length, selectedTokens.length]);
+  }, [maxWinners]);
 
   //fetch NFTs when NFT dialog opens
   useEffect(() => {
@@ -307,20 +325,33 @@ const CreateRaffle = () => {
               `Token ${mint.slice(0, 6)}...`;
             let image: string | null = null;
             const uri = t.metadata?.uri;
+
             if (uri) {
+              const normalized = normalizeIpfs(uri);
+
               try {
-                const res = await fetch(normalizeIpfs(uri)!);
-                if (res.ok) {
+                const res = await fetch(normalized);
+
+                const contentType = res.headers.get("content-type") || "";
+
+                // CASE 1 — direct image
+                if (contentType.startsWith("image/")) {
+                  image = normalized;
+                }
+
+                // CASE 2 — metadata JSON
+                else if (contentType.includes("application/json")) {
                   const meta = await res.json();
-                  if (meta?.image) {
-                    image = normalizeIpfs(meta.image);
-                  }
+                  image = normalizeIpfs(
+                    meta?.image || meta?.logoURI || meta?.image_url,
+                  );
+
                   if (!t.metadata?.name && meta?.name) {
                     name = meta.name;
                   }
                 }
               } catch (err) {
-                console.warn("Failed to fetch token metadata:", uri);
+                console.warn("Token metadata fetch failed:", normalized);
               }
             }
 
@@ -554,13 +585,19 @@ const CreateRaffle = () => {
 
     if (!totalTickets || Number(totalTickets) <= 0)
       newErrors.totalTickets = "Total tickets must be greater than 0";
-    if (!numberOfWinners || Number(numberOfWinners) <= 0)
-      newErrors.numberOfWinners = "Number of winners must be at least 1";
+    const winners = typeof numberOfWinners === "number" ? numberOfWinners : 0;
+
     const totalPrizes = selectedNFTs.length + selectedTokens.length;
-    if (numberOfWinners > totalPrizes) {
+
+    if (winners < 1) {
+      newErrors.numberOfWinners = "Number of winners must be at least 1";
+    }
+
+    if (winners > totalPrizes) {
       newErrors.numberOfWinners =
         "Number of winners cannot exceed total prizes";
     }
+
     if (!startNow && !startDate) newErrors.startDate = "Start date is required";
     if (!endDate) newErrors.endDate = "End date is required";
     if (!selectedTokenType)
@@ -1590,6 +1627,7 @@ const CreateRaffle = () => {
                               placeholder="Amount to use"
                               className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
                             />
+
                             {errors[`token-${t.mint}`] && (
                               <p className="text-red-500 text-xs mt-1">
                                 {errors[`token-${t.mint}`]}
@@ -1632,6 +1670,7 @@ const CreateRaffle = () => {
                   step="0.01"
                   className="mt-2 w-full text-base md:text-sm bg-background/50 outline-none"
                 />
+
                 {errors.ticketPrice && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.ticketPrice}
@@ -1702,19 +1741,40 @@ const CreateRaffle = () => {
                   value={numberOfWinners}
                   min={1}
                   max={selectedNFTs.length + selectedTokens.length}
+                  step={1}
                   onChange={(e) => {
-                    const value = Number(e.target.value);
-                    const max = selectedNFTs.length + selectedTokens.length;
+                    const value = e.target.value;
+                    if (value === "") {
+                      setNumberOfWinners("");
+                      return;
+                    }
+                    const num = Number(value);
+                    if (isNaN(num)) return;
 
-                    setNumberOfWinners(Math.min(Math.max(1, value), max));
+                    setNumberOfWinners(num);
 
                     setErrors((prev) => ({
                       ...prev,
                       numberOfWinners: undefined,
                     }));
                   }}
+                  onBlur={() => {
+                    if (numberOfWinners === "") {
+                      setNumberOfWinners(1);
+                      return;
+                    }
+
+                    if (numberOfWinners < 1) {
+                      setNumberOfWinners(1);
+                    } else if (numberOfWinners > maxWinners) {
+                      setNumberOfWinners(maxWinners);
+                    }
+                  }}
                   className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Max winners: {maxWinners}
+                </p>
                 {errors.numberOfWinners && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.numberOfWinners}
