@@ -4,7 +4,11 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class XpConfig extends Model {
     static associate(models) {
-      // No associations needed for config table
+      this.hasMany(models.XpTable, {
+        sourceKey: "id",
+        foreignKey: "configId",
+        as: "xpRecords",
+      });
     }
 
     // Helper method to get config value by key

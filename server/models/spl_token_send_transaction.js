@@ -28,7 +28,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       txId: DataTypes.TEXT,
       tokenAddress: DataTypes.STRING,
-      decimals: DataTypes.DECIMAL(10, 2),
+      decimals: DataTypes.INTEGER,
       uiAmount: DataTypes.STRING,
       status: DataTypes.INTEGER,
       additionalJson: DataTypes.JSON,

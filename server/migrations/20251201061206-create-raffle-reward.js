@@ -42,6 +42,30 @@ module.exports = {
         type: Sequelize.JSON,
         allowNull: true,
       },
+      winnerId: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: "users",
+          key: "id",
+        },
+      },
+      winnerTicketId: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+      isClaimed: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+      },
+      splTokenTransferTxId: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+      splTokenClaimTxId: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,

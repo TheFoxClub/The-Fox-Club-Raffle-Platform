@@ -21,6 +21,12 @@ module.exports = (sequelize, DataTypes) => {
         targetKey: "id",
         as: "raffle",
       });
+
+      this.belongsTo(models.XpConfig, {
+        foreignKey: "configId",
+        targetKey: "id",
+        as: "config",
+      });
     }
   }
 
@@ -35,23 +41,6 @@ module.exports = (sequelize, DataTypes) => {
           },
           isInt: {
             msg: "User ID must be an integer",
-          },
-        },
-      },
-      sourceType: {
-        type: DataTypes.ENUM(
-          "ticket_purchase",
-          "raffle_revenue",
-          "raffle_creation",
-        ),
-        allowNull: false,
-        validate: {
-          notNull: {
-            msg: "Source type is required",
-          },
-          isIn: {
-            args: [["ticket_purchase", "raffle_revenue", "raffle_creation"]],
-            msg: "Invalid source type",
           },
         },
       },
@@ -70,6 +59,15 @@ module.exports = (sequelize, DataTypes) => {
         validate: {
           isInt: {
             msg: "Raffle ID must be an integer",
+          },
+        },
+      },
+      configId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        validate: {
+          isInt: {
+            msg: "Config ID must be an integer",
           },
         },
       },
@@ -160,20 +158,20 @@ module.exports = (sequelize, DataTypes) => {
           fields: ["userId"],
         },
         {
-          fields: ["sourceType"],
-        },
-        {
           fields: ["splTokenSendTransactionId"],
         },
         {
           fields: ["raffleId"],
         },
         {
+          fields: ["configId"],
+        },
+        {
           fields: ["createdAt"],
         },
         {
           unique: true,
-          fields: ["userId", "sourceType", "splTokenSendTransactionId"],
+          fields: ["userId", "splTokenSendTransactionId"],
           where: {
             splTokenSendTransactionId: {
               [sequelize.Sequelize.Op.ne]: null,

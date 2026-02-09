@@ -174,11 +174,14 @@ class XpService {
       const rates = await this.getXpRates();
       const xpEarned = usdValue * (rates.ticket_purchase_rate || 1);
 
+      const config = await XpConfig.findOne({
+        where: { configKey: 'ticket_purchase_rate', isActive: true }
+      });
+
       // Check for duplicate transaction
       const existing = await XpTable.findOne({
         where: { 
-          splTokenSendTransactionId,
-          sourceType: 'ticket_purchase'
+          splTokenSendTransactionId
         }
       });
 
@@ -191,9 +194,9 @@ class XpService {
 
       const xpRecord = await XpTable.create({
         userId,
-        sourceType: 'ticket_purchase',
         splTokenSendTransactionId,
         raffleId: metadata.raffleId,
+        configId: config?.id,
         usdValue,
         xpEarned,
         tokenType: metadata.tokenType,
@@ -230,12 +233,16 @@ class XpService {
       const rates = await this.getXpRates();
       const xpEarned = usdRevenue * (rates.raffle_revenue_rate || 1);
 
+      const config = await XpConfig.findOne({
+        where: { configKey: 'raffle_revenue_rate', isActive: true }
+      });
+
       // Check for duplicate
       const existing = await XpTable.findOne({
         where: { 
           userId,
           raffleId,
-          sourceType: 'raffle_revenue'
+          configId: config?.id
         }
       });
 
@@ -246,8 +253,8 @@ class XpService {
 
       const xpRecord = await XpTable.create({
         userId,
-        sourceType: 'raffle_revenue',
         raffleId,
+        configId: config?.id,
         usdValue: usdRevenue,
         xpEarned,
         metadata
@@ -278,12 +285,16 @@ class XpService {
       const rates = await this.getXpRates();
       const xpEarned = rates.raffle_creation_reward || 10;
 
+      const config = await XpConfig.findOne({
+        where: { configKey: 'raffle_creation_reward', isActive: true }
+      });
+
       // Check for duplicate
       const existing = await XpTable.findOne({
         where: { 
           userId,
           raffleId,
-          sourceType: 'raffle_creation'
+          configId: config?.id
         }
       });
 
@@ -296,8 +307,8 @@ class XpService {
 
       const xpRecord = await XpTable.create({
         userId,
-        sourceType: 'raffle_creation',
         raffleId,
+        configId: config?.id,
         usdValue: 0, // Fixed reward, not based on USD value
         xpEarned,
         metadata
@@ -378,13 +389,18 @@ class XpService {
 
       const breakdown = await XpTable.findAll({
         where: { userId },
+        include: [{
+          model: XpConfig,
+          as: 'config',
+          attributes: ['configKey', 'description'],
+          required: false
+        }],
         attributes: [
-          'sourceType',
-          [XpTable.sequelize.fn('COUNT', XpTable.sequelize.col('id')), 'count'],
+          [XpTable.sequelize.fn('COUNT', XpTable.sequelize.col('XpTable.id')), 'count'],
           [XpTable.sequelize.fn('SUM', XpTable.sequelize.col('xpEarned')), 'totalXp']
         ],
-        group: ['sourceType'],
-        raw: true
+        group: ['config.id'],
+        raw: false
       });
 
       const summary = {

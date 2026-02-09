@@ -1,12 +1,14 @@
-import { TrendingUp, Activity, DollarSign, Users } from "lucide-react";
+import { TrendingUp } from "lucide-react";
+import { getSourceConfig, getRecordLabel } from "../../config/xpSources";
 
 interface XPAnalytics {
   sourceBreakdown: Array<{
-    sourceType: string;
     recordCount: number;
     totalXp: number;
     totalUsdValue: number;
     avgXpPerRecord: number;
+    configKey: string;
+    description: string;
   }>;
   totalStats: {
     totalRecords: number;
@@ -24,18 +26,6 @@ interface XPAnalytics {
 interface XPAnalyticsCardProps {
   analytics: XPAnalytics | null;
 }
-
-const SOURCE_TYPE_LABELS = {
-  ticket_purchase: "Ticket Purchases",
-  raffle_revenue: "Raffle Revenue", 
-  raffle_creation: "Raffle Creation"
-};
-
-const SOURCE_TYPE_ICONS = {
-  ticket_purchase: Activity,
-  raffle_revenue: DollarSign,
-  raffle_creation: TrendingUp
-};
 
 export function XPAnalyticsCard({ analytics }: XPAnalyticsCardProps) {
   if (!analytics) {
@@ -64,20 +54,21 @@ export function XPAnalyticsCard({ analytics }: XPAnalyticsCardProps) {
       <div className="space-y-4 mb-6">
         <h4 className="text-sm font-medium text-muted-foreground">XP by Source Type</h4>
         <div className="space-y-3">
-          {analytics.sourceBreakdown.map((source) => {
-            const Icon = SOURCE_TYPE_ICONS[source.sourceType as keyof typeof SOURCE_TYPE_ICONS] || Activity;
-            const label = SOURCE_TYPE_LABELS[source.sourceType as keyof typeof SOURCE_TYPE_LABELS] || source.sourceType;
+          {analytics.sourceBreakdown.map((source, index) => {
+            const config = getSourceConfig(source.configKey);
+            const Icon = config.icon;
+            const recordLabel = getRecordLabel(source.configKey, source.recordCount);
             
             return (
-              <div key={source.sourceType} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/30">
+              <div key={source.configKey || index} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/30">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-md bg-primary/10">
                     <Icon className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{label}</p>
+                    <p className="text-sm font-medium">{config.label}</p>
                     <p className="text-xs text-muted-foreground">
-                      {source.recordCount} records • Avg: {source.avgXpPerRecord.toFixed(1)} XP
+                      {source.recordCount} {recordLabel} • Avg: {source.avgXpPerRecord.toFixed(1)} XP
                     </p>
                   </div>
                 </div>

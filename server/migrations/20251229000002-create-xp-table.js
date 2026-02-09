@@ -19,10 +19,6 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
       },
-      sourceType: {
-        type: Sequelize.ENUM('ticket_purchase', 'raffle_revenue', 'raffle_creation'),
-        allowNull: false
-      },
       splTokenSendTransactionId: {
         type: Sequelize.INTEGER,
         allowNull: true,
@@ -38,6 +34,16 @@ module.exports = {
         allowNull: true,
         references: {
           model: 'raffles',
+          key: 'id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+      },
+      configId: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'xp_configs',
           key: 'id'
         },
         onUpdate: 'CASCADE',
@@ -76,16 +82,20 @@ module.exports = {
         type: Sequelize.JSON,
         allowNull: true,
         comment: 'Additional context like ticket count, raffle title, etc.'
-      }
+      },
+      createdAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
+      updatedAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
     });
 
     // Add indexes for better query performance
     await queryInterface.addIndex('xp_tables', ['userId'], {
       name: 'idx_xp_tables_user_id'
-    });
-    
-    await queryInterface.addIndex('xp_tables', ['sourceType'], {
-      name: 'idx_xp_tables_source_type'
     });
     
     await queryInterface.addIndex('xp_tables', ['splTokenSendTransactionId'], {
@@ -96,8 +106,12 @@ module.exports = {
       name: 'idx_xp_tables_raffle_id'
     });
 
+    await queryInterface.addIndex('xp_tables', ['configId'], {
+      name: 'idx_xp_tables_config_id'
+    });
+
     // Composite index for preventing duplicates
-    await queryInterface.addIndex('xp_tables', ['userId', 'sourceType', 'splTokenSendTransactionId'], {
+    await queryInterface.addIndex('xp_tables', ['userId', 'splTokenSendTransactionId'], {
       name: 'idx_xp_tables_unique_transaction',
       unique: true,
       where: {

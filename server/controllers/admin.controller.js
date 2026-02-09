@@ -1217,19 +1217,24 @@ class AdminController {
   // Get XP analytics and statistics
   static async getXpAnalytics(req, res) {
     try {
-      const { XpTable } = require("../models");
+      const { XpTable, XpConfig } = require("../models");
 
-      // XP breakdown by source type
+      // XP breakdown by config type
       const sourceBreakdown = await XpTable.findAll({
+        include: [{
+          model: XpConfig,
+          as: 'config',
+          attributes: ['configKey', 'description'],
+          required: false
+        }],
         attributes: [
-          "sourceType",
-          [sequelize.fn("COUNT", sequelize.col("id")), "recordCount"],
+          [sequelize.fn("COUNT", sequelize.col("XpTable.id")), "recordCount"],
           [sequelize.fn("SUM", sequelize.col("xpEarned")), "totalXp"],
           [sequelize.fn("SUM", sequelize.col("usdValue")), "totalUsdValue"],
           [sequelize.fn("AVG", sequelize.col("xpEarned")), "avgXpPerRecord"],
         ],
-        group: ["sourceType"],
-        raw: true,
+        group: ["config.id"],
+        raw: false,
       });
 
       const totalStats = await XpTable.findOne({
@@ -1316,11 +1321,12 @@ class AdminController {
         "XP analytics retrieved successfully",
         {
           sourceBreakdown: sourceBreakdown.map((item) => ({
-            sourceType: item.sourceType,
-            recordCount: parseInt(item.recordCount),
-            totalXp: parseFloat(item.totalXp || 0),
-            totalUsdValue: parseFloat(item.totalUsdValue || 0),
-            avgXpPerRecord: parseFloat(item.avgXpPerRecord || 0),
+            configKey: item.config?.configKey,
+            description: item.config?.description,
+            recordCount: parseInt(item.dataValues.recordCount),
+            totalXp: parseFloat(item.dataValues.totalXp || 0),
+            totalUsdValue: parseFloat(item.dataValues.totalUsdValue || 0),
+            avgXpPerRecord: parseFloat(item.dataValues.avgXpPerRecord || 0),
           })),
           totalStats: {
             totalRecords: parseInt(totalStats.totalRecords),
@@ -1375,18 +1381,23 @@ class AdminController {
       const {
         page = 1,
         limit = 50,
-        sourceType,
+        configKey,
         userId,
         startDate,
         endDate,
       } = req.query;
       const offset = (page - 1) * limit;
-      const { XpTable } = require("../models");
+      const { XpTable, XpConfig } = require("../models");
 
       let whereClause = {};
+      let includeClause = [{
+        model: XpConfig,
+        as: 'config',
+        attributes: ['configKey', 'description']
+      }];
 
-      if (sourceType) {
-        whereClause.sourceType = sourceType;
+      if (configKey) {
+        includeClause[0].where = { configKey };
       }
 
       if (userId) {
@@ -1409,6 +1420,7 @@ class AdminController {
         limit: parseInt(limit),
         offset: parseInt(offset),
         include: [
+          ...includeClause,
           {
             model: User,
             as: "user",

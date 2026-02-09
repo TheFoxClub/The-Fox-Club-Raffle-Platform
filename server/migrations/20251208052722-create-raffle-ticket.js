@@ -35,6 +35,14 @@ module.exports = {
         type: Sequelize.BOOLEAN,
         defaultValue: false,
       },
+      commissionRate: {
+        type: Sequelize.DECIMAL(10, 4),
+        defaultValue: 0.05,
+      },
+      creatorAmount: {
+        type: Sequelize.DECIMAL(10, 9),
+        defaultValue: 0,
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
