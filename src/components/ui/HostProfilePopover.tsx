@@ -13,6 +13,7 @@ import {
 import server from "../../config/server";
 import { Link } from "react-router-dom";
 import { formatPrice } from "../../helpers/formatPrice";
+import { toast } from "react-toastify";
 
 const HostProfilePopover = ({ hostId }: { hostId: number }) => {
   const [showPopover, setShowPopover] = useState(false);
@@ -24,6 +25,17 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
 
   const TOKEN_DISPLAY_NAMES: Record<string, string> = {
     SOLANA: "SOL",
+  };
+  const shortenAddress = (address: string, start = 4, end = 4) =>
+    `${address.slice(0, start)}...${address.slice(-end)}`;
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Wallet address copied");
+    } catch {
+      toast.error("Failed to copy wallet address");
+    }
   };
 
   useEffect(() => {
@@ -103,7 +115,39 @@ const HostProfilePopover = ({ hostId }: { hostId: number }) => {
                     <User className="h-6 w-6 text-white" />
                   )}
                 </div>
-                <div className="break-all text-sm">{hostData.pubkey}</div>
+                {/* <div className="break-all text-sm">{hostData.pubkey}</div> */}
+                <div className="flex flex-col mt-1 items-center justify-center space-y-2">
+                  {hostData.user_info?.username ? (
+                    <>
+                      {/* Username */}
+                      <h1 className="text-lg font-bold leading-tight">
+                        {hostData.user_info.username}
+                      </h1>
+
+                      <button
+                        onClick={() => copyToClipboard(hostData.pubkey)}
+                        className="text-sm text-muted-foreground break-all
+                   hover:text-primary transition cursor-pointer"
+                        title="Click to copy wallet address"
+                      >
+                        {shortenAddress(hostData.pubkey)}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => copyToClipboard(hostData.pubkey)}
+                      className="text-lg font-bold break-all
+                   hover:text-primary transition cursor-pointer"
+                      title="Click to copy wallet address"
+                    >
+                      {shortenAddress(hostData.pubkey)}
+                    </button>
+                    /* Wallet only (fallback) */
+                    // <h1 className="text-lg font-bold break-all">
+                    //   {shortenAddress(hostData.pubkey)}
+                    // </h1>
+                  )}
+                </div>
               </div>
 
               {/* Level, Rank, Streak */}
