@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import { toast } from "react-toastify";
 import server from "../../config/server";
 import Button from "../../components/ui/Button";
@@ -74,27 +74,79 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
         {
           raffleId,
           rewardId: reward.id,
-        }
+        },
       );
 
       if (claimRes.data.success && claimRes.data.data) {
+        // Check if this was auto-submitted
+        if ((claimRes.data.data as any).autoSubmitted) {
+          const autoSubmitData = claimRes.data.data as any;
+          toast.success("Reward claimed successfully!");
+          setClaimed(true);
+
+          // Call the onClaimed callback if provided
+          if (onClaimed) {
+            onClaimed();
+          }
+
+          const signature = autoSubmitData.signature;
+          const explorerUrl = `https://solscan.io/tx/${signature}`;
+
+          toast.info(
+            <div>
+              Transaction confirmed:
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 underline ml-1"
+              >
+                View on Solscan
+              </a>
+            </div>,
+          );
+          return;
+        }
+
         const { transaction, checksum } = claimRes.data.data;
 
-        // Sign the transaction (user signature for fee payment)
-        const tx = Transaction.from(Buffer.from(transaction, "base64"));
+        // Try to deserialize as legacy or versioned transaction
+        let tx: Transaction | VersionedTransaction;
+
+        try {
+          // Try legacy transaction first
+          tx = Transaction.from(Buffer.from(transaction, "base64"));
+        } catch (error) {
+          try {
+            // Fallback to versioned transaction (for pNFTs)
+            tx = VersionedTransaction.deserialize(
+              Buffer.from(transaction, "base64"),
+            );
+          } catch (versionedError) {
+            console.error(
+              "Failed to deserialize transaction:",
+              error,
+              versionedError,
+            );
+            throw new Error("Failed to deserialize transaction");
+          }
+        }
+
         const signedTx = await signTransaction(tx);
+
+        const serializedTx = Buffer.from(signedTx.serialize()).toString(
+          "base64",
+        );
 
         // Submit signed transaction
         const submitRes = await server.post<SubmitClaimResponse>(
           "/raffle/submit-claim",
           {
-            signedTransaction: Buffer.from(signedTx.serialize()).toString(
-              "base64"
-            ),
+            signedTransaction: serializedTx,
             checksum,
             raffleId,
             rewardId: reward.id,
-          }
+          },
         );
 
         if (submitRes.data.success && submitRes.data.data) {
@@ -120,7 +172,7 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
               >
                 View on Solscan
               </a>
-            </div>
+            </div>,
           );
         } else {
           throw new Error("Failed to submit claim");

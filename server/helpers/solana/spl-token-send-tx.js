@@ -31,6 +31,7 @@ const {
 } = require("@metaplex-foundation/umi");
 const { base64 } = require("@metaplex-foundation/umi/serializers");
 const { generateChecksum } = require("./checksum-validation.js");
+const logger = require("../../util/logger");
 
 const umi = getUmi();
 
@@ -385,7 +386,12 @@ const createClaimTransaction = async ({
 
     const { tokenAddress, amount, type } = reward;
 
-    switch (type) {
+    logger.info(`createClaimTransaction - type: ${type} (${typeof type}), NFT enum: ${RAFFLE_REWARD_TYPES.NFT}, match: ${type === RAFFLE_REWARD_TYPES.NFT}`);
+
+    // Ensure type is a number for comparison
+    const rewardType = typeof type === 'string' ? RAFFLE_REWARD_TYPES[type] : type;
+
+    switch (rewardType) {
       case RAFFLE_REWARD_TYPES.SOLANA:
         // SOL transfer
         transaction.add(
@@ -400,7 +406,7 @@ const createClaimTransaction = async ({
       case RAFFLE_REWARD_TYPES.NFT:
         // For NFT transfers, we'll use the existing NFT transfer function
         // which handles the complexity of NFT transfers
-        return await addNftSendTransaction({
+        const nftResult = await addNftSendTransaction({
           transaction: new Transaction(),
           mintAddresses: [
             {
@@ -414,9 +420,25 @@ const createClaimTransaction = async ({
           direction: "platform_to_user",
         });
 
+        return {
+          success: true,
+          data: {
+            serializedTx: nftResult.serializedTx,
+            blockhash: nftResult.blockhash,
+            lastValidBlockHeight: nftResult.lastValidBlockHeight,
+            autoSubmit: nftResult.autoSubmit || false, // Pass through autoSubmit flag
+          },
+          message: "Created NFT claim transaction",
+        };
+
       default:
         // SPL Token transfer
         const tokenDetail = await getTokenDetail(tokenAddress);
+        
+        if (!tokenDetail) {
+          throw new Error(`Failed to get token details for ${tokenAddress}. This might be an NFT - please check the reward type.`);
+        }
+        
         const { transferFeeConfig, decimals, tokenProgramId } = tokenDetail;
 
         const uiAmount = amount * Math.pow(10, decimals);
@@ -519,6 +541,7 @@ const createClaimTransaction = async ({
       message: "Created pre-signed claim transaction",
     };
   } catch (error) {
+    logger.error("Error in createClaimTransaction:", error);
     return {
       success: false,
       data: null,
@@ -666,11 +689,17 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
   try {
     const transactionBuffer = Buffer.from(signedTransactionBase64, "base64");
 
-    // Submit to Solana network
+    logger.info(`Submitting transaction to blockchain...`);
+    logger.info(`Transaction size: ${transactionBuffer.length} bytes`);
+    
+    // Submit to Solana network with simulation first
     const signature = await connection.sendRawTransaction(transactionBuffer, {
       skipPreflight: false,
       preflightCommitment: "confirmed",
+      maxRetries: 3,
     });
+
+    logger.info(`Transaction submitted with signature: ${signature}`);
 
     // Wait for confirmation
     const confirmation = await connection.confirmTransaction(
@@ -679,20 +708,31 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
     );
 
     if (confirmation.value.err) {
+      logger.error(`Transaction confirmation failed:`, confirmation.value.err);
       throw new Error(
         `Transaction failed: ${JSON.stringify(confirmation.value.err)}`,
       );
     }
 
+    logger.info(`Transaction confirmed successfully`);
     return {
       success: true,
       signature,
       confirmation,
     };
   } catch (error) {
+    logger.error(`Error submitting transaction to blockchain:`, error);
+    
+    // Try to get more detailed logs if available
+    if (error.logs) {
+      logger.error(`Transaction logs:`, error.logs);
+    }
+    
     return {
       success: false,
+      message: error.message,
       error: error.message,
+      logs: error.logs || [],
     };
   }
 };
