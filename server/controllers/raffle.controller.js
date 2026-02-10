@@ -477,6 +477,7 @@ class RaffleController {
             rewardName: reward.rewardName,
             rewardType: reward.rewardType,
             rewardIndex: index,
+            mintAddress: reward.mintAddress,
           },
         };
       });
@@ -506,6 +507,9 @@ class RaffleController {
         );
       }
 
+      // Capture NFT type information if available
+      const nftTypeInfo = transferResponse.data.type || null;
+
       // Return transaction for user to sign
       return respond(
         res,
@@ -518,9 +522,11 @@ class RaffleController {
             rewards: rewards.map((reward, index) => ({
               ...reward,
               transferIndex: index,
+              nftType: nftTypeInfo, // NFT type info ("legacy", "pnft")
             })),
             platformWallet: BET_RECEIVER_WALLET,
             totalRewards: rewards.length,
+            nftTypeInfo,
           },
         },
       );
@@ -728,18 +734,52 @@ class RaffleController {
           await RaffleReward.destroy({ where: { raffleId: draftId } });
 
           // Create new rewards
-          const rewardsToInsert = rewards.map((reward) => ({
-            raffleId: draftId,
-            rewardType:
+          const rewardsToInsert = rewards.map((reward) => {
+            let mappedType =
               RAFFLE_REWARD_TYPES[reward.rewardType] ||
-              RAFFLE_REWARD_TYPES.SPL_TOKEN,
-            rewardName: reward.rewardName,
-            mintAddress: reward.mintAddress,
-            amount: reward.amount || 1,
-            imageUrl: reward.imageUrl,
-            metadataJson: reward.metadataJson,
-            splTokenTransferTxId: null, // Will be set when reward is transferred
-          }));
+              RAFFLE_REWARD_TYPES.SPL_TOKEN;
+
+            // For NFTs, check if it's a pNFT from the transfer data
+            // pNFTs need rewardType = 0 (NFT), legacy NFTs need rewardType = 1 (SPL_TOKEN)
+            if (reward.rewardType === "NFT" && rewardTransferData) {
+              // Check if this is a pNFT based on transfer metadata
+              const nftTypeInfo =
+                rewardTransferData.nftTypeInfo || reward.nftType;
+
+              // for future reference
+              const existingMetadata = reward.metadataJson
+                ? typeof reward.metadataJson === "string"
+                  ? JSON.parse(reward.metadataJson)
+                  : reward.metadataJson
+                : {};
+
+              reward.metadataJson = JSON.stringify({
+                ...existingMetadata,
+                nftType: nftTypeInfo,
+              });
+
+              if (nftTypeInfo === "pnft") {
+                mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
+                logger.info(`Detected pNFT, setting rewardType to 0 (NFT)`);
+              } else {
+                mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
+                logger.info(
+                  `Detected legacy NFT, setting rewardType to 1 (SPL_TOKEN)`,
+                );
+              }
+            }
+
+            return {
+              raffleId: draftId,
+              rewardType: mappedType,
+              rewardName: reward.rewardName,
+              mintAddress: reward.mintAddress,
+              amount: reward.amount || 1,
+              imageUrl: reward.imageUrl,
+              metadataJson: reward.metadataJson,
+              splTokenTransferTxId: null, // Will be set when reward is transferred
+            };
+          });
 
           const createdRewards = await RaffleReward.bulkCreate(rewardsToInsert);
 
@@ -1033,18 +1073,53 @@ class RaffleController {
 
       // Create rewards
       if (rewards && rewards.length > 0) {
-        const rewardsToInsert = rewards.map((reward) => ({
-          raffleId: raffle.id,
-          rewardType:
+        const rewardsToInsert = rewards.map((reward) => {
+          let mappedType =
             RAFFLE_REWARD_TYPES[reward.rewardType] ||
-            RAFFLE_REWARD_TYPES.SPL_TOKEN,
-          rewardName: reward.rewardName,
-          mintAddress: reward.mintAddress,
-          amount: reward.amount || 1,
-          imageUrl: reward.imageUrl,
-          metadataJson: reward.metadataJson,
-          splTokenTransferTxId: null, // Will be set when reward is transferred
-        }));
+            RAFFLE_REWARD_TYPES.SPL_TOKEN;
+
+          // pNFTs need rewardType = 0 (NFT), legacy NFTs need rewardType = 1 (SPL_TOKEN)
+          if (reward.rewardType === "NFT" && rewardTransferData) {
+            const nftTypeInfo =
+              rewardTransferData.nftTypeInfo || reward.nftType;
+
+            const existingMetadata = reward.metadataJson
+              ? typeof reward.metadataJson === "string"
+                ? JSON.parse(reward.metadataJson)
+                : reward.metadataJson
+              : {};
+
+            reward.metadataJson = JSON.stringify({
+              ...existingMetadata,
+              nftType: nftTypeInfo,
+            });
+
+            if (nftTypeInfo === "pnft") {
+              mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
+              logger.info(`Detected pNFT, setting rewardType to 0 (NFT)`);
+            } else {
+              mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
+              logger.info(
+                `Detected legacy NFT, setting rewardType to 1 (SPL_TOKEN)`,
+              );
+            }
+          }
+
+          logger.info(
+            `Creating reward in createRaffle: ${reward.rewardName}, rewardType: "${reward.rewardType}", mapped to: ${mappedType}, nftType: ${reward.metadataJson}`,
+          );
+
+          return {
+            raffleId: raffle.id,
+            rewardType: mappedType,
+            rewardName: reward.rewardName,
+            mintAddress: reward.mintAddress,
+            amount: reward.amount || 1,
+            imageUrl: reward.imageUrl,
+            metadataJson: reward.metadataJson,
+            splTokenTransferTxId: null, // Will be set when reward is transferred
+          };
+        });
 
         const createdRewards = await RaffleReward.bulkCreate(rewardsToInsert);
 
@@ -1228,19 +1303,26 @@ class RaffleController {
 
       // Create rewards without transfer information (will be updated by cron job)
       if (rewards && rewards.length > 0) {
-        const rewardsToInsert = rewards.map((reward) => ({
-          raffleId: raffle.id,
-          rewardType:
+        const rewardsToInsert = rewards.map((reward) => {
+          const rewardType =
             RAFFLE_REWARD_TYPES[reward.rewardType] ||
-            RAFFLE_REWARD_TYPES.SPL_TOKEN,
-          rewardName: reward.rewardName,
-          mintAddress: reward.mintAddress,
-          amount: reward.amount || 1,
-          imageUrl: reward.imageUrl,
-          metadataJson: reward.metadataJson,
-          // Status tracking only
-          isClaimed: false,
-        }));
+            RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          logger.info(
+            `Mapping reward: ${reward.rewardName}, rewardType string: ${reward.rewardType}, mapped to: ${rewardType}`,
+          );
+
+          return {
+            raffleId: raffle.id,
+            rewardType,
+            rewardName: reward.rewardName,
+            mintAddress: reward.mintAddress,
+            amount: reward.amount || 1,
+            imageUrl: reward.imageUrl,
+            metadataJson: reward.metadataJson,
+            // Status tracking only
+            isClaimed: false,
+          };
+        });
 
         await RaffleReward.bulkCreate(rewardsToInsert);
       }
@@ -1484,7 +1566,9 @@ class RaffleController {
         const XpProcessor = require("../services/xp-processor");
         await XpProcessor.processRaffleCreationXp(raffleId);
       } catch (xpError) {
-        logger.error(`Error awarding creation XP for raffle ${raffleId}: ${xpError.message}`);
+        logger.error(
+          `Error awarding creation XP for raffle ${raffleId}: ${xpError.message}`,
+        );
         // Don't fail the raffle creation if XP fails
       }
 
@@ -1599,12 +1683,23 @@ class RaffleController {
       let tokenAddress = reward.mintAddress;
       let amount = reward.amount || 1;
 
+      logger.info(
+        `Reward type from DB: ${reward.rewardType}, NFT enum: ${RAFFLE_REWARD_TYPES.NFT}`,
+      );
+
       switch (reward.rewardType) {
         case RAFFLE_REWARD_TYPES.NFT:
           type = RAFFLE_REWARD_TYPES.NFT;
           break;
         case RAFFLE_REWARD_TYPES.SPL_TOKEN:
-          type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          // Check if this is actually an NFT (amount = 1 and decimals = 0)
+          // This handles cases where pNFTs were incorrectly stored as SPL tokens
+          if (amount === 1) {
+            logger.info(`Reward has amount=1, checking if it's an NFT...`);
+            type = RAFFLE_REWARD_TYPES.NFT;
+          } else {
+            type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          }
           break;
         case RAFFLE_REWARD_TYPES.SPL_TOKEN_2022:
           type = RAFFLE_REWARD_TYPES.SPL_TOKEN_2022;
@@ -1616,6 +1711,8 @@ class RaffleController {
         default:
           type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
       }
+
+      logger.info(`Type set for claim: ${type}, tokenAddress: ${tokenAddress}`);
 
       // Prepare transfer summary
       const splTokenSendSummary = [
@@ -1658,6 +1755,36 @@ class RaffleController {
           httpStatus.BAD_REQUEST,
           `Failed to create claim transaction: ${transferResponse.message}`,
         );
+      }
+
+      // Check if this is a pNFT that was already submitted and confirmed
+      if (transferResponse.data.autoSubmit && transferResponse.data.confirmed) {
+        logger.info(
+          `pNFT claim transaction already confirmed for reward ${reward.id}`,
+        );
+
+        // Mark reward as claimed
+        await RaffleReward.update(
+          {
+            isClaimed: true,
+            claimedAt: new Date(),
+          },
+          {
+            where: { id: reward.id },
+          },
+        );
+
+        logger.info(
+          `pNFT reward ${reward.id} claimed successfully with signature: ${transferResponse.data.signature}`,
+        );
+
+        return respond(res, httpStatus.OK, "pNFT reward claimed successfully", {
+          success: true,
+          signature: transferResponse.data.signature,
+          rewardId: reward.id,
+          claimedAt: new Date(),
+          autoSubmitted: true,
+        });
       }
 
       // Generate checksum for verification
