@@ -57,7 +57,8 @@ const normalizeRewardType = (rewardType: any) => {
 const CreateRaffle = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected } =
+    useWallet();
 
   const [selectedNFTs, setSelectedNFTs] = useState<any[]>([]);
   const [selectedTokens, setSelectedTokens] = useState<
@@ -870,7 +871,7 @@ const CreateRaffle = () => {
               isVersioned = false;
             } catch (error) {
               try {
-                // Fallback to versioned transaction (for MPL Core NFTs)
+                // Fallback to versioned transaction (for pNFTs and MPL Core NFTs)
                 const txBytes = Uint8Array.from(atob(transaction), (c) =>
                   c.charCodeAt(0),
                 );
@@ -886,62 +887,23 @@ const CreateRaffle = () => {
               }
             }
 
-            let signedTx;
-            try {
-              signedTx = await signTransaction(tx);
-            } catch (signError) {
-              console.error("Transaction signing failed:", signError);
-
-              // Try to provide more specific error messages
-              if (signError.message?.includes("insufficient")) {
-                throw new Error(
-                  "Insufficient balance to transfer rewards. Please check your token balance.",
-                );
-              } else if (signError.message?.includes("account")) {
-                throw new Error(
-                  "Token account not found. Please ensure you own the tokens you're trying to transfer.",
-                );
-              } else if (signError.message?.includes("rejected")) {
-                throw new Error("Transaction was rejected by wallet.");
-              } else {
-                throw new Error(
-                  `Transaction signing failed: ${signError.message || "Unknown error"}`,
-                );
-              }
-            }
-
-            let serializedTransaction;
-            if (isVersioned) {
-              serializedTransaction = Buffer.from(
-                signedTx.serialize(),
-              ).toString("base64");
-            } else {
-              serializedTransaction = Buffer.from(
-                signedTx.serialize(),
-              ).toString("base64");
-            }
-
             const connection = new Connection(
               import.meta.env.VITE_SOLANA_RPC_HOST ||
-                "https://api.devnet.solana.org",
+                "https://api.devnet.solana.com",
             );
 
             let signature;
             try {
-              const txBytes = Buffer.from(serializedTransaction, "base64");
-              signature = await connection.sendRawTransaction(txBytes, {
-                skipPreflight: true, // Skip preflight to avoid signature verification issues
-                maxRetries: 3, // Allow retries
-                preflightCommitment: "processed",
+              signature = await sendTransaction(tx, connection, {
+                skipPreflight: false,
+                maxRetries: 5,
+                preflightCommitment: "confirmed",
               });
 
+              toast.info("Transaction sent! Waiting for confirmation...");
+
               const confirmation = await connection.confirmTransaction(
-                {
-                  signature,
-                  blockhash: (await connection.getLatestBlockhash()).blockhash,
-                  lastValidBlockHeight: (await connection.getLatestBlockhash())
-                    .lastValidBlockHeight,
-                },
+                signature,
                 "confirmed",
               );
 
@@ -966,17 +928,6 @@ const CreateRaffle = () => {
                 } catch (logError) {
                   console.error("DEBUG: Failed to get logs:", logError);
                 }
-              }
-
-              try {
-                const simulation =
-                  await connection.simulateTransaction(signedTx);
-                console.error(
-                  "DEBUG: Simulation accounts:",
-                  simulation.value.accounts,
-                );
-              } catch (simError) {
-                console.error("DEBUG: Simulation failed:", simError);
               }
 
               throw submitError;
