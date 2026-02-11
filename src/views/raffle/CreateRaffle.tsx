@@ -29,14 +29,27 @@ import NFT_PLACEHOLDER from "../../../public/uploads/nft-placeholder.svg";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
+// const normalizeRewardType = (rewardType: any) => {
+//   if (rewardType === 0 || rewardType === "NFT") return "NFT";
+//   if (
+//     rewardType === 1 ||
+//     rewardType === "SPL_TOKEN" ||
+//     rewardType === "SPL_TOKEN_2022"
+//   )
+//     return "SPL_TOKEN";
+
+//   return null;
+// };
 const normalizeRewardType = (rewardType: any) => {
-  if (rewardType === 0 || rewardType === "NFT") return "NFT";
-  if (
-    rewardType === 1 ||
-    rewardType === "SPL_TOKEN" ||
-    rewardType === "SPL_TOKEN_2022"
-  )
+  if (!rewardType && rewardType !== 0) return null;
+
+  const type = String(rewardType).trim().toUpperCase();
+
+  if (type === "0" || type === "NFT") return "NFT";
+
+  if (type === "1" || type === "SPL_TOKEN" || type === "SPL_TOKEN_2022") {
     return "SPL_TOKEN";
+  }
 
   return null;
 };

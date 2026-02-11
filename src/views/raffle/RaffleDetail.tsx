@@ -1113,7 +1113,7 @@ const RaffleDetail = () => {
                   >
                     -
                   </Button>
-                  <input
+                  {/* <input
                     type="number"
                     value={ticketCount}
                     min={1}
@@ -1127,7 +1127,35 @@ const RaffleDetail = () => {
                     }}
                     className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold focus:ring-offset-2"
                     disabled={!connected || ticketsLeft === 0}
+                  /> */}
+                  <input
+                    type="number"
+                    value={ticketCount === 0 ? "" : ticketCount}
+                    min={1}
+                    max={ticketsLeft}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+
+                      // Allow empty input while typing
+                      if (raw === "") {
+                        setTicketCount(0);
+                        return;
+                      }
+
+                      const value = Number(raw);
+                      if (Number.isNaN(value)) return;
+
+                      setTicketCount(value);
+                    }}
+                    onBlur={() => {
+                      // Clamp ONLY when user finishes typing
+                      setTicketCount((prev) =>
+                        Math.min(Math.max(1, prev), ticketsLeft),
+                      );
+                    }}
+                    className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold"
                   />
+
                   <Button
                     variant="outline"
                     className="bg-background-50 h-9 w-9 sm:h-10 sm:w-10"
