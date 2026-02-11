@@ -7,6 +7,7 @@ const {
   VerifiedCollection,
   RaffleTicket,
   SplTokenSendTransaction,
+  sequelize,
 } = require("../models");
 const { status: httpStatus, default: status } = require("http-status");
 const respond = require("../util/respond");
@@ -321,6 +322,15 @@ class RaffleController {
 
       const userData = await User.findOne({ where: { id: userId } });
 
+      // unique users who purchased tickets for this raffle
+      const ticketPurchasers = await RaffleTicket.findAll({
+        where: { raffleId: id },
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('userId')), 'userId']],
+        raw: true,
+      });
+
+      const purchaserUserIds = ticketPurchasers.map(ticket => ticket.userId);
+
       // Calculate progress percentage
       const progressPercentage =
         raffle.totalTickets > 0
@@ -350,6 +360,7 @@ class RaffleController {
         winners,
         hasWinners: winners.length > 0,
         winnersSelected: raffle.winnersSelected,
+        purchaserUserIds,
       });
     } catch (err) {
       logger.error(err);
