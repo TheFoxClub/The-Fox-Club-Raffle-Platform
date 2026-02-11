@@ -134,9 +134,20 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
 
         const signedTx = await signTransaction(tx);
 
-        const serializedTx = Buffer.from(signedTx.serialize()).toString(
-          "base64",
-        );
+        // Serialize with partial signatures allowed (platform will add its signature)
+        let serializedTx: string;
+        if (signedTx instanceof VersionedTransaction) {
+          // VersionedTransaction doesn't have serialize options, just serialize as-is
+          serializedTx = Buffer.from(signedTx.serialize()).toString("base64");
+        } else {
+          // Legacy Transaction - allow partial signatures
+          serializedTx = Buffer.from(
+            signedTx.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            }),
+          ).toString("base64");
+        }
 
         // Submit signed transaction
         const submitRes = await server.post<SubmitClaimResponse>(
