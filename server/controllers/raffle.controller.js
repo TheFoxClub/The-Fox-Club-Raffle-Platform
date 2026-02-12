@@ -325,11 +325,13 @@ class RaffleController {
       // unique users who purchased tickets for this raffle
       const ticketPurchasers = await RaffleTicket.findAll({
         where: { raffleId: id },
-        attributes: [[sequelize.fn('DISTINCT', sequelize.col('userId')), 'userId']],
+        attributes: [
+          [sequelize.fn("DISTINCT", sequelize.col("userId")), "userId"],
+        ],
         raw: true,
       });
 
-      const purchaserUserIds = ticketPurchasers.map(ticket => ticket.userId);
+      const purchaserUserIds = ticketPurchasers.map((ticket) => ticket.userId);
 
       // Calculate progress percentage
       const progressPercentage =
@@ -746,13 +748,31 @@ class RaffleController {
 
           // Create new rewards
           const rewardsToInsert = rewards.map((reward) => {
-            let mappedType =
-              RAFFLE_REWARD_TYPES[reward.rewardType] ||
-              RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            let mappedType;
+
+            // Handle different input formats for rewardType
+            if (typeof reward.rewardType === "number") {
+              mappedType = reward.rewardType;
+            } else if (typeof reward.rewardType === "string") {
+              const upperRewardType = reward.rewardType.toUpperCase();
+              mappedType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+              if (mappedType === undefined) {
+                logger.warn(
+                  `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
+                );
+                mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+              }
+            } else {
+              mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
 
             // For NFTs, check if it's a pNFT from the transfer data
-            // pNFTs need rewardType = 0 (NFT), legacy NFTs need rewardType = 1 (SPL_TOKEN)
-            if (reward.rewardType === "NFT" && rewardTransferData) {
+            // pNFTs stay as rewardType = 0 (NFT), legacy NFTs change to rewardType = 1 (SPL_TOKEN)
+            if (
+              (reward.rewardType === "NFT" || reward.rewardType === 0) &&
+              rewardTransferData
+            ) {
               // Check if this is a pNFT based on transfer metadata
               const nftTypeInfo =
                 rewardTransferData.nftTypeInfo || reward.nftType;
@@ -1085,12 +1105,31 @@ class RaffleController {
       // Create rewards
       if (rewards && rewards.length > 0) {
         const rewardsToInsert = rewards.map((reward) => {
-          let mappedType =
-            RAFFLE_REWARD_TYPES[reward.rewardType] ||
-            RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          let mappedType;
 
-          // pNFTs need rewardType = 0 (NFT), legacy NFTs need rewardType = 1 (SPL_TOKEN)
-          if (reward.rewardType === "NFT" && rewardTransferData) {
+          // Handle different input formats for rewardType
+          if (typeof reward.rewardType === "number") {
+            mappedType = reward.rewardType;
+          } else if (typeof reward.rewardType === "string") {
+            const upperRewardType = reward.rewardType.toUpperCase();
+            mappedType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+            if (mappedType === undefined) {
+              logger.warn(
+                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
+              );
+              mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
+          } else {
+            mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          }
+
+          // For NFTs with transfer data, check if it's a pNFT or legacy NFT
+          // overrides the default NFT (0) mapping if it's actually a legacy NFT
+          if (
+            (reward.rewardType === "NFT" || reward.rewardType === 0) &&
+            rewardTransferData
+          ) {
             const nftTypeInfo =
               rewardTransferData.nftTypeInfo || reward.nftType;
 
@@ -1117,7 +1156,7 @@ class RaffleController {
           }
 
           logger.info(
-            `Creating reward in createRaffle: ${reward.rewardName}, rewardType: "${reward.rewardType}", mapped to: ${mappedType}, nftType: ${reward.metadataJson}`,
+            `Creating reward in createRaffle: ${reward.rewardName}, rewardType: "${reward.rewardType}", mapped to: ${mappedType}, isDraft: ${statusEnum === RAFFLE_STATUS.DRAFT}`,
           );
 
           return {
@@ -1315,9 +1354,25 @@ class RaffleController {
       // Create rewards without transfer information (will be updated by cron job)
       if (rewards && rewards.length > 0) {
         const rewardsToInsert = rewards.map((reward) => {
-          const rewardType =
-            RAFFLE_REWARD_TYPES[reward.rewardType] ||
-            RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          let rewardType;
+
+          // Handle different input formats for rewardType
+          if (typeof reward.rewardType === "number") {
+            rewardType = reward.rewardType;
+          } else if (typeof reward.rewardType === "string") {
+            const upperRewardType = reward.rewardType.toUpperCase();
+            rewardType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+            if (rewardType === undefined) {
+              logger.warn(
+                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
+              );
+              rewardType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
+          } else {
+            rewardType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          }
+
           logger.info(
             `Mapping reward: ${reward.rewardName}, rewardType string: ${reward.rewardType}, mapped to: ${rewardType}`,
           );
@@ -2462,13 +2517,36 @@ class RaffleController {
       if (Array.isArray(rewards)) {
         await RaffleReward.destroy({ where: { raffleId } });
 
-        const rewardsToInsert = rewards.map((r) => ({
-          raffleId,
-          rewardType: RAFFLE_REWARD_TYPES[r.rewardType],
-          rewardName: r.rewardName,
-          mintAddress: r.mintAddress,
-          amount: r.amount,
-        }));
+        const rewardsToInsert = rewards.map((r) => {
+          let mappedType;
+
+          // Handle different input formats for rewardType
+          if (typeof r.rewardType === "number") {
+            mappedType = r.rewardType;
+          } else if (typeof r.rewardType === "string") {
+            const upperRewardType = r.rewardType.toUpperCase();
+            mappedType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+            if (mappedType === undefined) {
+              logger.warn(
+                `Unknown rewardType "${r.rewardType}", defaulting to SPL_TOKEN`,
+              );
+              mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
+          } else {
+            mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          }
+
+          return {
+            raffleId,
+            rewardType: mappedType,
+            rewardName: r.rewardName,
+            mintAddress: r.mintAddress,
+            amount: r.amount,
+            imageUrl: r.imageUrl,
+            metadataJson: r.metadataJson,
+          };
+        });
 
         await RaffleReward.bulkCreate(rewardsToInsert);
       }
