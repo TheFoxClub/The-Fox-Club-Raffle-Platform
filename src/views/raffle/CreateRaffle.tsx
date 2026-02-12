@@ -392,24 +392,24 @@ const CreateRaffle = () => {
     fetchTokens();
   }, [isTokenDialogOpen, user?.pubkey]);
 
-  useEffect(() => {
-    if (selectedTokens.length === 0 || tokenCandidates.length === 0) return;
+  // useEffect(() => {
+  //   if (selectedTokens.length === 0 || tokenCandidates.length === 0) return;
 
-    setSelectedTokens((prev) =>
-      prev.map((selected) => {
-        const walletToken = tokenCandidates.find(
-          (t) => t.mint === selected.mint,
-        );
+  //   setSelectedTokens((prev) =>
+  //     prev.map((selected) => {
+  //       const walletToken = tokenCandidates.find(
+  //         (t) => t.mint === selected.mint,
+  //       );
 
-        return walletToken
-          ? {
-              ...selected,
-              amount: walletToken.amount,
-            }
-          : selected;
-      }),
-    );
-  }, [tokenCandidates]);
+  //       return walletToken
+  //         ? {
+  //             ...selected,
+  //             amount: walletToken.amount,
+  //           }
+  //         : selected;
+  //     }),
+  //   );
+  // }, [tokenCandidates]);
 
   useEffect(() => {
     if (!isResumingDraft) return;
@@ -578,10 +578,14 @@ const CreateRaffle = () => {
       if (t.amountToUse <= 0) {
         newErrors[`token-${t.mint}`] = "Amount must be greater than 0";
       }
-      if (t.amountToUse > t.amount) {
-        newErrors[`token-${t.mint}`] =
-          `Cannot exceed available amount (${t.amount})`;
-      }
+      const walletBalance =
+        tokenCandidates.find((c) => c.mint === t.mint)?.amount ?? 0;
+
+      if (t.amountToUse > walletBalance)
+        if (t.amountToUse > walletBalance) {
+          newErrors[`token-${t.mint}`] =
+            `Cannot exceed available amount (${walletBalance})`;
+        }
     });
 
     if (!title.trim()) newErrors.title = "Title is required";
@@ -1079,7 +1083,7 @@ const CreateRaffle = () => {
             amountToUse: Number(reward.amount),
             image: reward.imageUrl,
             // amount: Number(reward.amount),
-            amount: 0,
+            // amount: 0,
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
         }
@@ -1114,29 +1118,8 @@ const CreateRaffle = () => {
       console.log("Delete response:", res.data);
 
       if (res.data.success) {
-        // Clear the saved draft state
         setSavedDraft(null);
-        // Reset the resuming flag since draft is deleted
         setIsResumingDraft(false);
-
-        setTitle("");
-        setDescription("");
-        setTicketPrice("");
-        setTotalTickets("");
-        setNumberOfWinners(1);
-        setStartDate("");
-        setEndDate("");
-        setSelectedTokenType(null);
-        setSelectedTokenAddress("");
-        setSelectedNFTs([]);
-        setSelectedTokens([]);
-
-        setErrors({});
-        // setRewardDisclaimerShown({ nft: false, token: false });
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
 
         toast.success("Draft deleted successfully!");
       } else {
@@ -1541,66 +1524,74 @@ const CreateRaffle = () => {
 
                 {selectedTokens.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    {selectedTokens.map((t) => (
-                      <div
-                        key={t.mint}
-                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => removeToken(t.mint)}
-                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                    {selectedTokens.map((t) => {
+                      const walletBalance =
+                        tokenCandidates.find((c) => c.mint === t.mint)
+                          ?.amount ?? 0;
+
+                      return (
+                        <div
+                          key={t.mint}
+                          className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
                         >
-                          <X className="h-4 w-4" />
-                        </button>
-                        <div className="flex flex-col gap-2 break-all">
-                          <div className="flex-1">
-                            <p className="font-semibold break-all">{t.name}</p>
-                            <p className="text-xs text-muted-foreground break-all">
-                              Mint: {t.mint}
-                            </p>
-                            <p className="text-xs text-muted-foreground break-all">
-                              Amount: {t.amount}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col">
-                            <label className="text-xs font-medium">
-                              Amount
-                            </label>
-                            <input
-                              type="number"
-                              value={t.amountToUse}
-                              min={0}
-                              max={t.amount}
-                              onChange={(e) => {
-                                const value = Number(e.target.value);
-                                setSelectedTokens((prev) =>
-                                  prev.map((token) =>
-                                    token.mint === t.mint
-                                      ? { ...token, amountToUse: value }
-                                      : token,
-                                  ),
-                                );
-                                // Clear error if any
-                                setErrors((prev) => ({
-                                  ...prev,
-                                  [`token-${t.mint}`]: undefined,
-                                }));
-                              }}
-                              placeholder="Amount to use"
-                              className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
-                            />
-
-                            {errors[`token-${t.mint}`] && (
-                              <p className="text-red-500 text-xs mt-1">
-                                {errors[`token-${t.mint}`]}
+                          <button
+                            type="button"
+                            onClick={() => removeToken(t.mint)}
+                            className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                          <div className="flex flex-col gap-2 break-all">
+                            <div className="flex-1">
+                              <p className="font-semibold break-all">
+                                {t.name}
                               </p>
-                            )}
+                              <p className="text-xs text-muted-foreground break-all">
+                                Mint: {t.mint}
+                              </p>
+                              <p className="text-xs text-muted-foreground break-all">
+                                Amount: {walletBalance}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col">
+                              <label className="text-xs font-medium">
+                                Amount
+                              </label>
+                              <input
+                                type="number"
+                                value={t.amountToUse}
+                                min={0}
+                                max={walletBalance}
+                                onChange={(e) => {
+                                  const value = Number(e.target.value);
+                                  setSelectedTokens((prev) =>
+                                    prev.map((token) =>
+                                      token.mint === t.mint
+                                        ? { ...token, amountToUse: value }
+                                        : token,
+                                    ),
+                                  );
+                                  // Clear error if any
+                                  setErrors((prev) => ({
+                                    ...prev,
+                                    [`token-${t.mint}`]: undefined,
+                                  }));
+                                }}
+                                placeholder="Amount to use"
+                                className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
+                              />
+
+                              {errors[`token-${t.mint}`] && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors[`token-${t.mint}`]}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1890,7 +1881,6 @@ const CreateRaffle = () => {
           </div>
         </DialogContent>
       </Dialog>
-      {/* ===================================================== */}
     </div>
   );
 };

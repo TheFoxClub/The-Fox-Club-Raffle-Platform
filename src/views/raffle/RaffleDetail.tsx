@@ -7,6 +7,8 @@ import HostProfilePopover from "../../components/ui/HostProfilePopover";
 import { TokenDisplay } from "../../components/ui/TokenDisplay";
 import { RewardAmountDisplay } from "../../components/ui/RewardAmountDisplay";
 import socketService from "../../services/socket.service";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../redux/store";
 
 import {
   Clock,
@@ -93,7 +95,9 @@ export interface RaffleType {
   winnersData?: Winner[];
   hasWinners?: boolean;
   winnersSelected?: boolean;
-  participants?: string[];
+  purchaserUserIds?: number[];
+
+  //participants?: string[];
   status?: number;
   tokenTypeNumber?: number;
   tokenAddress?: string;
@@ -189,6 +193,7 @@ const RaffleDetail = () => {
   const winners = raffle?.winnersData ?? [];
   const [nftImages, setNftImages] = useState<Record<string, string>>({});
   const [isBuying, setIsBuying] = useState(false);
+  const user = useSelector((state: RootState) => state.user);
 
   const extractErrorMessage = (error: any): string => {
     if (!error) return "";
@@ -343,9 +348,6 @@ const RaffleDetail = () => {
       toast.info(
         `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
       );
-      toast.info(
-        `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
-      );
 
       // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(
@@ -462,7 +464,9 @@ const RaffleDetail = () => {
           winnersData: res.data.data.winners || [],
           hasWinners: res.data.data.hasWinners || false,
           winnersSelected: res.data.data.winnersSelected || false,
-          participants: data.participants || [],
+          // participants: data.participants || [],
+          purchaserUserIds: res.data.data.purchaserUserIds || [],
+
           status: data.status,
         };
 
@@ -619,12 +623,11 @@ const RaffleDetail = () => {
 
     const handleRaffleStatusChange = (data: any) => {
       if (data.raffleId === raffleIdNum) {
-        // console.log("Raffle status changed:", data);
         if (data.newStatus === "ENDED") {
-          // Only show toast to users who have tickets in this raffle
           if (
             publicKey &&
-            raffle?.participants?.includes(publicKey.toBase58())
+            user?.id &&
+            raffle?.purchaserUserIds?.includes(user.id)
           ) {
             toast.info(
               `Raffle has ended! ${
@@ -634,21 +637,24 @@ const RaffleDetail = () => {
               }`,
             );
           }
-          fetchRaffle(); // Refresh to get latest data
+
+          fetchRaffle();
         }
       }
     };
 
     const handleWinnersSelected = (data: any) => {
       if (data.raffleId === raffleIdNum) {
-        // console.log("Winners selected:", data);
-        // Only show toast to users who have tickets in this raffle
-        if (publicKey && raffle?.participants?.includes(publicKey.toBase58())) {
+        const participated =
+          user?.id && raffle?.purchaserUserIds?.includes(user.id);
+
+        if (participated) {
           toast.success(
             `Winners have been selected! ${data.numberOfWinners} winner(s)`,
           );
         }
-        fetchRaffle(); // Refresh to show winners
+
+        fetchRaffle();
       }
     };
 
@@ -673,32 +679,27 @@ const RaffleDetail = () => {
   }, []);
 
   useEffect(() => {
-    if (!raffle || !publicKey || !raffle.endedAt) return;
+    if (!raffle || !publicKey || !raffle.winnersSelected || !user?.id) return;
 
     const key = `raffle-${raffle.id}-result-seen`;
     if (localStorage.getItem(key)) return;
 
-    const user = publicKey.toBase58();
-
-    // Check if user participated
-    const participated = raffle.participants?.includes(user) || raffle.sold > 0;
-
+    const participated = raffle.purchaserUserIds?.includes(user.id);
     if (!participated) return;
 
-    // Check if user won
     const userRewards = raffle.winnersData?.filter(
-      (w) => w.winnerPubkey === user,
+      (w) => w.winnerPubkey === publicKey.toBase58(),
     );
+
     const isWinner = (userRewards?.length ?? 0) > 0;
 
     if (isWinner) {
       const allClaimed = userRewards!.every((r) => r.isClaimed);
       if (!allClaimed) setWinnerModalVisible(true);
     } else {
-      // Not a winner → show banner
       setNonWinnerBannerVisible(true);
     }
-  }, [raffle, publicKey]);
+  }, [raffle, publicKey, user]);
 
   if (loading)
     return (
@@ -1113,48 +1114,57 @@ const RaffleDetail = () => {
                   >
                     -
                   </Button>
-                  {/* <input
-                    type="number"
-                    value={ticketCount}
-                    min={1}
-                    max={ticketsLeft}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-
-                      if (Number.isNaN(value)) return;
-
-                      setTicketCount(Math.min(Math.max(1, value), ticketsLeft));
-                    }}
-                    className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold focus:ring-offset-2"
-                    disabled={!connected || ticketsLeft === 0}
-                  /> */}
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={ticketCount === 0 ? "" : ticketCount}
-                    min={1}
-                    max={ticketsLeft}
-                    onChange={(e) => {
-                      const raw = e.target.value;
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setTicketCount((prev) =>
+                          Math.min((prev || 1) + 1, ticketsLeft),
+                        );
+                      }
 
-                      // Allow empty input while typing
-                      if (raw === "") {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setTicketCount((prev) => Math.max((prev || 1) - 1, 1));
+                      }
+                    }}
+                    onChange={(e) => {
+                      const onlyDigits = e.target.value.replace(/\D/g, "");
+                      const numeric = Number(onlyDigits);
+
+                      if (onlyDigits === "") {
                         setTicketCount(0);
                         return;
                       }
 
-                      const value = Number(raw);
-                      if (Number.isNaN(value)) return;
-
-                      setTicketCount(value);
+                      setTicketCount(
+                        Math.min(Math.max(1, numeric), ticketsLeft),
+                      );
                     }}
                     onBlur={() => {
-                      // Clamp ONLY when user finishes typing
                       setTicketCount((prev) =>
                         Math.min(Math.max(1, prev), ticketsLeft),
                       );
                     }}
                     className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold"
                   />
+
+                  {/* <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={ticketCount === 0 ? "" : ticketCount}
+                    onChange={(e) => {
+                      const onlyDigits = e.target.value.replace(/\D/g, "");
+                      const numeric = Number(onlyDigits);
+                      setTicketCount(Math.min(numeric, ticketsLeft));
+                    }}
+                    className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold"
+                  /> */}
 
                   <Button
                     variant="outline"
