@@ -843,8 +843,26 @@ const CreateRaffle = () => {
             );
 
             let signature;
+            let latestBlockhash;
             try {
-              signature = await sendTransaction(tx, connection, {
+              latestBlockhash = await connection.getLatestBlockhash(
+                "confirmed",
+              );
+
+              if (isVersioned) {
+                tx.message.recentBlockhash = latestBlockhash.blockhash;
+              } else {
+                tx.recentBlockhash = latestBlockhash.blockhash;
+              }
+
+              const signedTx = await withTimeout(
+                signTransaction(tx),
+                120_000,
+                "Wallet approval timed out. Please try again.",
+              );
+
+              const txBytes = Buffer.from(signedTx.serialize());
+              signature = await connection.sendRawTransaction(txBytes, {
                 skipPreflight: false,
                 maxRetries: 5,
                 preflightCommitment: "confirmed",
@@ -853,7 +871,11 @@ const CreateRaffle = () => {
               toast.info("Transaction sent! Waiting for confirmation...");
 
               const confirmation = await connection.confirmTransaction(
-                signature,
+                {
+                  signature,
+                  blockhash: latestBlockhash.blockhash,
+                  lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+                },
                 "confirmed",
               );
 

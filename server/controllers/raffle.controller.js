@@ -739,7 +739,7 @@ class RaffleController {
               RAFFLE_REWARD_TYPES[reward.rewardType] ||
               RAFFLE_REWARD_TYPES.SPL_TOKEN;
 
-            // For NFTs, check if it's a pNFT from the transfer data
+            // For NFTs, check if it's a pNFT or MPL Core from transfer data
             // pNFTs need rewardType = 0 (NFT), legacy NFTs need rewardType = 1 (SPL_TOKEN)
             if (reward.rewardType === "NFT" && rewardTransferData) {
               // Check if this is a pNFT based on transfer metadata
@@ -757,10 +757,15 @@ class RaffleController {
                 ...existingMetadata,
                 nftType: nftTypeInfo,
               });
-
-              if (nftTypeInfo === "pnft") {
+              logger.info(`1st typ: ${nftTypeInfo}`)
+              if (
+                nftTypeInfo === "pnft" ||
+                nftTypeInfo === "mpl_core" ||
+                nftTypeInfo === "mplcore" ||
+                nftTypeInfo === "core"
+              ) {
                 mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
-                logger.info(`Detected pNFT, setting rewardType to 0 (NFT)`);
+                logger.info(`Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`);
               } else {
                 mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
                 logger.info(
@@ -1093,10 +1098,15 @@ class RaffleController {
               ...existingMetadata,
               nftType: nftTypeInfo,
             });
-
-            if (nftTypeInfo === "pnft") {
+            logger.info(`2nd typ: ${nftTypeInfo}`)
+            if (
+              nftTypeInfo === "pnft" ||
+              nftTypeInfo === "mpl_core" ||
+              nftTypeInfo === "mplcore" ||
+              nftTypeInfo === "core"
+            ) {
               mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
-              logger.info(`Detected pNFT, setting rewardType to 0 (NFT)`);
+              logger.info(`Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`);
             } else {
               mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
               logger.info(
@@ -1681,7 +1691,7 @@ class RaffleController {
       // Prepare transfer from platform to winner
       let type;
       let tokenAddress = reward.mintAddress;
-      let amount = reward.amount || 1;
+      let amount = Number(reward.amount ?? 1);
 
       logger.info(
         `Reward type from DB: ${reward.rewardType}, NFT enum: ${RAFFLE_REWARD_TYPES.NFT}`,

@@ -51,6 +51,7 @@ const {
   mplCore,
   fetchAsset,
   transferV1: transferCoreV1,
+  collectionAddress,
 } = require("@metaplex-foundation/mpl-core");
 
 const {
@@ -313,45 +314,49 @@ const handleMPLCore = async ({
       );
     }
 
-    // Create noop signers for user (authority and payer)
-    const userSigner = createNoopSigner(publicKey(fromAccountAddress));
+    const collection = collectionAddress(coreAsset) || undefined;
 
-    // Build transaction with user as authority (payer will default to authority)
-    const builtTx = await transferCoreV1(umi, {
-      asset: coreAsset.publicKey,
-      collection: coreAsset.updateAuthority.address,
-      authority: userSigner, // User is the authority (current owner)
-      newOwner: publicKey(toAccountAddress), // Transfer to platform wallet
-    })
-      .useV0()
-      .buildWithLatestBlockhash(umi);
+    let builtTx;
+    if (direction === "platform_to_user") {
+      const userPayer = createNoopSigner(publicKey(toAccountAddress));
+
+      builtTx = await transferCoreV1(umi, {
+        asset: coreAsset.publicKey,
+        collection,
+        authority: umi.identity, // Platform wallet owns the asset
+        newOwner: publicKey(toAccountAddress), // Transfer to user wallet
+        payer: userPayer, // User pays fees
+      })
+        .useV0()
+        .buildWithLatestBlockhash(umi);
+
+      builtTx = await umi.identity.signTransaction(builtTx);
+    } else {
+      // Build transaction with a user identity to avoid extra required signers
+      const userSigner = createNoopSigner(publicKey(fromAccountAddress));
+      const transferUmi = createUmi(connection);
+
+      transferUmi.use(signerIdentity(userSigner)).use(mplCore());
+
+      builtTx = await transferCoreV1(transferUmi, {
+        asset: coreAsset.publicKey,
+        collection,
+        newOwner: publicKey(toAccountAddress), // Transfer to platform wallet
+      })
+        .useV0()
+        .buildWithLatestBlockhash(transferUmi);
+    }
 
     logger.info(`Transaction signatures length: ${builtTx.signatures.length}`);
     logger.info(
       `Required signatures: ${builtTx.message.header.numRequiredSignatures}`,
     );
 
-    // Instead of clearing signatures, let's try a different approach
-    // Serialize the transaction and manually replace signature bytes with zeros
-    const serializedWithSigs = umi.transactions.serialize(builtTx);
-    const serializedBytes = new Uint8Array(serializedWithSigs);
+    const serializedTx = Buffer.from(
+      umi.transactions.serialize(builtTx),
+    ).toString("base64");
 
-    // Log the original transaction for debugging
-    logger.info(`Original serialized length: ${serializedBytes.length}`);
-    logger.info(`First 10 bytes: ${Array.from(serializedBytes.slice(0, 10))}`);
-
-    // The first byte should be the number of signatures
-    const numSigs = serializedBytes[0];
-    logger.info(`Number of signatures: ${numSigs}`);
-
-    // Zero out all signature bytes (64 bytes per signature, starting from byte 1)
-    for (let i = 1; i <= numSigs * 64; i++) {
-      serializedBytes[i] = 0;
-    }
-
-    const serializedTx = Buffer.from(serializedBytes).toString("base64");
-
-    logger.info(`MPL Core transaction signatures zeroed out manually`);
+    logger.info(`MPL Core transaction serialized for user signature`);
 
     return {
       serializedTx: serializedTx,
@@ -562,10 +567,13 @@ const addNftSendTransaction = async ({
 
         case "mplcore":
         case "core":
-          // MPL Core NFTs also have complex signature requirements that are currently not supported
-          throw new Error(
-            "MPL Core NFTs are not currently supported for raffle rewards due to their complex signature requirements. Please use Legacy NFTs instead. We're working on adding MPL Core support in a future update.",
-          );
+          return await handleMPLCore({
+            umi,
+            mint,
+            toAccountAddress,
+            fromAccountAddress,
+            direction,
+          });
 
         case "cnft":
         case "compressed":
