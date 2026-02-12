@@ -7,6 +7,7 @@ const {
   VerifiedCollection,
   RaffleTicket,
   SplTokenSendTransaction,
+  sequelize,
 } = require("../models");
 const { status: httpStatus, default: status } = require("http-status");
 const respond = require("../util/respond");
@@ -28,6 +29,17 @@ const {
   createPayoutTransaction,
   submitTransactionToBlockchain,
 } = require("../helpers/solana/spl-token-send-tx");
+const { getConnectionDas } = require("../config/solana");
+const connection = getConnectionDas();
+const { validateChecksum } = require("../helpers/solana/checksum-validation");
+const { Transaction, VersionedTransaction } = require("@solana/web3.js");
+const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
+const { publicKey } = require("@metaplex-foundation/umi");
+const { Wallet } = require("../helpers/solana/wallet");
+
+const { Keypair } = require("@solana/web3.js");
+const walletKeypair = require("../helpers/solana/wallet.json");
+
 const logger = require("../util/logger");
 const WinnerSelectionService = require("../services/raffles/winner-selection");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
@@ -321,6 +333,17 @@ class RaffleController {
 
       const userData = await User.findOne({ where: { id: userId } });
 
+      // unique users who purchased tickets for this raffle
+      const ticketPurchasers = await RaffleTicket.findAll({
+        where: { raffleId: id },
+        attributes: [
+          [sequelize.fn("DISTINCT", sequelize.col("userId")), "userId"],
+        ],
+        raw: true,
+      });
+
+      const purchaserUserIds = ticketPurchasers.map((ticket) => ticket.userId);
+
       // Calculate progress percentage
       const progressPercentage =
         raffle.totalTickets > 0
@@ -350,6 +373,7 @@ class RaffleController {
         winners,
         hasWinners: winners.length > 0,
         winnersSelected: raffle.winnersSelected,
+        purchaserUserIds,
       });
     } catch (err) {
       logger.error(err);
@@ -735,13 +759,31 @@ class RaffleController {
 
           // Create new rewards
           const rewardsToInsert = rewards.map((reward) => {
-            let mappedType =
-              RAFFLE_REWARD_TYPES[reward.rewardType] ||
-              RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            let mappedType;
 
-            // For NFTs, check if it's a pNFT or MPL Core from transfer data
-            // pNFTs need rewardType = 0 (NFT), legacy NFTs need rewardType = 1 (SPL_TOKEN)
-            if (reward.rewardType === "NFT" && rewardTransferData) {
+            // Handle different input formats for rewardType
+            if (typeof reward.rewardType === "number") {
+              mappedType = reward.rewardType;
+            } else if (typeof reward.rewardType === "string") {
+              const upperRewardType = reward.rewardType.toUpperCase();
+              mappedType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+              if (mappedType === undefined) {
+                logger.warn(
+                  `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
+                );
+                mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+              }
+            } else {
+              mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
+
+            // For NFTs, check if it's a pNFT from the transfer data
+            // pNFTs stay as rewardType = 0 (NFT), legacy NFTs change to rewardType = 1 (SPL_TOKEN)
+            if (
+              (reward.rewardType === "NFT" || reward.rewardType === 0) &&
+              rewardTransferData
+            ) {
               // Check if this is a pNFT based on transfer metadata
               const nftTypeInfo =
                 rewardTransferData.nftTypeInfo || reward.nftType;
@@ -1079,12 +1121,31 @@ class RaffleController {
       // Create rewards
       if (rewards && rewards.length > 0) {
         const rewardsToInsert = rewards.map((reward) => {
-          let mappedType =
-            RAFFLE_REWARD_TYPES[reward.rewardType] ||
-            RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          let mappedType;
 
-          // pNFTs need rewardType = 0 (NFT), legacy NFTs need rewardType = 1 (SPL_TOKEN)
-          if (reward.rewardType === "NFT" && rewardTransferData) {
+          // Handle different input formats for rewardType
+          if (typeof reward.rewardType === "number") {
+            mappedType = reward.rewardType;
+          } else if (typeof reward.rewardType === "string") {
+            const upperRewardType = reward.rewardType.toUpperCase();
+            mappedType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+            if (mappedType === undefined) {
+              logger.warn(
+                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
+              );
+              mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
+          } else {
+            mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          }
+
+          // For NFTs with transfer data, check if it's a pNFT or legacy NFT
+          // overrides the default NFT (0) mapping if it's actually a legacy NFT
+          if (
+            (reward.rewardType === "NFT" || reward.rewardType === 0) &&
+            rewardTransferData
+          ) {
             const nftTypeInfo =
               rewardTransferData.nftTypeInfo || reward.nftType;
 
@@ -1116,7 +1177,7 @@ class RaffleController {
           }
 
           logger.info(
-            `Creating reward in createRaffle: ${reward.rewardName}, rewardType: "${reward.rewardType}", mapped to: ${mappedType}, nftType: ${reward.metadataJson}`,
+            `Creating reward in createRaffle: ${reward.rewardName}, rewardType: "${reward.rewardType}", mapped to: ${mappedType}, isDraft: ${statusEnum === RAFFLE_STATUS.DRAFT}`,
           );
 
           return {
@@ -1314,9 +1375,25 @@ class RaffleController {
       // Create rewards without transfer information (will be updated by cron job)
       if (rewards && rewards.length > 0) {
         const rewardsToInsert = rewards.map((reward) => {
-          const rewardType =
-            RAFFLE_REWARD_TYPES[reward.rewardType] ||
-            RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          let rewardType;
+
+          // Handle different input formats for rewardType
+          if (typeof reward.rewardType === "number") {
+            rewardType = reward.rewardType;
+          } else if (typeof reward.rewardType === "string") {
+            const upperRewardType = reward.rewardType.toUpperCase();
+            rewardType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+            if (rewardType === undefined) {
+              logger.warn(
+                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
+              );
+              rewardType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
+          } else {
+            rewardType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          }
+
           logger.info(
             `Mapping reward: ${reward.rewardName}, rewardType string: ${reward.rewardType}, mapped to: ${rewardType}`,
           );
@@ -1612,6 +1689,7 @@ class RaffleController {
    * Claim reward (platform wallet → winner)
    * Returns transaction for user to sign (user pays fees, platform pre-signs)
    */
+  // Create unsigned tx and return checksum, user signs first, then BE validates and signs
   static async claimReward(req, res) {
     try {
       const userId = req.payload?.id;
@@ -1724,26 +1802,11 @@ class RaffleController {
 
       logger.info(`Type set for claim: ${type}, tokenAddress: ${tokenAddress}`);
 
-      // Prepare transfer summary
-      const splTokenSendSummary = [
-        {
-          tokenAddress,
-          toAccount: user.pubkey,
-          amount,
-          type,
-          metadata: {
-            rewardName: reward.rewardName,
-            rewardId: reward.id,
-            raffleId: raffle.id,
-          },
-        },
-      ];
-
       logger.info(
-        `Creating claim transaction for reward ${reward.id} to winner ${user.pubkey}`,
+        `Creating UNSIGNED claim transaction for reward ${reward.id} to winner ${user.pubkey}`,
       );
 
-      // Create transaction with platform pre-signing and user as fee payer
+      // Create UNSIGNED transaction (user signs first for security)
       const transferResponse = await createClaimTransaction({
         reward: {
           tokenAddress,
@@ -1797,17 +1860,14 @@ class RaffleController {
         });
       }
 
-      // Generate checksum for verification
-      const checksum = `${raffleId}-${rewardId}-${userId}-${Date.now()}`;
-
       logger.info(
-        `Claim transaction created for reward ${reward.id} by user ${user.pubkey}`,
+        `UNSIGNED claim transaction created for reward ${reward.id}. Checksum: ${transferResponse.data.checksum}`,
       );
 
       return respond(res, httpStatus.OK, "Claim transaction created", {
         transaction: transferResponse.data.serializedTx,
         blockhash: transferResponse.data.blockhash,
-        checksum,
+        checksum: transferResponse.data.checksum,
         rewardInfo: {
           id: reward.id,
           name: reward.rewardName,
@@ -1827,6 +1887,7 @@ class RaffleController {
 
   /**
    * Submit signed claim transaction
+   * Step 2: Validate user signature and checksum, then platform signs and submits
    */
   static async submitClaim(req, res) {
     try {
@@ -1874,7 +1935,7 @@ class RaffleController {
 
       const raffle = await Raffle.findOne({
         where: { id: raffleId },
-        attributes: ["id", "status"],
+        attributes: ["id", "status", "platformWallet", "endDate", "endedAt"],
       });
 
       if (!raffle) {
@@ -1895,9 +1956,133 @@ class RaffleController {
         );
       }
 
+      // Deserialize and validate the user-signed transaction
+      let userSignedTx;
+      let isVersioned = false;
+
       try {
-        const submissionResult =
-          await submitTransactionToBlockchain(signedTransaction);
+        const txBytes = Buffer.from(signedTransaction, "base64");
+
+        // Try legacy transaction first
+        try {
+          userSignedTx = Transaction.from(txBytes);
+          isVersioned = false;
+        } catch (legacyError) {
+          // Try versioned transaction
+          userSignedTx = VersionedTransaction.deserialize(txBytes);
+          isVersioned = true;
+        }
+      } catch (deserializeError) {
+        logger.error("Failed to deserialize transaction:", deserializeError);
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Invalid transaction format",
+        );
+      }
+
+      // Convert to UMI transaction for checksum validation
+      const umi = createUmi(connection);
+      let umiTx;
+
+      if (isVersioned) {
+        // For versioned transactions (like pNFTs), reconstruct UMI transaction from the message
+        const versionedMessage = userSignedTx.message;
+
+        // Extract instructions from the versioned message
+        const instructions = [];
+        for (let i = 0; i < versionedMessage.compiledInstructions.length; i++) {
+          const compiledIx = versionedMessage.compiledInstructions[i];
+          instructions.push({
+            programIndex: compiledIx.programIdIndex,
+            accountIndexes: compiledIx.accountKeyIndexes,
+            data: compiledIx.data,
+          });
+        }
+
+        // Create UMI transaction for checksum validation
+        umiTx = {
+          message: {
+            accounts: versionedMessage.staticAccountKeys.map((key) =>
+              publicKey(key.toBase58()),
+            ),
+            instructions: instructions,
+            recentBlockhash: versionedMessage.recentBlockhash,
+          },
+        };
+
+        logger.info(
+          "Reconstructed UMI transaction from versioned transaction for checksum validation",
+        );
+      } else {
+        // Convert legacy transaction to UMI format
+        const compiledMessage = userSignedTx.compileMessage();
+        umiTx = umi.transactions.create({
+          version: "legacy",
+          blockhash: compiledMessage.recentBlockhash,
+          instructions: userSignedTx.instructions,
+          payer: publicKey(userSignedTx.feePayer.toBase58()),
+        });
+      }
+
+      // Validate checksum to ensure transaction wasn't tampered with
+      const isValidChecksum = validateChecksum(umiTx.message, checksum);
+
+      if (!isValidChecksum) {
+        logger.error(
+          `Checksum validation failed for reward ${rewardId} by user ${user.pubkey}`,
+        );
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Transaction checksum validation failed. Transaction may have been tampered with.",
+        );
+      }
+
+      logger.info(
+        `Checksum validated successfully for reward ${rewardId}. Adding platform signature...`,
+      );
+
+      let platformSignedTx;
+      if (isVersioned) {
+        // For VersionedTransaction (pNFT), we need to add platform signature
+        logger.info("Adding platform signature to pNFT transaction...");
+
+        const platformSigner = Keypair.fromSecretKey(
+          new Uint8Array(walletKeypair),
+        );
+
+        // Sign the versioned transaction with platform wallet
+        userSignedTx.sign([platformSigner]);
+        platformSignedTx = userSignedTx;
+
+        logger.info("Platform signature added to pNFT transaction");
+      } else {
+        // For legacy transactions, add platform signature
+        platformSignedTx = Wallet.partialSign(userSignedTx);
+        logger.info("Platform signature added to legacy transaction");
+      }
+
+      let fullySignedTxBytes;
+      if (isVersioned) {
+        fullySignedTxBytes = platformSignedTx.serialize();
+      } else {
+        fullySignedTxBytes = platformSignedTx.serialize({
+          requireAllSignatures: true,
+          verifySignatures: true,
+        });
+      }
+
+      logger.info(
+        `Platform signature added. Submitting fully-signed transaction for reward ${rewardId}.`,
+      );
+
+      try {
+        const signedTransactionBase64 =
+          Buffer.from(fullySignedTxBytes).toString("base64");
+        const submissionResult = await submitTransactionToBlockchain(
+          signedTransactionBase64,
+        );
 
         if (!submissionResult.success) {
           throw new Error(
@@ -2461,13 +2646,36 @@ class RaffleController {
       if (Array.isArray(rewards)) {
         await RaffleReward.destroy({ where: { raffleId } });
 
-        const rewardsToInsert = rewards.map((r) => ({
-          raffleId,
-          rewardType: RAFFLE_REWARD_TYPES[r.rewardType],
-          rewardName: r.rewardName,
-          mintAddress: r.mintAddress,
-          amount: r.amount,
-        }));
+        const rewardsToInsert = rewards.map((r) => {
+          let mappedType;
+
+          // Handle different input formats for rewardType
+          if (typeof r.rewardType === "number") {
+            mappedType = r.rewardType;
+          } else if (typeof r.rewardType === "string") {
+            const upperRewardType = r.rewardType.toUpperCase();
+            mappedType = RAFFLE_REWARD_TYPES[upperRewardType];
+
+            if (mappedType === undefined) {
+              logger.warn(
+                `Unknown rewardType "${r.rewardType}", defaulting to SPL_TOKEN`,
+              );
+              mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+            }
+          } else {
+            mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          }
+
+          return {
+            raffleId,
+            rewardType: mappedType,
+            rewardName: r.rewardName,
+            mintAddress: r.mintAddress,
+            amount: r.amount,
+            imageUrl: r.imageUrl,
+            metadataJson: r.metadataJson,
+          };
+        });
 
         await RaffleReward.bulkCreate(rewardsToInsert);
       }

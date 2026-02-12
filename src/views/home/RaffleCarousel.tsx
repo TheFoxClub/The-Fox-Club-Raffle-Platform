@@ -132,6 +132,10 @@ export default function RaffleCarousel() {
   const [isHovered, setIsHovered] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  const MIN_SWIPE_DISTANCE = 50;
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640);
@@ -289,6 +293,38 @@ export default function RaffleCarousel() {
   const prev = () =>
     setIndex((prev) => (prev - 1 + raffles.length) % raffles.length);
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+    setIsHovered(true);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStartX || !touchEndX) {
+      setIsHovered(false);
+      return;
+    }
+
+    const distance = touchStartX - touchEndX;
+
+    if (Math.abs(distance) < MIN_SWIPE_DISTANCE) {
+      setIsHovered(false);
+      return;
+    }
+
+    if (distance > 0) {
+      next();
+    } else {
+      prev();
+    }
+
+    setIsHovered(false);
+  };
+
   // **3D carousel style helper**
   const getCardStyle = (cardIndex: number) => {
     const diff = cardIndex - index;
@@ -353,6 +389,9 @@ export default function RaffleCarousel() {
         <div
           className="relative h-[380px] sm:h-[430px] mx-auto overflow-hidden"
           style={{ perspective: isMobile ? "none" : "1200px" }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
         >
           <div
             className="absolute inset-0 flex items-center justify-center"

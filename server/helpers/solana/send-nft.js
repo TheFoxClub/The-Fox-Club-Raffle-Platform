@@ -109,9 +109,11 @@ const handleLegacyNFT = async ({
     // Add transfer instruction
     transaction.add(createTransferInstruction(fromAta, toAta, from, 1));
 
+    let blockhashResult = await umi.rpc.getLatestBlockhash();
+
     let tx = umi.transactions.create({
       version: "legacy",
-      blockhash: (await umi.rpc.getLatestBlockhash()).blockhash,
+      blockhash: blockhashResult.blockhash,
       instructions: transaction.instructions,
       payer: publicKey(fromAccountAddress), // User is the payer, not platform
     });
@@ -119,9 +121,33 @@ const handleLegacyNFT = async ({
     const serializedTx = umi.transactions.serialize(tx);
     const txBase64 = base64.deserialize(serializedTx)[0];
 
+    let checksum;
+    try {
+      if (!tx.message || !tx.message.accounts || !tx.message.instructions) {
+        logger.error(`Invalid transaction message structure:`, {
+          hasMessage: !!tx.message,
+          hasAccounts: !!tx.message?.accounts,
+          hasInstructions: !!tx.message?.instructions,
+          messageKeys: tx.message ? Object.keys(tx.message) : [],
+        });
+        throw new Error("Transaction message missing required fields");
+      }
+
+      checksum = generateChecksum(tx.message);
+      logger.info(`Successfully generated checksum for legacy NFT`);
+    } catch (checksumError) {
+      logger.error(`Failed to generate checksum for legacy NFT:`, {
+        error: checksumError.message,
+        stack: checksumError.stack,
+      });
+      throw checksumError;
+    }
+
     return {
       serializedTx: txBase64,
-      checksum: generateChecksum(tx.message),
+      checksum,
+      blockhash: blockhashResult.blockhash,
+      lastValidBlockHeight: blockhashResult.lastValidBlockHeight,
       type: "legacy",
       direction,
     };
@@ -169,18 +195,27 @@ const handlePNFT = async ({
         token: destinationTokenAccount[0],
       });
 
-      // noop signer for the user (fee payer)
+      // Create noop signers for both platform and user (unsigned transaction)
+      const platformNoopSigner = createNoopSigner(umiFrom);
       const userPayerSigner = createNoopSigner(umiTo);
 
+      // Create a temporary UMI instance with noop signer for platform
+      const tempUmi = createUmi(connection);
+      tempUmi
+        .use(signerIdentity(platformNoopSigner))
+        .use(dasApi())
+        .use(mplTokenMetadata())
+        .use(mplCore());
+
       logger.info(
-        `Building pNFT transfer transaction with platform as authority, user as payer`,
+        `Building UNSIGNED pNFT transfer transaction for user to sign first`,
       );
       logger.info(`Destination token account: ${destinationTokenAccount[0]}`);
       logger.info(`Destination token record: ${destinationTokenRecord[0]}`);
 
-      const txBuilder = transferV1(umi, {
+      const txBuilder = transferV1(tempUmi, {
         mint: asset.mint.publicKey,
-        authority: umi.identity, // Platform wallet (owns the pNFT)
+        authority: platformNoopSigner, // Platform wallet (owns the pNFT) - noop for now
         tokenOwner: umiFrom,
         destinationOwner: umiTo,
         token: asset.token.publicKey,
@@ -197,30 +232,29 @@ const handlePNFT = async ({
         amount: 1,
       });
 
-      const builtTx = await txBuilder.useV0().buildWithLatestBlockhash(umi);
+      const builtTx = await txBuilder.useV0().buildWithLatestBlockhash(tempUmi);
 
       logger.info(
-        `Transaction built with ${builtTx.message.instructions.length} instructions, platform signing...`,
+        `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`,
       );
 
-      // Platform signs the transaction (partial signature)
-      const platformSignedTx = await umi.identity.signTransaction(builtTx);
+      // Generate checksum BEFORE any signatures
+      const checksum = generateChecksum(builtTx.message);
 
-      logger.info(`Platform signed, serializing for user to sign...`);
-
-      // Serialize the partially signed transaction
-      const serializedTx = umi.transactions.serialize(platformSignedTx);
+      // Serialize the UNSIGNED transaction
+      const serializedTx = tempUmi.transactions.serialize(builtTx);
       const serializedTxString = base64.deserialize(serializedTx)[0];
 
       logger.info(
-        `pNFT transfer transaction created with platform signature, ready for user signature`,
+        `UNSIGNED pNFT transfer transaction created for user to sign first. Checksum: ${checksum}`,
       );
+
       return {
         serializedTx: serializedTxString,
-        blockhash: platformSignedTx.blockhash,
-        checksum: generateChecksum(platformSignedTx.message),
-        requiresUserSignature: true, // User needs to sign for fees
-        type: "pnft", 
+        blockhash: builtTx.blockhash,
+        checksum,
+        requiresUserSignature: true, // User needs to sign first
+        type: "pnft",
       };
     } else {
       // User is sending to platform - create unsigned transaction for user to sign
@@ -274,7 +308,7 @@ const handlePNFT = async ({
         serializedTx: serializedTxString,
         blockhash: builtTx.blockhash,
         checksum: generateChecksum(builtTx.message),
-        type: "pnft", 
+        type: "pnft",
       };
     }
   } catch (error) {

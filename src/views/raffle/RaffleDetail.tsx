@@ -930,56 +930,49 @@ const RaffleDetail = () => {
                   {winners.map((winner, index) => (
                     <div
                       key={winner.rewardId}
-                      className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
+                      className="flex gap-3 flex-row items-center justify-between bg-card/40 border border-border/40 rounded-lg p-3 sm:p-4"
                     >
-                      {/* <div className="flex items-center gap-3 sm:gap-4">
-                        {winner.imageUrl && (
-                          <img
-                            src={winner.imageUrl}
-                            alt={winner.rewardName}
-                            className="w-10 h-10 rounded-md object-cover shrink-0"
-                          />
-                        )}
-
-                        <div className="flex flex-col"> */}
-                      <div className="flex flex-col sm:flex-col gap-1 min-w-[160px]">
-                        <span className="font-semibold text-xs sm:text-sm">
-                          Winner #{index + 1}
-                        </span>
-                        <button
-                          onClick={() => copyToClipboard(winner.winnerPubkey)}
-                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition group"
-                        >
-                          {/* Mobile (short) */}
-                          <span className="sm:hidden">
-                            {winner.winnerPubkey.slice(0, 4)}…
-                            {winner.winnerPubkey.slice(-4)}
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="font-semibold text-xs sm:text-sm">
+                            Winner #{index + 1}
                           </span>
+                          <button
+                            onClick={() => copyToClipboard(winner.winnerPubkey)}
+                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition group"
+                          >
+                            {/* Mobile (short) */}
+                            <span className="sm:hidden">
+                              {winner.winnerPubkey.slice(0, 4)}…
+                              {winner.winnerPubkey.slice(-4)}
+                            </span>
 
-                          {/* Desktop (full) */}
-                          <span className="hidden sm:block">
-                            {winner.winnerPubkey}
+                            {/* Desktop (full) */}
+                            <span className="hidden sm:block">
+                              {winner.winnerPubkey}
+                            </span>
+
+                            <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                          </button>
+
+                          <span className="text-xs text-muted-foreground">
+                            Ticket #{winner.ticketNumber}
                           </span>
-
-                          <Copy className="h-3 w-3 opacity-50 group-hover:opacity-100" />
-                        </button>
-
-                        <span className="text-xs text-muted-foreground">
-                          Ticket #{winner.ticketNumber}
-                        </span>
+                        </div>
                       </div>
 
                       {/* <div className="text-left sm:text-right"> */}
-                      <div className="flex items-center justify-end gap-3 flex-1 min-w-0">
+
+                      <div className="flex items-start gap-3 justify-end">
                         {winner.imageUrl && (
                           <img
                             src={winner.imageUrl}
                             alt={winner.rewardName}
-                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover shrink-0"
+                            className="w-12 h-12 rounded-md object-cover shrink-0"
                           />
                         )}
                         {/* Reward details */}
-                        <div className="flex flex-col text-left min-w-0">
+                        <div className="flex flex-col text-left">
                           <span className="text-sm font-medium block">
                             {winner.rewardName}
                           </span>
