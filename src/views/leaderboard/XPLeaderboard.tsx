@@ -57,7 +57,7 @@ export default function XPLeaderboard() {
     fetchLeaderboard();
   }, []);
 
-  const shortenAddress = (address: string, start = 4, end = 4) =>
+  const shortenAddress = (address: string, start = 3, end = 3) =>
     `${address.slice(0, start)}...${address.slice(-end)}`;
 
   const getRankIcon = (rank: number) => {
@@ -268,7 +268,7 @@ export default function XPLeaderboard() {
                     {/* XP Amount */}
                     <div className="flex items-center gap-2">
                       <Star className="h-5 w-5 text-primary" />
-                      <span className="text-lg font-bold text-primary">
+                      <span className="text-lg font-semibold sm:font-bold text-primary">
                         {user.totalXp.toLocaleString()} XP
                       </span>
                     </div>

@@ -71,6 +71,7 @@ function App() {
             closeOnClick
             rtl={false}
             pauseOnFocusLoss
+            style={{ zIndex: 9999 }}
             draggable
             pauseOnHover
           />

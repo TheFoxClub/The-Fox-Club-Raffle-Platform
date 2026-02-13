@@ -29,14 +29,27 @@ import NFT_PLACEHOLDER from "../../../public/uploads/nft-placeholder.svg";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
+// const normalizeRewardType = (rewardType: any) => {
+//   if (rewardType === 0 || rewardType === "NFT") return "NFT";
+//   if (
+//     rewardType === 1 ||
+//     rewardType === "SPL_TOKEN" ||
+//     rewardType === "SPL_TOKEN_2022"
+//   )
+//     return "SPL_TOKEN";
+
+//   return null;
+// };
 const normalizeRewardType = (rewardType: any) => {
-  if (rewardType === 0 || rewardType === "NFT") return "NFT";
-  if (
-    rewardType === 1 ||
-    rewardType === "SPL_TOKEN" ||
-    rewardType === "SPL_TOKEN_2022"
-  )
+  if (!rewardType && rewardType !== 0) return null;
+
+  const type = String(rewardType).trim().toUpperCase();
+
+  if (type === "0" || type === "NFT") return "NFT";
+
+  if (type === "1" || type === "SPL_TOKEN" || type === "SPL_TOKEN_2022") {
     return "SPL_TOKEN";
+  }
 
   return null;
 };
@@ -381,24 +394,24 @@ const CreateRaffle = () => {
     fetchTokens();
   }, [isTokenDialogOpen, user?.pubkey]);
 
-  useEffect(() => {
-    if (selectedTokens.length === 0 || tokenCandidates.length === 0) return;
+  // useEffect(() => {
+  //   if (selectedTokens.length === 0 || tokenCandidates.length === 0) return;
 
-    setSelectedTokens((prev) =>
-      prev.map((selected) => {
-        const walletToken = tokenCandidates.find(
-          (t) => t.mint === selected.mint,
-        );
+  //   setSelectedTokens((prev) =>
+  //     prev.map((selected) => {
+  //       const walletToken = tokenCandidates.find(
+  //         (t) => t.mint === selected.mint,
+  //       );
 
-        return walletToken
-          ? {
-              ...selected,
-              amount: walletToken.amount,
-            }
-          : selected;
-      }),
-    );
-  }, [tokenCandidates]);
+  //       return walletToken
+  //         ? {
+  //             ...selected,
+  //             amount: walletToken.amount,
+  //           }
+  //         : selected;
+  //     }),
+  //   );
+  // }, [tokenCandidates]);
 
   useEffect(() => {
     if (!isResumingDraft) return;
@@ -567,10 +580,14 @@ const CreateRaffle = () => {
       if (t.amountToUse <= 0) {
         newErrors[`token-${t.mint}`] = "Amount must be greater than 0";
       }
-      if (t.amountToUse > t.amount) {
-        newErrors[`token-${t.mint}`] =
-          `Cannot exceed available amount (${t.amount})`;
-      }
+      const walletBalance =
+        tokenCandidates.find((c) => c.mint === t.mint)?.amount ?? 0;
+
+      if (t.amountToUse > walletBalance)
+        if (t.amountToUse > walletBalance) {
+          newErrors[`token-${t.mint}`] =
+            `Cannot exceed available amount (${walletBalance})`;
+        }
     });
 
     if (!title.trim()) newErrors.title = "Title is required";
@@ -803,7 +820,7 @@ const CreateRaffle = () => {
 
       if (status === "DRAFT" && draftId) {
         //UPDATE EXISTING DRAFT
-        console.log("Updating existing draft:", draftId);
+        // console.log("Updating existing draft:", draftId);
         res = await server.put(`/raffle/draft/${draftId}`, payload);
 
         // Drafts don't require reward transfer, so we can finish here
@@ -884,9 +901,8 @@ const CreateRaffle = () => {
             let signature;
             let latestBlockhash;
             try {
-              latestBlockhash = await connection.getLatestBlockhash(
-                "confirmed",
-              );
+              latestBlockhash =
+                await connection.getLatestBlockhash("confirmed");
 
               if (isVersioned) {
                 tx.message.recentBlockhash = latestBlockhash.blockhash;
@@ -906,7 +922,6 @@ const CreateRaffle = () => {
                 maxRetries: 5,
                 preflightCommitment: "confirmed",
               });
-              
 
               toast.info("Transaction sent! Waiting for confirmation...");
 
@@ -1091,7 +1106,7 @@ const CreateRaffle = () => {
             amountToUse: Number(reward.amount),
             image: reward.imageUrl,
             // amount: Number(reward.amount),
-            amount: 0,
+            // amount: 0,
             programId: metadata.programId || TOKEN_PROGRAM_ID,
           });
         }
@@ -1108,7 +1123,7 @@ const CreateRaffle = () => {
     const status = raffleData?.status;
 
     if (!draftId) {
-      console.log("No draft ID found:", savedDraft);
+      // console.log("No draft ID found:", savedDraft);
       toast.error("No draft to delete");
       return;
     }
@@ -1123,32 +1138,11 @@ const CreateRaffle = () => {
         res = await server.delete(`/raffle/${draftId}`);
       }
 
-      console.log("Delete response:", res.data);
+      //    console.log("Delete response:", res.data);
 
       if (res.data.success) {
-        // Clear the saved draft state
         setSavedDraft(null);
-        // Reset the resuming flag since draft is deleted
         setIsResumingDraft(false);
-
-        setTitle("");
-        setDescription("");
-        setTicketPrice("");
-        setTotalTickets("");
-        setNumberOfWinners(1);
-        setStartDate("");
-        setEndDate("");
-        setSelectedTokenType(null);
-        setSelectedTokenAddress("");
-        setSelectedNFTs([]);
-        setSelectedTokens([]);
-
-        setErrors({});
-        // setRewardDisclaimerShown({ nft: false, token: false });
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
 
         toast.success("Draft deleted successfully!");
       } else {
@@ -1176,14 +1170,14 @@ const CreateRaffle = () => {
         const draftData = res.data.data.raffle || res.data.data;
 
         if (draftData && draftData.id) {
-          console.log("Valid draft found:", draftData);
+          // console.log("Valid draft found:", draftData);
           setSavedDraft(draftData);
         } else {
-          console.log("No valid draft ID found");
+          //  console.log("No valid draft ID found");
           setSavedDraft(null);
         }
       } else {
-        console.log("No draft data in response");
+        // console.log("No draft data in response");
         setSavedDraft(null);
       }
     } catch (err: any) {
@@ -1553,66 +1547,74 @@ const CreateRaffle = () => {
 
                 {selectedTokens.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    {selectedTokens.map((t) => (
-                      <div
-                        key={t.mint}
-                        className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => removeToken(t.mint)}
-                          className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                    {selectedTokens.map((t) => {
+                      const walletBalance =
+                        tokenCandidates.find((c) => c.mint === t.mint)
+                          ?.amount ?? 0;
+
+                      return (
+                        <div
+                          key={t.mint}
+                          className="relative border-2 border-primary-30 rounded-lg p-4 bg-background-50"
                         >
-                          <X className="h-4 w-4" />
-                        </button>
-                        <div className="flex flex-col gap-2 break-all">
-                          <div className="flex-1">
-                            <p className="font-semibold break-all">{t.name}</p>
-                            <p className="text-xs text-muted-foreground break-all">
-                              Mint: {t.mint}
-                            </p>
-                            <p className="text-xs text-muted-foreground break-all">
-                              Amount: {t.amount}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col">
-                            <label className="text-xs font-medium">
-                              Amount
-                            </label>
-                            <input
-                              type="number"
-                              value={t.amountToUse}
-                              min={0}
-                              max={t.amount}
-                              onChange={(e) => {
-                                const value = Number(e.target.value);
-                                setSelectedTokens((prev) =>
-                                  prev.map((token) =>
-                                    token.mint === t.mint
-                                      ? { ...token, amountToUse: value }
-                                      : token,
-                                  ),
-                                );
-                                // Clear error if any
-                                setErrors((prev) => ({
-                                  ...prev,
-                                  [`token-${t.mint}`]: undefined,
-                                }));
-                              }}
-                              placeholder="Amount to use"
-                              className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
-                            />
-
-                            {errors[`token-${t.mint}`] && (
-                              <p className="text-red-500 text-xs mt-1">
-                                {errors[`token-${t.mint}`]}
+                          <button
+                            type="button"
+                            onClick={() => removeToken(t.mint)}
+                            className="absolute top-2 right-2 p-1 rounded-full bg-background-80 hover:bg-destructive-80 transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                          <div className="flex flex-col gap-2 break-all">
+                            <div className="flex-1">
+                              <p className="font-semibold break-all">
+                                {t.name}
                               </p>
-                            )}
+                              <p className="text-xs text-muted-foreground break-all">
+                                Mint: {t.mint}
+                              </p>
+                              <p className="text-xs text-muted-foreground break-all">
+                                Amount: {walletBalance}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col">
+                              <label className="text-xs font-medium">
+                                Amount
+                              </label>
+                              <Input
+                                type="number"
+                                value={t.amountToUse}
+                                min={0}
+                                max={walletBalance}
+                                onChange={(e) => {
+                                  const value = Number(e.target.value);
+                                  setSelectedTokens((prev) =>
+                                    prev.map((token) =>
+                                      token.mint === t.mint
+                                        ? { ...token, amountToUse: value }
+                                        : token,
+                                    ),
+                                  );
+                                  // Clear error if any
+                                  setErrors((prev) => ({
+                                    ...prev,
+                                    [`token-${t.mint}`]: undefined,
+                                  }));
+                                }}
+                                placeholder="Amount to use"
+                                className="border border-input rounded-lg mt-1 w-full px-3 py-2 text-sm bg-background-50 outline-none"
+                              />
+
+                              {errors[`token-${t.mint}`] && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors[`token-${t.mint}`]}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1696,11 +1698,23 @@ const CreateRaffle = () => {
               <div>
                 <Input
                   type="number"
+                  min={1}
                   value={totalTickets}
-                  onChange={(e) => setTotalTickets(Number(e.target.value))}
+                  // onChange={(e) => setTotalTickets(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+
+                    if (val === "") {
+                      setTotalTickets("");
+                      return;
+                    }
+
+                    setTotalTickets(Math.max(1, Number(val)));
+                  }}
                   placeholder="100"
                   className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
+
                 {errors.totalTickets && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.totalTickets}
@@ -1902,7 +1916,6 @@ const CreateRaffle = () => {
           </div>
         </DialogContent>
       </Dialog>
-      {/* ===================================================== */}
     </div>
   );
 };

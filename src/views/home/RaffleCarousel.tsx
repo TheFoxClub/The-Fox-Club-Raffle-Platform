@@ -179,7 +179,7 @@ export default function RaffleCarousel() {
   // Socket.IO integration for real-time updates (separate useEffect to avoid dependency issues)
   useEffect(() => {
     const handleRaffleListUpdate = (data: any) => {
-      console.log("Featured raffles - raffle list update received:", data);
+      //  console.log("Featured raffles - raffle list update received:", data);
 
       if (data.raffleId) {
         // Handle new raffle creation - refresh featured raffles if needed

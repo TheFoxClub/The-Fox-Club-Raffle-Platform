@@ -10,7 +10,7 @@ interface DialogContextType {
   setIsOpen: (open: boolean) => void;
 }
 const DialogContext = React.createContext<DialogContextType | undefined>(
-  undefined
+  undefined,
 );
 
 // --- 2. Dialog Root (Controller) ---
@@ -20,7 +20,11 @@ interface DialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-const Dialog: React.FC<DialogProps> = ({ children, open: controlledOpen, onOpenChange }) => {
+const Dialog: React.FC<DialogProps> = ({
+  children,
+  open: controlledOpen,
+  onOpenChange,
+}) => {
   const [internalOpen, setInternalOpen] = React.useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -32,7 +36,7 @@ const Dialog: React.FC<DialogProps> = ({ children, open: controlledOpen, onOpenC
       }
       onOpenChange?.(newOpen);
     },
-    [isControlled, onOpenChange]
+    [isControlled, onOpenChange],
   );
 
   // SCROLL LOCK: add/remove overflow hidden on body
@@ -117,13 +121,13 @@ const DialogContent = React.forwardRef<
     "grid w-full gap-4 border border-input bg-background p-6 shadow-lg duration-200 sm:rounded-lg max-w-2xl",
     "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
     "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-    className
+    className,
   );
 
   // modal JSX to portal
   const modal = (
     <div
-      className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center"
+      className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex items-center justify-center"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
@@ -161,7 +165,7 @@ const DialogHeader = ({
   <div
     className={cn(
       "flex flex-col space-y-1.5 text-center sm:text-left",
-      className
+      className,
     )}
     {...props}
   />
@@ -178,7 +182,7 @@ const DialogTitle = React.forwardRef<
     id="modal-title"
     className={cn(
       "text-lg font-semibold leading-none tracking-tight",
-      className
+      className,
     )}
     {...props}
   />
@@ -208,7 +212,7 @@ const DialogFooter = ({
   <div
     className={cn(
       "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-4",
-      className
+      className,
     )}
     {...props}
   />

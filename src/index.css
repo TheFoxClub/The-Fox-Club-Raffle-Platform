@@ -274,11 +274,15 @@ body {
 
 /* Hover glow for raffle cards */
 .glass-card {
-  transition: box-shadow 0.35s ease, transform 0.35s ease,
+  transition:
+    box-shadow 0.35s ease,
+    transform 0.35s ease,
     border-color 0.35s ease;
 }
 .glass-card:hover {
-  box-shadow: var(--glow-primary), 0 6px 20px rgba(0, 0, 0, 0.28);
+  box-shadow:
+    var(--glow-primary),
+    0 6px 20px rgba(0, 0, 0, 0.28);
   transform: translateY(-6px);
   border-color: rgba(255, 123, 63, 0.35);
 }
@@ -325,4 +329,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .animate-slide {
   animation: slideFade 0.5s ease-in-out;
+}
+
+.Toastify__toast-container {
+  z-index: 999999 !important;
 }

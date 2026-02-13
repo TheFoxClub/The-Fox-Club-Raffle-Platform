@@ -424,10 +424,11 @@ export default function AdminTokens() {
                 </div>
               )}
 
-              <div className="flex justify-end mt-4">
+              {/* <div className="flex justify-end mt-4"> */}
+              <div className="sticky bottom-0 pb-2 flex justify-end">
                 <Button
-                  className="gradient-primary"
-                  disabled={!selectedToken}
+                  className="gradient-primary shadow-lg shadow-black/80"
+                  // disabled={!selectedToken}
                   onClick={handleAddVerifiedToken}
                 >
                   Add
