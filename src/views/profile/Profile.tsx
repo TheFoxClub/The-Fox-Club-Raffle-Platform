@@ -423,17 +423,34 @@ const Profile = () => {
               )}
             </div>
 
-            <div className="flex-1 space-y-4">
+            {/* <div className="flex-1 space-y-4">
               <div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
                   <h1 className="text-lg sm:text-lg font-bold break-all">
                     {pubkey}
                   </h1>
-                </div>
-                {/* <h4 className="text-lg sm:text-lg font-bold break-all">
+                </div> */}
+            {/* <h4 className="text-lg sm:text-lg font-bold break-all">
                   {user_info?.username}
                 </h4> */}
-              </div>
+            {/* </div>
+            </div> */}
+            <div className="flex-1 space-y-2">
+              {user_info?.username ? (
+                <>
+                  {/* Username */}
+                  <h1 className="text-xl font-bold leading-tight">
+                    {user_info.username}
+                  </h1>
+
+                  {/* Wallet address */}
+                  <p className="text-sm text-muted-foreground break-all">
+                    {pubkey}
+                  </p>
+                </>
+              ) : (
+                <h1 className="text-lg font-bold break-all">{pubkey}</h1>
+              )}
             </div>
 
             <Link to="/profile/EditProfile">

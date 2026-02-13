@@ -32,6 +32,7 @@ const {
 const { base64 } = require("@metaplex-foundation/umi/serializers");
 const { generateChecksum } = require("./checksum-validation.js");
 const logger = require("../../util/logger");
+const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
 
 const umi = getUmi();
 
@@ -367,7 +368,7 @@ const createClaimTransaction = async ({
   feePayer,
 }) => {
   try {
-    const { Wallet } = require("./wallet.js");
+    const { generateChecksum } = require("./checksum-validation.js");
 
     let transaction = new Transaction();
 
@@ -386,10 +387,13 @@ const createClaimTransaction = async ({
 
     const { tokenAddress, amount, type } = reward;
 
-    logger.info(`createClaimTransaction - type: ${type} (${typeof type}), NFT enum: ${RAFFLE_REWARD_TYPES.NFT}, match: ${type === RAFFLE_REWARD_TYPES.NFT}`);
+    logger.info(
+      `createClaimTransaction - type: ${type} (${typeof type}), NFT enum: ${RAFFLE_REWARD_TYPES.NFT}, match: ${type === RAFFLE_REWARD_TYPES.NFT}`,
+    );
 
     // Ensure type is a number for comparison
-    const rewardType = typeof type === 'string' ? RAFFLE_REWARD_TYPES[type] : type;
+    const rewardType =
+      typeof type === "string" ? RAFFLE_REWARD_TYPES[type] : type;
 
     switch (rewardType) {
       case RAFFLE_REWARD_TYPES.SOLANA:
@@ -426,6 +430,7 @@ const createClaimTransaction = async ({
             serializedTx: nftResult.serializedTx,
             blockhash: nftResult.blockhash,
             lastValidBlockHeight: nftResult.lastValidBlockHeight,
+            checksum: nftResult.checksum,
             autoSubmit: nftResult.autoSubmit || false, // Pass through autoSubmit flag
           },
           message: "Created NFT claim transaction",
@@ -434,11 +439,13 @@ const createClaimTransaction = async ({
       default:
         // SPL Token transfer
         const tokenDetail = await getTokenDetail(tokenAddress);
-        
+
         if (!tokenDetail) {
-          throw new Error(`Failed to get token details for ${tokenAddress}. This might be an NFT - please check the reward type.`);
+          throw new Error(
+            `Failed to get token details for ${tokenAddress}. This might be an NFT - please check the reward type.`,
+          );
         }
-        
+
         const { transferFeeConfig, decimals, tokenProgramId } = tokenDetail;
 
         const uiAmount = amount * Math.pow(10, decimals);
@@ -520,16 +527,27 @@ const createClaimTransaction = async ({
     transaction.recentBlockhash = latestBlockhash.blockhash;
     transaction.feePayer = new PublicKey(feePayer);
 
-    // Platform wallet partially signs the transaction
-    const signedTransaction = Wallet.partialSign(transaction);
+    // Convert to UMI transaction to generate checksum
+    const umi = createUmi(connection);
 
-    // Serialize the partially signed transaction
-    const serializedTx = signedTransaction
+    const umiTx = umi.transactions.create({
+      version: "legacy",
+      blockhash: latestBlockhash.blockhash,
+      instructions: transaction.instructions,
+      payer: publicKey(feePayer),
+    });
+
+    const checksum = generateChecksum(umiTx.message);
+
+    // Serialize the original transaction (unsigned)
+    const serializedTx = transaction
       .serialize({
-        requireAllSignatures: false, // Allow partial signatures
+        requireAllSignatures: false,
         verifySignatures: false,
       })
       .toString("base64");
+
+    logger.info("Created UNSIGNED claim transaction for user to sign first");
 
     return {
       success: true,
@@ -537,8 +555,9 @@ const createClaimTransaction = async ({
         serializedTx,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        checksum,
       },
-      message: "Created pre-signed claim transaction",
+      message: "Created unsigned claim transaction",
     };
   } catch (error) {
     logger.error("Error in createClaimTransaction:", error);
@@ -691,7 +710,7 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
 
     logger.info(`Submitting transaction to blockchain...`);
     logger.info(`Transaction size: ${transactionBuffer.length} bytes`);
-    
+
     // Submit to Solana network with simulation first
     const signature = await connection.sendRawTransaction(transactionBuffer, {
       skipPreflight: false,
@@ -722,12 +741,12 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
     };
   } catch (error) {
     logger.error(`Error submitting transaction to blockchain:`, error);
-    
+
     // Try to get more detailed logs if available
     if (error.logs) {
       logger.error(`Transaction logs:`, error.logs);
     }
-    
+
     return {
       success: false,
       message: error.message,
