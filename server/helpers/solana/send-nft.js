@@ -247,8 +247,8 @@ const handlePNFT = async ({
       return {
         serializedTx: serializedTxString,
         blockhash: builtTx.blockhash,
+        lastValidBlockHeight: builtTx.lastValidBlockHeight,
         checksum,
-        requiresUserSignature: true, // User needs to sign first
         type: "pnft",
       };
     } else {
@@ -347,19 +347,32 @@ const handleMPLCore = async ({
 
     let builtTx;
     if (direction === "platform_to_user") {
+      const platformNoopSigner = createNoopSigner(
+        publicKey(fromAccountAddress),
+      );
       const userPayer = createNoopSigner(publicKey(toAccountAddress));
 
-      builtTx = await transferCoreV1(umi, {
+      // Create a temporary UMI instance with noop signer for platform
+      const tempUmi = createUmi(connection);
+      tempUmi.use(signerIdentity(platformNoopSigner)).use(mplCore());
+
+      logger.info(
+        `Building UNSIGNED MPL Core transfer transaction for user to sign first`,
+      );
+
+      builtTx = await transferCoreV1(tempUmi, {
         asset: coreAsset.publicKey,
         collection,
-        authority: umi.identity, // Platform wallet owns the asset
+        authority: platformNoopSigner, // Platform wallet owns the asset - noop for now
         newOwner: publicKey(toAccountAddress), // Transfer to user wallet
         payer: userPayer, // User pays fees
       })
         .useV0()
-        .buildWithLatestBlockhash(umi);
+        .buildWithLatestBlockhash(tempUmi);
 
-      builtTx = await umi.identity.signTransaction(builtTx);
+      logger.info(
+        `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`,
+      );
     } else {
       // Build transaction with a user identity to avoid extra required signers
       const userSigner = createNoopSigner(publicKey(fromAccountAddress));
@@ -381,15 +394,22 @@ const handleMPLCore = async ({
       `Required signatures: ${builtTx.message.header.numRequiredSignatures}`
     );
 
+    // Generate checksum from built transaction message
+    const checksum = generateChecksum(builtTx.message);
+
     const serializedTx = Buffer.from(
       umi.transactions.serialize(builtTx),
     ).toString("base64");
 
-    logger.info(`MPL Core transaction serialized for user signature`);
+    logger.info(
+      `${direction === "platform_to_user" ? "UNSIGNED" : ""} MPL Core transaction serialized. Checksum: ${checksum}`,
+    );
 
     return {
       serializedTx: serializedTx,
-      checksum: "mpl_core_umi",
+      checksum,
+      blockhash: builtTx.blockhash,
+      lastValidBlockHeight: builtTx.lastValidBlockHeight,
       type: "mpl_core",
       direction,
     };
