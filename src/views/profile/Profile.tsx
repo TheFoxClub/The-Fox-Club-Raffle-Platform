@@ -34,6 +34,7 @@ import socketService from "../../services/socket.service";
 import { toast } from "react-toastify";
 import { UserXPCard } from "../../components/profile/UserXPCard";
 import { TokenDisplay } from "../../components/ui/TokenDisplay";
+import { formatRewardType } from "../../utils/rewardTypeUtils";
 
 type HostedRaffle = {
   id: number;
@@ -142,6 +143,7 @@ const Profile = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [loadingRewards, setLoadingRewards] = useState(false);
+  const unclaimedWinsCount = wins.filter((win) => !win.isClaimed).length;
 
   const formatEndDate = (dateString: string) => {
     if (!dateString) return "N/A";
@@ -490,14 +492,16 @@ const Profile = () => {
         {/* XP Card */}
         <UserXPCard />
 
-        {claimableRewards.length > 0 && (
+        {/* {claimableRewards.length > 0 && ( */}
+        {unclaimedWinsCount > 0 && (
           <Card className="bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Gift className="h-6 w-6 text-primary" />
                 <div>
                   <h3 className="font-bold">
-                    You have {claimableRewards.length} unclaimed reward(s)!
+                    {/* You have {claimableRewards.length} unclaimed reward(s)! */}
+                    You have {unclaimedWinsCount} unclaimed reward(s)!
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     Go to the "Wins" tab to claim your rewards
@@ -592,9 +596,14 @@ const Profile = () => {
               data-tab="won"
             >
               Wins{" "}
-              {claimableRewards.length > 0 && (
+              {/* {claimableRewards.length > 0 && (
                 <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {claimableRewards.length}
+                </span>
+              )} */}
+              {unclaimedWinsCount > 0 && (
+                <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unclaimedWinsCount}
                 </span>
               )}
             </TabsTrigger>
@@ -1044,7 +1053,7 @@ const Profile = () => {
                           <div className="flex items-center gap-1">
                             <Gift className="h-3 w-3" />
                             <span>
-                              {win.amount} {win.rewardType}
+                              {win.amount} {formatRewardType(win.rewardType)}
                             </span>
                           </div>
 

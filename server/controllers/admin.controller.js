@@ -1221,12 +1221,14 @@ class AdminController {
 
       // XP breakdown by config type
       const sourceBreakdown = await XpTable.findAll({
-        include: [{
-          model: XpConfig,
-          as: 'config',
-          attributes: ['configKey', 'description'],
-          required: false
-        }],
+        include: [
+          {
+            model: XpConfig,
+            as: "config",
+            attributes: ["configKey", "description"],
+            required: false,
+          },
+        ],
         attributes: [
           [sequelize.fn("COUNT", sequelize.col("XpTable.id")), "recordCount"],
           [sequelize.fn("SUM", sequelize.col("xpEarned")), "totalXp"],
@@ -1303,16 +1305,18 @@ class AdminController {
               },
             ],
           });
-          
+
           return {
             userId: earner.userId,
             monthlyXp: parseFloat(earner.monthlyXp || 0),
-            user: user ? {
-              pubkey: user.pubkey,
-              user_info: user.user_info
-            } : null
+            user: user
+              ? {
+                  pubkey: user.pubkey,
+                  user_info: user.user_info,
+                }
+              : null,
           };
-        })
+        }),
       );
 
       return respond(
@@ -1390,11 +1394,13 @@ class AdminController {
       const { XpTable, XpConfig } = require("../models");
 
       let whereClause = {};
-      let includeClause = [{
-        model: XpConfig,
-        as: 'config',
-        attributes: ['configKey', 'description']
-      }];
+      let includeClause = [
+        {
+          model: XpConfig,
+          as: "config",
+          attributes: ["configKey", "description"],
+        },
+      ];
 
       if (configKey) {
         includeClause[0].where = { configKey };

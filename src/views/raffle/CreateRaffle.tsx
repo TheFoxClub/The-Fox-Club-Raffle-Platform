@@ -820,7 +820,7 @@ const CreateRaffle = () => {
 
       if (status === "DRAFT" && draftId) {
         //UPDATE EXISTING DRAFT
-        console.log("Updating existing draft:", draftId);
+        // console.log("Updating existing draft:", draftId);
         res = await server.put(`/raffle/draft/${draftId}`, payload);
 
         // Drafts don't require reward transfer, so we can finish here
@@ -898,9 +898,8 @@ const CreateRaffle = () => {
             let signature;
             let latestBlockhash;
             try {
-              latestBlockhash = await connection.getLatestBlockhash(
-                "confirmed",
-              );
+              latestBlockhash =
+                await connection.getLatestBlockhash("confirmed");
 
               if (isVersioned) {
                 tx.message.recentBlockhash = latestBlockhash.blockhash;
@@ -920,7 +919,6 @@ const CreateRaffle = () => {
                 maxRetries: 5,
                 preflightCommitment: "confirmed",
               });
-              
 
               toast.info("Transaction sent! Waiting for confirmation...");
 
@@ -1122,7 +1120,7 @@ const CreateRaffle = () => {
     const status = raffleData?.status;
 
     if (!draftId) {
-      console.log("No draft ID found:", savedDraft);
+      // console.log("No draft ID found:", savedDraft);
       toast.error("No draft to delete");
       return;
     }
@@ -1137,7 +1135,7 @@ const CreateRaffle = () => {
         res = await server.delete(`/raffle/${draftId}`);
       }
 
-      console.log("Delete response:", res.data);
+      //    console.log("Delete response:", res.data);
 
       if (res.data.success) {
         setSavedDraft(null);
@@ -1169,14 +1167,14 @@ const CreateRaffle = () => {
         const draftData = res.data.data.raffle || res.data.data;
 
         if (draftData && draftData.id) {
-          console.log("Valid draft found:", draftData);
+          // console.log("Valid draft found:", draftData);
           setSavedDraft(draftData);
         } else {
-          console.log("No valid draft ID found");
+          //  console.log("No valid draft ID found");
           setSavedDraft(null);
         }
       } else {
-        console.log("No draft data in response");
+        // console.log("No draft data in response");
         setSavedDraft(null);
       }
     } catch (err: any) {
@@ -1580,7 +1578,7 @@ const CreateRaffle = () => {
                               <label className="text-xs font-medium">
                                 Amount
                               </label>
-                              <input
+                              <Input
                                 type="number"
                                 value={t.amountToUse}
                                 min={0}
@@ -1697,11 +1695,23 @@ const CreateRaffle = () => {
               <div>
                 <Input
                   type="number"
+                  min={1}
                   value={totalTickets}
-                  onChange={(e) => setTotalTickets(Number(e.target.value))}
+                  // onChange={(e) => setTotalTickets(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+
+                    if (val === "") {
+                      setTotalTickets("");
+                      return;
+                    }
+
+                    setTotalTickets(Math.max(1, Number(val)));
+                  }}
                   placeholder="100"
                   className="mt-2 w-full text-base placeholder:text-muted-foreground md:text-sm bg-background-50 outline-none"
                 />
+
                 {errors.totalTickets && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.totalTickets}
