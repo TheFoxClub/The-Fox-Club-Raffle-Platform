@@ -799,7 +799,7 @@ class RaffleController {
                 ...existingMetadata,
                 nftType: nftTypeInfo,
               });
-              logger.info(`1st typ: ${nftTypeInfo}`)
+              logger.info(`1st typ: ${nftTypeInfo}`);
               if (
                 nftTypeInfo === "pnft" ||
                 nftTypeInfo === "mpl_core" ||
@@ -807,7 +807,9 @@ class RaffleController {
                 nftTypeInfo === "core"
               ) {
                 mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
-                logger.info(`Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`);
+                logger.info(
+                  `Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`,
+                );
               } else {
                 mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
                 logger.info(
@@ -1159,7 +1161,7 @@ class RaffleController {
               ...existingMetadata,
               nftType: nftTypeInfo,
             });
-            logger.info(`2nd typ: ${nftTypeInfo}`)
+            logger.info(`2nd typ: ${nftTypeInfo}`);
             if (
               nftTypeInfo === "pnft" ||
               nftTypeInfo === "mpl_core" ||
@@ -1167,7 +1169,9 @@ class RaffleController {
               nftTypeInfo === "core"
             ) {
               mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
-              logger.info(`Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`);
+              logger.info(
+                `Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`,
+              );
             } else {
               mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
               logger.info(
@@ -1782,12 +1786,12 @@ class RaffleController {
         case RAFFLE_REWARD_TYPES.SPL_TOKEN:
           // Check if this is actually an NFT (amount = 1 and decimals = 0)
           // This handles cases where pNFTs were incorrectly stored as SPL tokens
-          if (amount === 1) {
-            logger.info(`Reward has amount=1, checking if it's an NFT...`);
-            type = RAFFLE_REWARD_TYPES.NFT;
-          } else {
-            type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
-          }
+          // if (amount === 1) {
+          //   logger.info(`Reward has amount=1, checking if it's an NFT...`);
+          //   type = RAFFLE_REWARD_TYPES.NFT;
+          // } else {
+          type = RAFFLE_REWARD_TYPES.SPL_TOKEN;
+          // }
           break;
         case RAFFLE_REWARD_TYPES.SPL_TOKEN_2022:
           type = RAFFLE_REWARD_TYPES.SPL_TOKEN_2022;
