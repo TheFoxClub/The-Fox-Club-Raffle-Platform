@@ -272,7 +272,9 @@ const CreateRaffle = () => {
                   if (!collection && meta.collection)
                     collection = meta.collection;
                 }
-              } catch (err) {}
+              } catch (err) {
+                image = "/assets/foxclub_logo.png";
+              }
             }
             return {
               id: mint,
@@ -848,14 +850,12 @@ const CreateRaffle = () => {
 
           try {
             let tx;
-            let isVersioned = false;
             try {
               // Try legacy transaction first (for standard NFTs)
               const txBytes = Uint8Array.from(atob(transaction), (c) =>
                 c.charCodeAt(0),
               );
               tx = Transaction.from(txBytes);
-              isVersioned = false;
             } catch (error) {
               try {
                 // Fallback to versioned transaction (for pNFTs and MPL Core NFTs)
@@ -863,7 +863,6 @@ const CreateRaffle = () => {
                   c.charCodeAt(0),
                 );
                 tx = VersionedTransaction.deserialize(txBytes);
-                isVersioned = true;
               } catch (versionedError) {
                 console.error(
                   "Failed to deserialize transaction:",
@@ -886,6 +885,7 @@ const CreateRaffle = () => {
                 maxRetries: 5,
                 preflightCommitment: "confirmed",
               });
+              
 
               toast.info("Transaction sent! Waiting for confirmation...");
 
