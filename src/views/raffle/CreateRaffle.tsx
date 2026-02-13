@@ -867,12 +867,14 @@ const CreateRaffle = () => {
 
           try {
             let tx;
+            let isVersioned = false;
             try {
               // Try legacy transaction first (for standard NFTs)
               const txBytes = Uint8Array.from(atob(transaction), (c) =>
                 c.charCodeAt(0),
               );
               tx = Transaction.from(txBytes);
+              isVersioned = false;
             } catch (error) {
               try {
                 // Fallback to versioned transaction (for pNFTs and MPL Core NFTs)
@@ -880,6 +882,7 @@ const CreateRaffle = () => {
                   c.charCodeAt(0),
                 );
                 tx = VersionedTransaction.deserialize(txBytes);
+                isVersioned = true;
               } catch (versionedError) {
                 console.error(
                   "Failed to deserialize transaction:",
