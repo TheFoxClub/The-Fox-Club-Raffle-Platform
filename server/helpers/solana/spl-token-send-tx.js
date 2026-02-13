@@ -438,8 +438,37 @@ const createClaimTransaction = async ({
 
       default:
         // SPL Token transfer
-        const tokenDetail = await getTokenDetail(tokenAddress);
+        let tokenDetail;
+        try {
+          tokenDetail = await getTokenDetail(tokenAddress);
+        } catch (tokenError) {
+          // If token lookup fails, fall back to NFT transfer (covers Core NFTs saved as SPL tokens)
+          const nftResult = await addNftSendTransaction({
+            transaction: new Transaction(),
+            mintAddresses: [
+              {
+                address: tokenAddress,
+                authorityAddress: fromAccount,
+                nftType: "auto",
+              },
+            ],
+            toAccountAddress: toAccount,
+            fromAccountAddress: fromAccount,
+            direction: "platform_to_user",
+          });
 
+          return {
+            success: true,
+            data: {
+              serializedTx: nftResult.serializedTx,
+              blockhash: nftResult.blockhash,
+              lastValidBlockHeight: nftResult.lastValidBlockHeight,
+              autoSubmit: nftResult.autoSubmit || false,
+            },
+            message: "Created NFT claim transaction",
+          };
+        }
+        
         if (!tokenDetail) {
           throw new Error(
             `Failed to get token details for ${tokenAddress}. This might be an NFT - please check the reward type.`,
