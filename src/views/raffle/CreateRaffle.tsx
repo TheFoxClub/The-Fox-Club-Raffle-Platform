@@ -285,7 +285,9 @@ const CreateRaffle = () => {
                   if (!collection && meta.collection)
                     collection = meta.collection;
                 }
-              } catch (err) {}
+              } catch (err) {
+                image = "/assets/foxclub_logo.png";
+              }
             }
             return {
               id: mint,
@@ -865,14 +867,12 @@ const CreateRaffle = () => {
 
           try {
             let tx;
-            let isVersioned = false;
             try {
               // Try legacy transaction first (for standard NFTs)
               const txBytes = Uint8Array.from(atob(transaction), (c) =>
                 c.charCodeAt(0),
               );
               tx = Transaction.from(txBytes);
-              isVersioned = false;
             } catch (error) {
               try {
                 // Fallback to versioned transaction (for pNFTs and MPL Core NFTs)
@@ -880,7 +880,6 @@ const CreateRaffle = () => {
                   c.charCodeAt(0),
                 );
                 tx = VersionedTransaction.deserialize(txBytes);
-                isVersioned = true;
               } catch (versionedError) {
                 console.error(
                   "Failed to deserialize transaction:",
@@ -897,17 +896,40 @@ const CreateRaffle = () => {
             );
 
             let signature;
+            let latestBlockhash;
             try {
-              signature = await sendTransaction(tx, connection, {
+              latestBlockhash = await connection.getLatestBlockhash(
+                "confirmed",
+              );
+
+              if (isVersioned) {
+                tx.message.recentBlockhash = latestBlockhash.blockhash;
+              } else {
+                tx.recentBlockhash = latestBlockhash.blockhash;
+              }
+
+              const signedTx = await withTimeout(
+                signTransaction(tx),
+                120_000,
+                "Wallet approval timed out. Please try again.",
+              );
+
+              const txBytes = Buffer.from(signedTx.serialize());
+              signature = await connection.sendRawTransaction(txBytes, {
                 skipPreflight: false,
                 maxRetries: 5,
                 preflightCommitment: "confirmed",
               });
+              
 
               toast.info("Transaction sent! Waiting for confirmation...");
 
               const confirmation = await connection.confirmTransaction(
-                signature,
+                {
+                  signature,
+                  blockhash: latestBlockhash.blockhash,
+                  lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+                },
                 "confirmed",
               );
 
