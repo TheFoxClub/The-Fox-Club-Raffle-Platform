@@ -118,19 +118,34 @@ class HolderController {
         return respond(res, httpStatus.BAD_REQUEST, "Missing wallet address");
       }
 
+      //filtering nfts with collections
+      const allVerifiedCollections = await VerifiedCollection.findAll({
+        raw: true,
+      });
+      const verifiedCollectionAddresses = allVerifiedCollections.map(
+        (item) => item.address
+      );
+
       const cacheKey = `nfts:all:${pubkey}`;
 
-      const cachedData = await redisClient.get(cacheKey);
+      let cachedData = await redisClient.get(cacheKey);
 
       if (cachedData) {
         logger.info(`Cache hit for key: ${cacheKey}`);
+        //filtering verified collections
+        let cachedNfts;
+        if (allVerifiedCollections.length > 0) {
+          cachedNfts = cachedData.nfts.filter((item) =>
+            verifiedCollectionAddresses.includes(item.collection?.group_value)
+          );
+        }
         return respond(
           res,
           httpStatus.OK,
           "NFTs fetched successfully (cached)!",
           {
             total: cachedData.total,
-            nfts: cachedData.nfts,
+            nfts: cachedNfts,
             cached: true,
             timestamp: cachedData.timestamp,
           }
@@ -145,14 +160,22 @@ class HolderController {
 
       const result = await getUmi().rpc.searchAssets(searchParams);
 
-      const nfts = result.items.map((item) => ({
+      let nfts = result.items.map((item) => ({
         mint: item.id,
         name: item.content?.metadata?.name,
         uri: item.content?.json_uri,
         interface: item.interface,
-        grouping: item.grouping,
+        collection: item.grouping[0],
+        image: item.links?.image || item.content.files?.[0]?.uri,
         ownership: item.ownership,
       }));
+
+      //filtering verified collections
+      if (allVerifiedCollections.length > 0) {
+        nfts = nfts.filter((item) =>
+          verifiedCollectionAddresses.includes(item.collection?.group_value)
+        );
+      }
 
       const responseData = {
         total: result.total,
