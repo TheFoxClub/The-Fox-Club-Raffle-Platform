@@ -47,7 +47,7 @@ function RaffleCard({
   return (
     <Card
       key={raffle.id}
-      className={`absolute w-[90vw] sm:w-[420px] md:w-[480px]
+      className={`absolute w-[90vw] sm:w-[420px] md:w-[440px]
       lg:w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
         isActive ? "glow-primary" : ""
       }`}
@@ -345,7 +345,7 @@ export default function RaffleCarousel() {
         : normalized;
 
     const rotateY = adjusted * 45;
-    const translateX = adjusted * 280;
+    const translateX = adjusted * 380;
     const translateZ = Math.abs(adjusted) * -150;
     const scale = adjusted === 0 ? 1 : 0.78;
     const opacity = Math.abs(adjusted) > 2 ? 0 : 1 - Math.abs(adjusted) * 0.3;
