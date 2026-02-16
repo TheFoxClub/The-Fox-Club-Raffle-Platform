@@ -59,13 +59,13 @@ const sendMultipleSplTokenTx = async ({
     transaction.add(
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: 300_000,
-      }),
+      })
     );
 
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({
         units: 300_000,
-      }),
+      })
     );
 
     let signatures = [];
@@ -82,7 +82,7 @@ const sendMultipleSplTokenTx = async ({
               fromPubkey: new PublicKey(fromAccount),
               toPubkey: new PublicKey(toAccount),
               lamports: amount * LAMPORTS_PER_SOL,
-            }),
+            })
           );
 
           transactionDetails.push({
@@ -101,7 +101,7 @@ const sendMultipleSplTokenTx = async ({
           // If there are multiple rewards including NFTs, we need to handle them separately
           if (splTokenSendSummary.length > 1) {
             throw new Error(
-              "Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only.",
+              "Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only."
             );
           }
 
@@ -167,14 +167,14 @@ const sendMultipleSplTokenTx = async ({
               new PublicKey(tokenAddress),
               new PublicKey(fromAccount),
               false,
-              tokenProgramId,
+              tokenProgramId
             );
 
             const toAta = getAssociatedTokenAddressSync(
               new PublicKey(tokenAddress),
               new PublicKey(toAccount),
               false,
-              tokenProgramId,
+              tokenProgramId
             );
 
             // Check if destination account exists, create if needed
@@ -190,8 +190,8 @@ const sendMultipleSplTokenTx = async ({
                     new PublicKey(toAccount), // Owner
                     new PublicKey(tokenAddress),
                     tokenProgramId,
-                    ASSOCIATED_TOKEN_PROGRAM_ID,
-                  ),
+                    ASSOCIATED_TOKEN_PROGRAM_ID
+                  )
                 );
               } else {
                 throw e;
@@ -205,7 +205,7 @@ const sendMultipleSplTokenTx = async ({
                 transferFeeConfig?.newerTransferFee?.transferFeeBasisPoints ||
                 0;
               const maxFee = BigInt(
-                transferFeeConfig?.newerTransferFee?.maximumFee || 0,
+                transferFeeConfig?.newerTransferFee?.maximumFee || 0
               );
               const fee =
                 (BigInt(uiAmount) * BigInt(feeBasisPoints)) / BigInt(10_000);
@@ -221,8 +221,8 @@ const sendMultipleSplTokenTx = async ({
                   decimals,
                   actualFee,
                   [],
-                  tokenProgramId,
-                ),
+                  tokenProgramId
+                )
               );
             } else {
               // Regular SPL token transfer
@@ -233,8 +233,8 @@ const sendMultipleSplTokenTx = async ({
                   new PublicKey(fromAccount),
                   uiAmount,
                   [],
-                  tokenProgramId,
-                ),
+                  tokenProgramId
+                )
               );
             }
 
@@ -255,7 +255,7 @@ const sendMultipleSplTokenTx = async ({
             });
           } catch (tokenError) {
             throw new Error(
-              `Token transfer failed for ${tokenAddress}: ${tokenError.message}`,
+              `Token transfer failed for ${tokenAddress}: ${tokenError.message}`
             );
           }
           break;
@@ -376,24 +376,28 @@ const createClaimTransaction = async ({
     transaction.add(
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: 300_000,
-      }),
+      })
     );
 
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({
         units: 300_000,
-      }),
+      })
     );
 
     const { tokenAddress, amount, type } = reward;
 
     logger.info(
-      `createClaimTransaction - type: ${type} (${typeof type}), NFT enum: ${RAFFLE_REWARD_TYPES.NFT}, match: ${type === RAFFLE_REWARD_TYPES.NFT}`,
+      `createClaimTransaction - type: ${type} (${typeof type}), NFT enum: ${
+        RAFFLE_REWARD_TYPES.NFT
+      }, match: ${type === RAFFLE_REWARD_TYPES.NFT}`
     );
 
     // Ensure type is a number for comparison
     const rewardType =
       typeof type === "string" ? RAFFLE_REWARD_TYPES[type] : type;
+
+    console.log("rewardtype: ", rewardType, type);
 
     switch (rewardType) {
       case RAFFLE_REWARD_TYPES.SOLANA:
@@ -403,7 +407,7 @@ const createClaimTransaction = async ({
             fromPubkey: new PublicKey(fromAccount),
             toPubkey: new PublicKey(toAccount),
             lamports: amount * LAMPORTS_PER_SOL,
-          }),
+          })
         );
         break;
 
@@ -468,10 +472,10 @@ const createClaimTransaction = async ({
             message: "Created NFT claim transaction",
           };
         }
-        
+
         if (!tokenDetail) {
           throw new Error(
-            `Failed to get token details for ${tokenAddress}. This might be an NFT - please check the reward type.`,
+            `Failed to get token details for ${tokenAddress}. This might be an NFT - please check the reward type.`
           );
         }
 
@@ -484,14 +488,14 @@ const createClaimTransaction = async ({
           new PublicKey(tokenAddress),
           new PublicKey(fromAccount),
           false,
-          tokenProgramId,
+          tokenProgramId
         );
 
         const toAta = getAssociatedTokenAddressSync(
           new PublicKey(tokenAddress),
           new PublicKey(toAccount),
           false,
-          tokenProgramId,
+          tokenProgramId
         );
 
         // Check if destination account exists, create if needed
@@ -506,8 +510,8 @@ const createClaimTransaction = async ({
                 new PublicKey(toAccount),
                 new PublicKey(tokenAddress),
                 tokenProgramId,
-                ASSOCIATED_TOKEN_PROGRAM_ID,
-              ),
+                ASSOCIATED_TOKEN_PROGRAM_ID
+              )
             );
           }
         }
@@ -517,7 +521,7 @@ const createClaimTransaction = async ({
           const feeBasisPoints =
             transferFeeConfig?.newerTransferFee?.transferFeeBasisPoints || 0;
           const maxFee = BigInt(
-            transferFeeConfig?.newerTransferFee?.maximumFee || 0,
+            transferFeeConfig?.newerTransferFee?.maximumFee || 0
           );
           const fee =
             (BigInt(uiAmount) * BigInt(feeBasisPoints)) / BigInt(10_000);
@@ -533,8 +537,8 @@ const createClaimTransaction = async ({
               decimals,
               actualFee,
               [],
-              tokenProgramId,
-            ),
+              tokenProgramId
+            )
           );
         } else {
           transaction.add(
@@ -544,8 +548,8 @@ const createClaimTransaction = async ({
               new PublicKey(fromAccount),
               uiAmount,
               [],
-              tokenProgramId,
-            ),
+              tokenProgramId
+            )
           );
         }
         break;
@@ -620,13 +624,13 @@ const createPayoutTransaction = async ({
     transaction.add(
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: 300_000,
-      }),
+      })
     );
 
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({
         units: 300_000,
-      }),
+      })
     );
 
     if (tokenType === TOKEN_TYPE.SOLANA) {
@@ -636,7 +640,7 @@ const createPayoutTransaction = async ({
           fromPubkey: new PublicKey(fromAccount), // Platform wallet
           toPubkey: new PublicKey(toAccount), // User wallet
           lamports: amount * LAMPORTS_PER_SOL,
-        }),
+        })
       );
     } else {
       // SPL Token transfer
@@ -654,14 +658,14 @@ const createPayoutTransaction = async ({
         new PublicKey(tokenAddress),
         new PublicKey(fromAccount),
         false,
-        tokenProgramId,
+        tokenProgramId
       );
 
       const toAta = getAssociatedTokenAddressSync(
         new PublicKey(tokenAddress),
         new PublicKey(toAccount),
         false,
-        tokenProgramId,
+        tokenProgramId
       );
 
       try {
@@ -675,8 +679,8 @@ const createPayoutTransaction = async ({
               new PublicKey(toAccount), // Owner
               new PublicKey(tokenAddress),
               tokenProgramId,
-              ASSOCIATED_TOKEN_PROGRAM_ID,
-            ),
+              ASSOCIATED_TOKEN_PROGRAM_ID
+            )
           );
         } else {
           throw e;
@@ -691,8 +695,8 @@ const createPayoutTransaction = async ({
           new PublicKey(fromAccount),
           uiAmount,
           [],
-          tokenProgramId,
-        ),
+          tokenProgramId
+        )
       );
     }
 
@@ -752,13 +756,13 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
     // Wait for confirmation
     const confirmation = await connection.confirmTransaction(
       signature,
-      "confirmed",
+      "confirmed"
     );
 
     if (confirmation.value.err) {
       logger.error(`Transaction confirmation failed:`, confirmation.value.err);
       throw new Error(
-        `Transaction failed: ${JSON.stringify(confirmation.value.err)}`,
+        `Transaction failed: ${JSON.stringify(confirmation.value.err)}`
       );
     }
 

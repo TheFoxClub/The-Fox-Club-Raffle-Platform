@@ -74,7 +74,7 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
         {
           raffleId,
           rewardId: reward.id,
-        },
+        }
       );
 
       if (claimRes.data.success && claimRes.data.data) {
@@ -103,7 +103,7 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
               >
                 View on Solscan
               </a>
-            </div>,
+            </div>
           );
           return;
         }
@@ -120,19 +120,26 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
           try {
             // Fallback to versioned transaction (for pNFTs)
             tx = VersionedTransaction.deserialize(
-              Buffer.from(transaction, "base64"),
+              Buffer.from(transaction, "base64")
             );
           } catch (versionedError) {
             console.error(
               "Failed to deserialize transaction:",
               error,
-              versionedError,
+              versionedError
             );
             throw new Error("Failed to deserialize transaction");
           }
         }
 
-        const signedTx = await signTransaction(tx);
+        let signedTx;
+        try {
+          console.log(tx);
+          signedTx = await signTransaction(tx);
+        } catch (errorr) {
+          console.log("signing error:", errorr);
+          return;
+        }
 
         // Serialize with partial signatures allowed (platform will add its signature)
         let serializedTx: string;
@@ -145,7 +152,7 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
             signedTx.serialize({
               requireAllSignatures: false,
               verifySignatures: false,
-            }),
+            })
           ).toString("base64");
         }
 
@@ -157,7 +164,7 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
             checksum,
             raffleId,
             rewardId: reward.id,
-          },
+          }
         );
 
         if (submitRes.data.success && submitRes.data.data) {
@@ -183,7 +190,7 @@ const ClaimReward: React.FC<ClaimRewardProps> = ({
               >
                 View on Solscan
               </a>
-            </div>,
+            </div>
           );
         } else {
           throw new Error("Failed to submit claim");
