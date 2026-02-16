@@ -266,7 +266,6 @@ const CreateRaffle = () => {
         // const res = await server.get(`/nfts/onCollection`);
         const nftsFromApi: any[] = res.data?.data?.nfts || [];
 
-        console.log("nftsFromApi: ", nftsFromApi);
         const mapped = await Promise.all(
           nftsFromApi.map(async (nftItem: any, idx: number) => {
             const mint = nftItem.mint ?? `unknown-${idx}`;
@@ -1354,9 +1353,14 @@ const CreateRaffle = () => {
               `}
                             >
                               <img
-                                src={nft.image}
+                                src={nft.image || "/assets/foxclub_logo.png"}
                                 alt={nft.name}
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src =
+                                    "/assets/foxclub_logo.png";
+                                }}
                               />
 
                               {/* Footer Overlay */}
