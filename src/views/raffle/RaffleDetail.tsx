@@ -118,8 +118,8 @@ const RAFFLE_STATUS = {
 
 // Default fallback images
 const DEFAULT_IMAGES = {
-  NFT: "/images/default-nft.png",
-  TOKEN: "/images/default-token.png",
+  NFT: "/uploads/nft-placeholder.svg",
+  TOKEN: "/uploads/token-placeholder.png",
 };
 
 const formatDateOnly = (dateStr: string) =>
@@ -191,7 +191,7 @@ const RaffleDetail = () => {
   //const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
   const [hostPhotoUrl, setHostPhotoUrl] = useState<string | null>(null);
   const winners = raffle?.winnersData ?? [];
-  const [nftImages, setNftImages] = useState<Record<string, string>>({});
+  // const [nftImages, setNftImages] = useState<Record<string, string>>({});
   const [isBuying, setIsBuying] = useState(false);
   const user = useSelector((state: RootState) => state.user);
 
@@ -213,44 +213,53 @@ const RaffleDetail = () => {
     }
   };
 
-  const isNFTReward = (rewardType: number) =>
-    rewardType === RAFFLE_REWARD_TYPES.NFT;
+  // const isNFTReward = (rewardType: number) =>
+  //   rewardType === RAFFLE_REWARD_TYPES.NFT;
 
-  const fetchNFTMetadata = useCallback(async (wallet: string) => {
-    try {
-      const res = await server.get(`/api/nfts/${wallet}`);
-      if (!res.data.success) return;
+  // const fetchNFTMetadata = useCallback(async (wallet: string) => {
+  //   try {
+  //     const res = await server.get(`/api/nfts/${wallet}`);
+  //     if (!res.data.success) return;
 
-      const nfts: any[] = res.data.data.nfts;
-      const images: Record<string, string> = {};
+  //     const nfts: any[] = res.data.data.nfts;
+  //     const images: Record<string, string> = {};
 
-      for (const nft of nfts) {
-        try {
-          if (!nft.uri) continue;
-          const metadataRes = await fetch(nft.uri);
-          if (!metadataRes.ok) continue;
-          const metadata = await metadataRes.json();
-          images[nft.mint] = metadata.image;
-        } catch (err) {
-          console.error("Failed to fetch NFT metadata for", nft.mint, err);
-        }
-      }
-      setNftImages(images);
-    } catch (err) {
-      console.error("Failed to fetch NFTs:", err);
-    }
-  }, []);
+  //     for (const nft of nfts) {
+  //       try {
+  //         if (!nft.uri) continue;
+  //         const metadataRes = await fetch(nft.uri);
+  //         if (!metadataRes.ok) continue;
+  //         const metadata = await metadataRes.json();
+  //         images[nft.mint] = metadata.image;
+  //       } catch (err) {
+  //         console.error("Failed to fetch NFT metadata for", nft.mint, err);
+  //       }
+  //     }
+  //     setNftImages(images);
+  //   } catch (err) {
+  //     console.error("Failed to fetch NFTs:", err);
+  //   }
+  // }, []);
 
+  // const getRewardImage = (reward: RaffleReward) => {
+  //   if (isNFTReward(reward.rewardType) && reward.mintAddress) {
+  //     return nftImages[reward.mintAddress] || DEFAULT_IMAGES.NFT;
+  //   }
+  //   if (
+  //     reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN ||
+  //     reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
+  //   ) {
+  //     return reward.imageUrl || DEFAULT_IMAGES.TOKEN;
+  //   }
+  //   return DEFAULT_IMAGES.TOKEN;
+  // };
   const getRewardImage = (reward: RaffleReward) => {
-    if (isNFTReward(reward.rewardType) && reward.mintAddress) {
-      return nftImages[reward.mintAddress] || DEFAULT_IMAGES.NFT;
+    if (reward.imageUrl) return reward.imageUrl;
+
+    if (reward.rewardType === RAFFLE_REWARD_TYPES.NFT) {
+      return DEFAULT_IMAGES.NFT;
     }
-    if (
-      reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN ||
-      reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
-    ) {
-      return reward.imageUrl || DEFAULT_IMAGES.TOKEN;
-    }
+
     return DEFAULT_IMAGES.TOKEN;
   };
 
@@ -491,14 +500,14 @@ const RaffleDetail = () => {
           }
         }
         // Fetch NFT metadata images if user won NFT
-        if (publicKey) {
-          const userWonNFT = mappedRaffle.winnersData?.some(
-            (w) =>
-              w.winnerPubkey === publicKey.toBase58() &&
-              isNFTReward(Number(w.rewardType)),
-          );
-          if (userWonNFT) fetchNFTMetadata(publicKey.toBase58());
-        }
+        //       if (publicKey) {
+        //         const userWonNFT = mappedRaffle.winnersData?.some(
+        //           (w) =>
+        //             w.winnerPubkey === publicKey.toBase58() &&
+        //             isNFTReward(Number(w.rewardType)),
+        //         );
+        //         if (userWonNFT) fetchNFTMetadata(publicKey.toBase58());
+        //       }
       } else {
         toast.error(res.data.message || "Failed to fetch raffle");
       }
@@ -508,7 +517,7 @@ const RaffleDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [raffleId, fetchNFTMetadata, publicKey]);
+  }, [raffleId, publicKey]);
 
   useEffect(() => {
     fetchRaffle();
@@ -862,6 +871,12 @@ const RaffleDetail = () => {
                         src={getRewardImage(reward)}
                         alt={reward.rewardName}
                         className="w-12 h-12 sm:w-14 sm:h-14 rounded-md object-cover shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            reward.rewardType === RAFFLE_REWARD_TYPES.NFT
+                              ? DEFAULT_IMAGES.NFT
+                              : DEFAULT_IMAGES.TOKEN;
+                        }}
                       />
 
                       <div className="flex-1 min-w-0">
