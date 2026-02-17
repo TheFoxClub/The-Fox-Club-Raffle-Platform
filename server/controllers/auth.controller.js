@@ -7,7 +7,7 @@ const Op = require("sequelize").Op;
 const bcrypt = require("bcryptjs");
 const { VERIFICATION_CODE_TYPES } = require("../config/data");
 const { QueryTypes, Model } = require("sequelize");
-const base58 = require("bs58");
+const { default: base58 } = require("bs58");
 
 // SOLANA
 const { ed25519 } = require("@noble/curves/ed25519");

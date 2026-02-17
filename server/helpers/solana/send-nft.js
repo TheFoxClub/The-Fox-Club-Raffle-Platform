@@ -30,6 +30,7 @@ const {
 const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
 const {
   fromWeb3JsKeypair,
+  toWeb3JsTransaction,
 } = require("@metaplex-foundation/umi-web3js-adapters");
 
 const {
@@ -55,21 +56,58 @@ const {
 } = require("@metaplex-foundation/mpl-core");
 
 const {
-  getAssetWithProof,
-  transferV2,
-  mplBubblegum,
+  transfer: cnftTransfer,
 } = require("@metaplex-foundation/mpl-bubblegum");
 
 const wallet = require("./wallet.json");
-const { getConnectionDas, getUmi } = require("../../config/solana");
+const {
+  getConnectionDas,
+  getUmi,
+  getConnection,
+} = require("../../config/solana");
 const { dasApi } = require("@metaplex-foundation/digital-asset-standard-api");
 const { base64 } = require("@metaplex-foundation/umi/serializers");
 const { Wallet } = require("./wallet");
 const { generateChecksum } = require("./checksum-validation");
 const logger = require("../../util/logger");
+const { default: bs58 } = require("bs58");
 
 const connection = getConnectionDas();
 const MPL_CORE_PROGRAM_ID = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
+
+const createAssetWithProof = (rpcAsset, rpcAssetProof) => {
+  if (!rpcAsset.compression || !rpcAsset.compression.compressed) {
+    throw new Error("Asset is not compressed, cannot create AssetWithProof");
+  }
+
+  return {
+    // Required by Bubblegum leaf
+    leafOwner: publicKey(rpcAsset.ownership.owner),
+    leafDelegate: rpcAsset.ownership.delegate
+      ? publicKey(rpcAsset.ownership.delegate)
+      : null,
+    merkleTree: publicKey(rpcAsset.compression.tree),
+    root: bs58.decode(rpcAssetProof.root),
+    dataHash: bs58.decode(rpcAsset.compression.data_hash),
+    creatorHash: bs58.decode(rpcAsset.compression.creator_hash),
+    collection_hash: rpcAsset.grouping?.find(
+      (g) => g.group_key === "collection"
+    )
+      ? bs58.decode(
+          rpcAsset.grouping.find((g) => g.group_key === "collection")
+            .group_value
+        )
+      : undefined,
+    asset_data_hash: bs58.decode(rpcAsset.compression.asset_hash),
+    flags: undefined, // optional, set if needed
+    nonce: rpcAsset.compression.leaf_id,
+    index: rpcAsset.compression.leaf_id,
+    proof: rpcAssetProof.proof.map((p) => publicKey(p)),
+    metadata: rpcAsset.content.metadata, // directly map MetadataArgs
+    rpcAsset,
+    rpcAssetProof,
+  };
+};
 
 /**
  * Handle legacy NFT transfer
@@ -84,7 +122,7 @@ const handleLegacyNFT = async ({
 }) => {
   try {
     logger.info(
-      `Processing legacy NFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`,
+      `Processing legacy NFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`
     );
 
     const from = new PublicKey(fromAccountAddress);
@@ -97,7 +135,7 @@ const handleLegacyNFT = async ({
     const toAtaInfo = await connection.getAccountInfo(toAta);
     if (!toAtaInfo) {
       transaction.add(
-        createAssociatedTokenAccountInstruction(from, toAta, to, mint),
+        createAssociatedTokenAccountInstruction(from, toAta, to, mint)
       );
     }
 
@@ -164,7 +202,7 @@ const handlePNFT = async ({
 }) => {
   try {
     logger.info(
-      `Processing pNFT transfer (${direction}): ${fromAccountAddress} → ${toAccountAddress}`,
+      `Processing pNFT transfer (${direction}): ${fromAccountAddress} → ${toAccountAddress}`
     );
 
     const umiTo = publicKey(toAccountAddress);
@@ -176,7 +214,7 @@ const handlePNFT = async ({
       const asset = await fetchDigitalAssetWithAssociatedToken(
         umi,
         mintPubkey,
-        umiFrom,
+        umiFrom
       );
       logger.info(`Asset fetched successfully`);
 
@@ -203,7 +241,7 @@ const handlePNFT = async ({
         .use(mplCore());
 
       logger.info(
-        `Building UNSIGNED pNFT transfer transaction for user to sign first`,
+        `Building UNSIGNED pNFT transfer transaction for user to sign first`
       );
       logger.info(`Destination token account: ${destinationTokenAccount[0]}`);
       logger.info(`Destination token record: ${destinationTokenRecord[0]}`);
@@ -230,7 +268,7 @@ const handlePNFT = async ({
       const builtTx = await txBuilder.useV0().buildWithLatestBlockhash(tempUmi);
 
       logger.info(
-        `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`,
+        `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`
       );
 
       // Generate checksum BEFORE any signatures
@@ -241,7 +279,7 @@ const handlePNFT = async ({
       const serializedTxString = base64.deserialize(serializedTx)[0];
 
       logger.info(
-        `UNSIGNED pNFT transfer transaction created for user to sign first. Checksum: ${checksum}`,
+        `UNSIGNED pNFT transfer transaction created for user to sign first. Checksum: ${checksum}`
       );
 
       return {
@@ -265,7 +303,7 @@ const handlePNFT = async ({
       const asset = await fetchDigitalAssetWithAssociatedToken(
         transferUmi,
         mintPubkey,
-        umiFrom,
+        umiFrom
       );
       logger.info(`Asset fetched successfully`);
 
@@ -325,7 +363,7 @@ const handleMPLCore = async ({
 }) => {
   try {
     logger.info(
-      `Processing MPL Core NFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`,
+      `Processing MPL Core NFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`
     );
 
     // Use the existing UMI instance with platform signer for fetching asset data
@@ -339,7 +377,7 @@ const handleMPLCore = async ({
     // Verify the user owns this asset
     if (coreAsset.owner?.toString() !== fromAccountAddress) {
       throw new Error(
-        `Asset owner mismatch. Expected: ${fromAccountAddress}, Actual: ${coreAsset.owner?.toString()}`,
+        `Asset owner mismatch. Expected: ${fromAccountAddress}, Actual: ${coreAsset.owner?.toString()}`
       );
     }
 
@@ -348,7 +386,7 @@ const handleMPLCore = async ({
     let builtTx;
     if (direction === "platform_to_user") {
       const platformNoopSigner = createNoopSigner(
-        publicKey(fromAccountAddress),
+        publicKey(fromAccountAddress)
       );
       const userPayer = createNoopSigner(publicKey(toAccountAddress));
 
@@ -357,7 +395,7 @@ const handleMPLCore = async ({
       tempUmi.use(signerIdentity(platformNoopSigner)).use(mplCore());
 
       logger.info(
-        `Building UNSIGNED MPL Core transfer transaction for user to sign first`,
+        `Building UNSIGNED MPL Core transfer transaction for user to sign first`
       );
 
       builtTx = await transferCoreV1(tempUmi, {
@@ -371,7 +409,7 @@ const handleMPLCore = async ({
         .buildWithLatestBlockhash(tempUmi);
 
       logger.info(
-        `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`,
+        `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`
       );
     } else {
       // Build transaction with a user identity to avoid extra required signers
@@ -391,18 +429,20 @@ const handleMPLCore = async ({
 
     logger.info(`Transaction signatures length: ${builtTx.signatures.length}`);
     logger.info(
-      `Required signatures: ${builtTx.message.header.numRequiredSignatures}`,
+      `Required signatures: ${builtTx.message.header.numRequiredSignatures}`
     );
 
     // Generate checksum from built transaction message
     const checksum = generateChecksum(builtTx.message);
 
     const serializedTx = Buffer.from(
-      umi.transactions.serialize(builtTx),
+      umi.transactions.serialize(builtTx)
     ).toString("base64");
 
     logger.info(
-      `${direction === "platform_to_user" ? "UNSIGNED" : ""} MPL Core transaction serialized. Checksum: ${checksum}`,
+      `${
+        direction === "platform_to_user" ? "UNSIGNED" : ""
+      } MPL Core transaction serialized. Checksum: ${checksum}`
     );
 
     return {
@@ -431,63 +471,40 @@ const handleCNFT = async ({
 }) => {
   try {
     logger.info(
-      `Processing cNFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`,
+      `Processing cNFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`
     );
-
-    umi.use(mplBubblegum());
-
-    const assetWithProof = await getAssetWithProof(
-      umi,
-      publicKey(mint.toBase58()),
-    );
-
-    logger.info(`cNFT asset with proof fetched:`, {
-      mint: mint.toBase58(),
-      leafOwner: fromAccountAddress,
-      newLeafOwner: toAccountAddress,
-      proof: assetWithProof.proof ? "Present" : "Missing",
+    const asset = await umi.rpc.getAsset(publicKey(mint));
+    const assetProof = await umi.rpc.getAssetProof(publicKey(mint));
+    const assetWithProof = createAssetWithProof(asset, assetProof);
+    let cnftTransferBuilder = cnftTransfer(umi, {
+      ...assetWithProof,
+      leafOwner: createNoopSigner(publicKey(fromAccountAddress)),
+      newLeafOwner: publicKey(toAccountAddress),
     });
 
-    // Create noop signer for the user
-    const userSigner = createNoopSigner(publicKey(fromAccountAddress));
+    let builtTx;
 
-    // Build unsigned transaction for user to sign
-    const txBuilder = await transferV2(umi, {
-      ...assetWithProof,
-      leafOwner: publicKey(fromAccountAddress),
-      newLeafOwner: publicKey(toAccountAddress),
-      payer: userSigner, // User pays fees
-    })
-      .useV0()
-      .buildWithLatestBlockhash(umi);
-
-    logger.info(
-      `cNFT transaction signatures length: ${txBuilder.signatures.length}`,
-    );
-    logger.info(
-      `cNFT required signatures: ${txBuilder.message.header.numRequiredSignatures}`,
-    );
-
-    // Use the same signature clearing approach as other NFT types
-    const serializedWithSigs = umi.transactions.serialize(txBuilder);
-    const serializedBytes = new Uint8Array(serializedWithSigs);
-
-    // The first byte should be the number of signatures
-    const numSigs = serializedBytes[0];
-    logger.info(`cNFT number of signatures: ${numSigs}`);
-
-    // Zero out all signature bytes (64 bytes per signature, starting from byte 1)
-    for (let i = 1; i <= numSigs * 64; i++) {
-      serializedBytes[i] = 0;
+    if (direction === "platform_to_user") {
+      builtTx = await cnftTransferBuilder
+        .setFeePayer(createNoopSigner(publicKey(toAccountAddress)))
+        .useV0()
+        .buildWithLatestBlockhash(umi);
+    } else {
+      builtTx = await cnftTransferBuilder
+        .setFeePayer(createNoopSigner(publicKey(fromAccountAddress)))
+        .useV0()
+        .buildWithLatestBlockhash(umi);
     }
 
-    const serializedTx = Buffer.from(serializedBytes).toString("base64");
+    const serializedWithSigs = umi.transactions.serialize(builtTx);
+
+    const serializedTx = Buffer.from(serializedWithSigs).toString("base64");
 
     logger.info(`cNFT transaction created successfully`);
 
     return {
       serializedTx: serializedTx,
-      checksum: generateChecksum(txBuilder.message),
+      checksum: generateChecksum(builtTx.message),
       type: "cnft",
       direction,
     };
@@ -573,7 +590,7 @@ const addNftSendTransaction = async ({
       }
 
       logger.info(
-        `Processing NFT transfer for ${address}, detected type: ${detectedType}`,
+        `Processing NFT transfer for ${address}, detected type: ${detectedType}`
       );
 
       switch (detectedType.toLowerCase()) {
@@ -621,7 +638,7 @@ const addNftSendTransaction = async ({
 
         default:
           logger.warn(
-            `Unknown NFT type: ${detectedType}. Falling back to legacy transfer.`,
+            `Unknown NFT type: ${detectedType}. Falling back to legacy transfer.`
           );
           return await handleLegacyNFT({
             umi,
