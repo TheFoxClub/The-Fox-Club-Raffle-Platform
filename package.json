@@ -33,6 +33,7 @@
     "@tailwindcss/vite": "^4.1.17",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
+    "bs58": "^6.0.0",
     "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "cookie-parser": "^1.4.7",
