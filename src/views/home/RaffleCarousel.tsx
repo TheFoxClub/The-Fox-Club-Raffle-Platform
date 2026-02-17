@@ -48,7 +48,7 @@ function RaffleCard({
     <Card
       key={raffle.id}
       className={`absolute w-[90vw] sm:w-[420px] md:w-[440px]
-      lg:w-[500px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
+      lg:w-[480px] glass-card overflow-hidden border-primary/30 transition-all duration-500 ease-out cursor-pointer ${
         isActive ? "glow-primary" : ""
       }`}
       style={{
@@ -76,7 +76,6 @@ function RaffleCard({
 
       {/* Details */}
       <div className="p-4 flex flex-col justify-between space-y-2 relative">
-        {/* Featured Raffle Badge */}
         <div className="flex flex-col">
           <h2 className="text-xl font-bold text-gradient">{raffle.title}</h2>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -84,7 +83,6 @@ function RaffleCard({
           </p>
         </div>
 
-        {/* Ticket Info */}
         <div className="flex gap-10 text-sm justify-between">
           <div className="flex items-center gap-2">
             <Coins className="h-4 w-4 text-accent" />
@@ -110,7 +108,6 @@ function RaffleCard({
           </div>
         </div>
 
-        {/* Button + Arrows */}
         {isActive && (
           <Button
             className="w-full sm:flex-1 gradient-primary glow-primary bg-background text-white rounded-xl"
@@ -130,10 +127,12 @@ export default function RaffleCarousel() {
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [index, setIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-
   const [isMobile, setIsMobile] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const [displayIndex, setDisplayIndex] = useState(0);
+  const [phase, setPhase] = useState<"idle" | "moving" | "reset">("idle");
+  const [returningIndex, setReturningIndex] = useState<number | null>(null);
 
   const MIN_SWIPE_DISTANCE = 50;
 
@@ -148,10 +147,8 @@ export default function RaffleCarousel() {
     const fetchFeatured = async () => {
       try {
         const res = await server.get("/raffle/featured");
-
         if (res.data?.success) {
           const raw = res.data.data.raffles;
-
           const mapped = raw.map((r: any) => ({
             id: r.id,
             title: r.title,
@@ -164,7 +161,6 @@ export default function RaffleCarousel() {
             tokenAddress: r.tokenAddress,
             isVerified: r.raffle_detail?.requiresNftVerification ?? false,
           }));
-
           setRaffles(mapped);
         } else {
           setRaffles([]);
@@ -176,17 +172,10 @@ export default function RaffleCarousel() {
     fetchFeatured();
   }, []);
 
-  // Socket.IO integration for real-time updates (separate useEffect to avoid dependency issues)
   useEffect(() => {
     const handleRaffleListUpdate = (data: any) => {
-      //  console.log("Featured raffles - raffle list update received:", data);
-
       if (data.raffleId) {
-        // Handle new raffle creation - refresh featured raffles if needed
         if (data.action === "raffle_created") {
-          console.log("New raffle created, refreshing featured raffles");
-          // For featured raffles, refresh the entire list
-          // Re-fetch featured raffles
           server
             .get("/raffle/featured")
             .then((res) => {
@@ -213,7 +202,6 @@ export default function RaffleCarousel() {
         } else {
           setRaffles((prevRaffles) => {
             if (!prevRaffles) return prevRaffles;
-
             return prevRaffles.map((raffle) => {
               if (raffle.id === data.raffleId) {
                 return {
@@ -236,13 +224,9 @@ export default function RaffleCarousel() {
     };
 
     const handleTicketPurchase = (data: any) => {
-      console.log("Featured raffles - ticket purchase received:", data);
-
-      // Update the specific raffle's ticket count
       if (data.raffleId) {
         setRaffles((prevRaffles) => {
           if (!prevRaffles) return prevRaffles;
-
           return prevRaffles.map((raffle) => {
             if (raffle.id === data.raffleId) {
               return {
@@ -263,69 +247,80 @@ export default function RaffleCarousel() {
       }
     };
 
-    // Register Socket.IO event listeners
     socketService.onRaffleListUpdated(handleRaffleListUpdate);
     socketService.onTicketPurchase(handleTicketPurchase);
-
-    // Cleanup event listeners
     return () => {
       socketService.offRaffleListUpdated(handleRaffleListUpdate);
       socketService.offTicketPurchase(handleTicketPurchase);
     };
-  }, []); // Empty dependency array to avoid re-registering listeners
+  }, []);
+
+  const changeSlide = (newIndex: number) => {
+    if (newIndex === index) return;
+
+    if (raffles.length === 2) {
+      if (phase !== "idle") return;
+
+      const oldIndex = index;
+      setPhase("moving");
+      setIndex(newIndex);
+
+      setTimeout(() => {
+        setReturningIndex(oldIndex);
+        setDisplayIndex(newIndex);
+        setPhase("reset");
+
+        setTimeout(() => {
+          setPhase("idle");
+          setReturningIndex(null);
+        }, 200);
+      }, 500);
+    } else {
+      setIndex(newIndex);
+      setDisplayIndex(newIndex);
+    }
+  };
 
   useEffect(() => {
     if (raffles.length < 2 || isHovered) return;
-
     const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % raffles.length);
+      changeSlide((index + 1) % raffles.length);
     }, 5000);
-
     return () => clearInterval(interval);
-  }, [raffles.length, isHovered]);
+  }, [raffles.length, isHovered, index, phase]);
 
   if (raffles === null) return null;
-
-  //if no raffles loaded yet
   if (raffles.length === 0) return null;
 
-  const next = () => setIndex((prev) => (prev + 1) % raffles.length);
-  const prev = () =>
-    setIndex((prev) => (prev - 1 + raffles.length) % raffles.length);
+  const next = () => changeSlide((index + 1) % raffles.length);
+  const prev = () => changeSlide((index - 1 + raffles.length) % raffles.length);
 
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEndX(null);
     setTouchStartX(e.targetTouches[0].clientX);
     setIsHovered(true);
   };
-
   const onTouchMove = (e: React.TouchEvent) => {
     setTouchEndX(e.targetTouches[0].clientX);
   };
-
   const onTouchEnd = () => {
     if (!touchStartX || !touchEndX) {
       setIsHovered(false);
       return;
     }
-
     const distance = touchStartX - touchEndX;
-
     if (Math.abs(distance) < MIN_SWIPE_DISTANCE) {
       setIsHovered(false);
       return;
     }
-
     if (distance > 0) {
       next();
     } else {
       prev();
     }
-
     setIsHovered(false);
   };
 
-  // **3D carousel style helper**
   const getCardStyle = (cardIndex: number) => {
     const diff = cardIndex - index;
 
@@ -344,8 +339,82 @@ export default function RaffleCarousel() {
         ? normalized - raffles.length
         : normalized;
 
+    if (raffles.length === 2) {
+      const isReturning = cardIndex === returningIndex;
+      const isCenter = cardIndex === displayIndex;
+
+      if (isReturning) {
+        if (phase === "reset") {
+          return {
+            transform: `translateX(380px) scale(0.85) rotateY(35deg)`,
+            opacity: 0,
+            zIndex: -1,
+            transition: "none",
+            pointerEvents: "none" as React.CSSProperties["pointerEvents"],
+          };
+        }
+
+        return {
+          transform: `translateX(380px) scale(0.85) rotateY(35deg)`,
+          opacity: 0.5,
+          zIndex: 5,
+          transition: "opacity 0.4s ease",
+        };
+      }
+
+      if (isCenter) {
+        if (phase === "idle" || phase === "reset") {
+          return {
+            transform: `translateX(0px) scale(1) rotateY(0deg)`,
+            opacity: 1,
+            zIndex: 10,
+            transition: "all 0.5s ease",
+          };
+        }
+        if (phase === "moving") {
+          return {
+            transform: `translateX(-380px) scale(0.85) rotateY(-35deg)`,
+            opacity: 0,
+            zIndex: 9,
+            transition: "all 0.5s ease",
+          };
+        }
+      }
+
+      //  INCOMING CARD (right side preview, about to become center)
+      if (phase === "idle") {
+        // Resting at right as preview
+        return {
+          transform: `translateX(380px) scale(0.85) rotateY(35deg)`,
+          opacity: 0.5,
+          zIndex: 5,
+          transition: "all 0.5s ease",
+        };
+      }
+      if (phase === "moving") {
+        // Slide from right → center
+        return {
+          transform: `translateX(0px) scale(1) rotateY(0deg)`,
+          opacity: 1,
+          zIndex: 9,
+          transition: "all 0.5s ease",
+        };
+      }
+      // reset — stay at center, become new current
+      return {
+        transform: `translateX(0px) scale(1) rotateY(0deg)`,
+        opacity: 1,
+        zIndex: 10,
+        transition: "none",
+      };
+    }
+
+    // 3+ CARDS: normal 3D carousel
     const rotateY = adjusted * 45;
-    const translateX = adjusted * 380;
+    // let cardSpacing =
+    //   raffles.length === 3 ? 380 : raffles.length === 4 ? 380 : 400;
+    // const translateX = adjusted * cardSpacing;
+    const translateX = adjusted * 370;
     const translateZ = Math.abs(adjusted) * -150;
     const scale = adjusted === 0 ? 1 : 0.78;
     const opacity = Math.abs(adjusted) > 2 ? 0 : 1 - Math.abs(adjusted) * 0.3;
@@ -385,7 +454,6 @@ export default function RaffleCarousel() {
             </Button>
           </>
         )}
-        {/* 3D Carousel Container */}
         <div
           className="relative h-[380px] sm:h-[430px] mx-auto overflow-hidden"
           style={{ perspective: isMobile ? "none" : "1200px" }}
@@ -400,7 +468,6 @@ export default function RaffleCarousel() {
             {raffles.map((raffle, cardIndex) => {
               const style = getCardStyle(cardIndex);
               const isActive = cardIndex === index;
-
               return (
                 <RaffleCard
                   key={raffle.id}
@@ -413,12 +480,11 @@ export default function RaffleCarousel() {
             })}
           </div>
         </div>
-        {/* Carousel Dots */}
         <div className="flex gap-2 justify-center mt-4">
           {raffles.map((_, i) => (
             <div
               key={i}
-              onClick={() => setIndex(i)}
+              onClick={() => changeSlide(i)}
               className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                 index === i ? "w-8 bg-primary" : "w-2 bg-gray-600"
               }`}
