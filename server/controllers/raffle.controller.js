@@ -236,13 +236,13 @@ class RaffleController {
     try {
       const raffles = await Raffle.findAll({
         where: {
+          status: RAFFLE_STATUS.LIVE,
           endedAt: null,
         },
         include: [
           {
             model: RaffleDetail,
             where: {
-              status: RAFFLE_STATUS.LIVE,
               isFeatured: true,
               featuredUntil: { [Op.gte]: new Date() },
             },
