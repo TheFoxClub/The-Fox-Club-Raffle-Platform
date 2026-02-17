@@ -45,7 +45,7 @@ export default function AdminRewards() {
   // Filter wallets in list based on searchInput
   const filteredWalletList = searchInput
     ? eligibleWallets.filter((w) =>
-        w.address.toLowerCase().includes(searchInput.toLowerCase())
+        w.address.toLowerCase().includes(searchInput.toLowerCase()),
       )
     : eligibleWallets;
 
@@ -54,7 +54,7 @@ export default function AdminRewards() {
         .filter(
           (wallet) =>
             wallet.address.toLowerCase().includes(walletInput.toLowerCase()) &&
-            wallet.address.toLowerCase() !== walletInput.toLowerCase()
+            wallet.address.toLowerCase() !== walletInput.toLowerCase(),
         )
         .sort((a, b) => b.id - a.id)
     : [];
@@ -77,8 +77,13 @@ export default function AdminRewards() {
     }
   };
 
-  const formatAmount = (amount: number, tokenType: string, tokenAddress?: string) => {
-    if (amount === null || amount === undefined) return `0 ${getTokenSymbol(tokenType, tokenAddress)}`;
+  const formatAmount = (
+    amount: number,
+    tokenType: string,
+    tokenAddress?: string,
+  ) => {
+    if (amount === null || amount === undefined)
+      return `0 ${getTokenSymbol(tokenType, tokenAddress)}`;
     return `${amount} ${getTokenSymbol(tokenType, tokenAddress)}`;
   };
 
@@ -100,7 +105,7 @@ export default function AdminRewards() {
     if (!address) return;
 
     const exists = eligibleWallets.some(
-      (w) => w.address.toLowerCase() === address.toLowerCase()
+      (w) => w.address.toLowerCase() === address.toLowerCase(),
     );
 
     if (exists) {
@@ -124,7 +129,7 @@ export default function AdminRewards() {
     if (!address) return;
 
     const exists = eligibleWallets.some(
-      (w) => w.address.toLowerCase() === address.toLowerCase()
+      (w) => w.address.toLowerCase() === address.toLowerCase(),
     );
 
     if (!exists) {
@@ -135,7 +140,7 @@ export default function AdminRewards() {
     try {
       await server.delete(`/pool?address=${address}`);
       setEligibleWallets((prev) =>
-        prev.filter((wallet) => wallet.address !== address)
+        prev.filter((wallet) => wallet.address !== address),
       );
       toast.success("Wallet removed successfully");
       setWalletInput("");
@@ -184,14 +189,18 @@ export default function AdminRewards() {
         server.get("/pool"),
       ]);
 
-      setTopHosts(leaderboardRes.data.data.topHosts.map((host: any) => ({
-        ...host,
-        tokenType: mapNumericTokenType(host.tokenType || 0)
-      })));
-      setTopBuyers(leaderboardRes.data.data.topBuyers.map((buyer: any) => ({
-        ...buyer,
-        tokenType: mapNumericTokenType(buyer.tokenType || 0)
-      })));
+      setTopHosts(
+        leaderboardRes.data.data.topHosts.map((host: any) => ({
+          ...host,
+          tokenType: mapNumericTokenType(host.tokenType || 0),
+        })),
+      );
+      setTopBuyers(
+        leaderboardRes.data.data.topBuyers.map((buyer: any) => ({
+          ...buyer,
+          tokenType: mapNumericTokenType(buyer.tokenType || 0),
+        })),
+      );
       setEligibleWallets(walletRes.data.data.rows);
     } catch (error) {
       toast.error("Failed to refresh dashboard");
@@ -251,7 +260,9 @@ export default function AdminRewards() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-gradient">{rewardPool} {getTokenSymbol("SOLANA")}</p>
+            <p className="text-3xl font-bold text-gradient">
+              {rewardPool} {getTokenSymbol("SOLANA")}
+            </p>
             <p className="text-sm text-muted-foreground">
               Available for distribution
             </p>
@@ -448,8 +459,8 @@ export default function AdminRewards() {
                       host.rank === 1
                         ? "bg-gradient-primary text-white"
                         : host.rank === 2
-                        ? "bg-secondary/20 text-secondary"
-                        : "bg-accent/20 text-accent"
+                          ? "bg-secondary/20 text-secondary"
+                          : "bg-accent/20 text-accent"
                     }`}
                   >
                     {host.rank}
@@ -467,7 +478,11 @@ export default function AdminRewards() {
                     </p>
                   </div>
                   <p className="font-bold text-primary">
-                    {formatAmount(host.totalRevenue, host.tokenType, host.tokenAddress)}
+                    {formatAmount(
+                      host.totalRevenue,
+                      host.tokenType,
+                      host.tokenAddress,
+                    )}
                   </p>
                 </div>
               ))
@@ -486,14 +501,6 @@ export default function AdminRewards() {
               <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
               Top Buyers
             </h3>
-            {/* <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExport("buyers")}
-            >
-              <Download className="h-3 w-3 mr-1" />
-              Export
-            </Button> */}
           </div>
 
           <div className="space-y-4">
@@ -508,8 +515,8 @@ export default function AdminRewards() {
                       buyer.rank === 1
                         ? "bg-gradient-primary text-white"
                         : buyer.rank === 2
-                        ? "bg-secondary/20 text-secondary"
-                        : "bg-accent/20 text-accent"
+                          ? "bg-secondary/20 text-secondary"
+                          : "bg-accent/20 text-accent"
                     }`}
                   >
                     {buyer.rank}
@@ -527,7 +534,11 @@ export default function AdminRewards() {
                     </p>
                   </div>
                   <p className="font-bold text-accent">
-                    {formatAmount(buyer.totalSpent, buyer.tokenType, buyer.tokenAddress)}
+                    {formatAmount(
+                      buyer.totalSpent,
+                      buyer.tokenType,
+                      buyer.tokenAddress,
+                    )}
                   </p>
                 </div>
               ))

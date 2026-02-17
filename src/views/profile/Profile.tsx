@@ -4,8 +4,7 @@ import { Card } from "../../components/ui/Card";
 import {
   User,
   Trophy,
-  // Flame,
-  // TrendingUp,
+ 
   Award,
   Ticket,
   Calendar,
@@ -65,14 +64,14 @@ type HostedRaffle = {
 
 type ExtendedUser = {
   id?: number;
-  // username?: string;
+
   email?: string;
   description?: string;
   photoUrl?: string;
   totalSpent?: number;
   rafflesWon?: number;
   ticketsPurchased?: number;
-  // reputation?: number;
+
   xp?: number;
   xpGoal?: number;
 };
@@ -115,11 +114,7 @@ const Profile = () => {
     (state: RootState) => state.user,
   );
 
-  // const {
-  //   // reputation = 0,
-  //   xp = 0,
-  //   xpGoal = 15000,
-  // } = (user_info ?? {}) as ExtendedUser;
+
 
   const [ticketsBought, setTicketsBought] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
@@ -425,18 +420,6 @@ const Profile = () => {
               )}
             </div>
 
-            {/* <div className="flex-1 space-y-4">
-              <div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
-                  <h1 className="text-lg sm:text-lg font-bold break-all">
-                    {pubkey}
-                  </h1>
-                </div> */}
-            {/* <h4 className="text-lg sm:text-lg font-bold break-all">
-                  {user_info?.username}
-                </h4> */}
-            {/* </div>
-            </div> */}
             <div className="flex-1 space-y-2">
               {user_info?.username ? (
                 <>
@@ -482,11 +465,7 @@ const Profile = () => {
             <p className="text-sm text-muted-foreground">Tickets Bought</p>
           </Card>
 
-          {/* <Card className="bg-card/50 backdrop-blur-xl border border-border/50 text-center p-6 space-y-2">
-            <TrendingUp className="h-8 w-8 mx-auto text-green-500" />
-            <p className="text-2xl font-bold">{reputation}%</p>
-            <p className="text-sm text-muted-foreground">Reputation</p>
-          </Card> */}
+        
         </div>
 
         {/* XP Card */}
@@ -596,11 +575,7 @@ const Profile = () => {
               data-tab="won"
             >
               Wins{" "}
-              {/* {claimableRewards.length > 0 && (
-                <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {claimableRewards.length}
-                </span>
-              )} */}
+            
               {unclaimedWinsCount > 0 && (
                 <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {unclaimedWinsCount}

@@ -213,46 +213,6 @@ const RaffleDetail = () => {
     }
   };
 
-  // const isNFTReward = (rewardType: number) =>
-  //   rewardType === RAFFLE_REWARD_TYPES.NFT;
-
-  // const fetchNFTMetadata = useCallback(async (wallet: string) => {
-  //   try {
-  //     const res = await server.get(`/api/nfts/${wallet}`);
-  //     if (!res.data.success) return;
-
-  //     const nfts: any[] = res.data.data.nfts;
-  //     const images: Record<string, string> = {};
-
-  //     for (const nft of nfts) {
-  //       try {
-  //         if (!nft.uri) continue;
-  //         const metadataRes = await fetch(nft.uri);
-  //         if (!metadataRes.ok) continue;
-  //         const metadata = await metadataRes.json();
-  //         images[nft.mint] = metadata.image;
-  //       } catch (err) {
-  //         console.error("Failed to fetch NFT metadata for", nft.mint, err);
-  //       }
-  //     }
-  //     setNftImages(images);
-  //   } catch (err) {
-  //     console.error("Failed to fetch NFTs:", err);
-  //   }
-  // }, []);
-
-  // const getRewardImage = (reward: RaffleReward) => {
-  //   if (isNFTReward(reward.rewardType) && reward.mintAddress) {
-  //     return nftImages[reward.mintAddress] || DEFAULT_IMAGES.NFT;
-  //   }
-  //   if (
-  //     reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN ||
-  //     reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
-  //   ) {
-  //     return reward.imageUrl || DEFAULT_IMAGES.TOKEN;
-  //   }
-  //   return DEFAULT_IMAGES.TOKEN;
-  // };
   const getRewardImage = (reward: RaffleReward) => {
     if (reward.imageUrl) return reward.imageUrl;
 
@@ -499,15 +459,6 @@ const RaffleDetail = () => {
             console.error("Failed to fetch host photo:", err);
           }
         }
-        // Fetch NFT metadata images if user won NFT
-        //       if (publicKey) {
-        //         const userWonNFT = mappedRaffle.winnersData?.some(
-        //           (w) =>
-        //             w.winnerPubkey === publicKey.toBase58() &&
-        //             isNFTReward(Number(w.rewardType)),
-        //         );
-        //         if (userWonNFT) fetchNFTMetadata(publicKey.toBase58());
-        //       }
       } else {
         toast.error(res.data.message || "Failed to fetch raffle");
       }
@@ -813,15 +764,6 @@ const RaffleDetail = () => {
 
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-2 pt-3 sm:pt-4 border-t border-border/50">
-              {/* <div className="space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
-                  <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="truncate">Prize Value</span>
-                </div>
-                <p className="font-bold text-base sm:text-lg truncate">
-                  ~{raffle.prizeValue}
-                </p>
-              </div> */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                   <Users className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -840,15 +782,6 @@ const RaffleDetail = () => {
                   {raffle.created}
                 </p>
               </div>
-              {/* <div className="space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
-                  <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                  Reputation
-                </div>
-                <p className="font-bold text-base sm:text-lg">
-                  {raffle.hostReputation}%
-                </p>
-              </div> */}
             </div>
           </Card>
 
@@ -1040,9 +973,6 @@ const RaffleDetail = () => {
                       {raffle.host}
                     </span>
                   </button>
-                  {/* <p className="text-xs sm:text-sm text-muted-foreground">
-                    {raffle.hostReputation}% positive rating
-                  </p> */}
                 </div>
               </div>
               <div className="relative z-10 shrink-0">
@@ -1168,19 +1098,6 @@ const RaffleDetail = () => {
                     className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold"
                   />
 
-                  {/* <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={ticketCount === 0 ? "" : ticketCount}
-                    onChange={(e) => {
-                      const onlyDigits = e.target.value.replace(/\D/g, "");
-                      const numeric = Number(onlyDigits);
-                      setTicketCount(Math.min(numeric, ticketsLeft));
-                    }}
-                    className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold"
-                  /> */}
-
                   <Button
                     variant="outline"
                     className="bg-background-50 h-9 w-9 sm:h-10 sm:w-10"
@@ -1216,29 +1133,7 @@ const RaffleDetail = () => {
               </div>
             )}
 
-            {/* Buy Button */}
-            {/* {isEnded ? (
-              <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
-                Raffle Ended
-              </div>
-            ) : isSoldOut ? (
-              <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
-                Sold Out
-              </div>
-            ) : (
-              <Button
-                className="w-full gradient-primary glow-primary h-10 sm:h-12 text-base sm:text-lg mt-4"
-                onClick={handleBuyTickets}
-                disabled={!connected}
-              >
-                <Ticket className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                Buy {ticketCount} Ticket{ticketCount > 1 ? "s" : ""}
-              </Button>
-            )} */}
             {isUpcoming ? (
-              // <div className="w-full h-10 sm:h-12 flex items-center justify-center rounded-lg bg-muted text-muted-foreground font-semibold text-sm sm:text-base mt-4">
-              //   Raffle has not started yet
-              // </div>
               <div className="w-full h-10 sm:h-12 flex items-center justify-center gap-2 rounded-lg bg-yellow-50 border border-border/50 text-yellow-800 font-semibold text-sm sm:text-base mt-4">
                 <Clock className="h-4 w-4" />
                 Raffle starts soon

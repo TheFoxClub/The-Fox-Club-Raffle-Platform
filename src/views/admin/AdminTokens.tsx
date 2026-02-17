@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Copy, RefreshCw } from "lucide-react";
 import Button from "../../components/ui/Button";
-// import { Input } from "../../components/ui/Input";
-// import { Label } from "../../components/ui/Label";
+
 import { Switch } from "../../components/ui/Switch";
 import {
   Dialog,

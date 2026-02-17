@@ -29,17 +29,7 @@ import NFT_PLACEHOLDER from "../../../public/uploads/nft-placeholder.svg";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
-// const normalizeRewardType = (rewardType: any) => {
-//   if (rewardType === 0 || rewardType === "NFT") return "NFT";
-//   if (
-//     rewardType === 1 ||
-//     rewardType === "SPL_TOKEN" ||
-//     rewardType === "SPL_TOKEN_2022"
-//   )
-//     return "SPL_TOKEN";
 
-//   return null;
-// };
 const normalizeRewardType = (rewardType: any) => {
   if (!rewardType && rewardType !== 0) return null;
 
@@ -88,12 +78,6 @@ const CreateRaffle = () => {
     }[]
   >([]);
   const [tokenLoading, setTokenLoading] = useState(false);
-
-  // const [raffleImage, setRaffleImage] = useState<File | null>(null);
-  // const [raffleImagePreview, setRaffleImagePreview] = useState<string | null>(
-  //   null,
-  // );
-  // const [imageUploading, setImageUploading] = useState(false);
 
   const [savedDraft, setSavedDraft] = useState<any>(null);
   const [isResumingDraft, setIsResumingDraft] = useState(false);
@@ -153,7 +137,7 @@ const CreateRaffle = () => {
             name: token.name,
           }));
 
-          // setTokenOptions(tokens);
+        
 
           const uniqueTokens = Array.from(
             new Map(tokens.map((t) => [t.value, t])).values(),
@@ -217,24 +201,6 @@ const CreateRaffle = () => {
     }
   }, [user.isAuthenticated]);
 
-  // useEffect(() => {
-  //   const totalPrizes = selectedNFTs.length + selectedTokens.length;
-
-  //   if (totalPrizes === 0) {
-  //     setNumberOfWinners(1);
-  //     return;
-  //   }
-
-  //   setNumberOfWinners((prev) => {
-  //     const prevValue = typeof prev === "number" ? prev : 1;
-  //     if (prevValue > totalPrizes) return totalPrizes;
-
-  //     // If rewards increased and winners matched old count, auto-increase
-  //     if (prevValue === totalPrizes - 1) return totalPrizes;
-
-  //     return prevValue;
-  //   });
-  // }, [selectedNFTs.length, selectedTokens.length]);
   useEffect(() => {
     if (maxWinners === 0) {
       setNumberOfWinners(1);
@@ -391,25 +357,6 @@ const CreateRaffle = () => {
 
     fetchTokens();
   }, [isTokenDialogOpen, user?.pubkey]);
-
-  // useEffect(() => {
-  //   if (selectedTokens.length === 0 || tokenCandidates.length === 0) return;
-
-  //   setSelectedTokens((prev) =>
-  //     prev.map((selected) => {
-  //       const walletToken = tokenCandidates.find(
-  //         (t) => t.mint === selected.mint,
-  //       );
-
-  //       return walletToken
-  //         ? {
-  //             ...selected,
-  //             amount: walletToken.amount,
-  //           }
-  //         : selected;
-  //     }),
-  //   );
-  // }, [tokenCandidates]);
 
   useEffect(() => {
     if (!isResumingDraft) return;
@@ -1513,11 +1460,7 @@ const CreateRaffle = () => {
                                       }
                                     `}
                             >
-                              {/* Left icon / badge */}
-                              {/* <div className="shrink-0 w-10 h-10 rounded-md bg-background-60 flex items-center justify-center text-xs font-semibold text-muted-foreground">
-                                {token.name?.charAt(0) ??
-                                  token.mint?.slice(0, 1)}
-                              </div> */}
+                          
 
                               {/* Content */}
                               <div className="flex-1 min-w-0">
