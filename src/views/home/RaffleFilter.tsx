@@ -30,12 +30,6 @@ export default function RaffleFilter({
     search: "",
   });
 
-  // const statusOptions = [
-  //   { value: "live", label: "Live" },
-  //   { value: "ended", label: "Ended" },
-  //   { value: "upcoming", label: "Upcoming" },
-  // ];
-
   const tokenOptions = [
     { value: "SOL", label: "SOL" },
     { value: "all", label: "All Tokens" },
@@ -72,14 +66,18 @@ export default function RaffleFilter({
 
   const appliedHasAny = Boolean(
     appliedFilters.status ||
-      appliedFilters.token ||
-      appliedFilters.price ||
-      appliedFilters.collection ||
-      appliedFilters.search
+    appliedFilters.token ||
+    appliedFilters.price ||
+    appliedFilters.collection ||
+    appliedFilters.search,
   );
 
   const currentHasAny = Boolean(
-    statusFilter || tokenFilter || priceFilter || collectionFilter || searchTerm
+    statusFilter ||
+    tokenFilter ||
+    priceFilter ||
+    collectionFilter ||
+    searchTerm,
   );
 
   const handlePrimaryButton = () => {
@@ -98,7 +96,6 @@ export default function RaffleFilter({
       return;
     }
 
-    // Otherwise apply current selections
     setAppliedFilters({
       status: statusFilter,
       token: tokenFilter,
@@ -107,7 +104,6 @@ export default function RaffleFilter({
       search: searchTerm,
     });
 
-    // Build params and notify parent
     const params: FilterParams = { page: 1, limit: 10 };
     if (tokenFilter && tokenFilter !== "all") params.tokenType = tokenFilter;
     if (searchTerm) params.search = searchTerm;
@@ -139,17 +135,6 @@ export default function RaffleFilter({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Status Filter */}
-        {/* <Select
-          options={statusOptions}
-          value={statusFilter}
-          onValueChange={setStatusFilter}
-          placeholder="Status" // This text will appear when nothing is selected
-          className="bg-[hsla(240,10%,3.9%,0.5)] border-[hsl(240,6%,20%)]"
-        /> */}
-
-        {/* 2. Token Type Filter */}
-
         <Select
           options={tokenOptions}
           value={tokenFilter || appliedFilters.token}
@@ -161,8 +146,7 @@ export default function RaffleFilter({
               : selectBaseClass
           }`}
         />
-
-        {/* 3. Price Range Filter */}
+        \
         <Select
           options={priceOptions}
           value={priceFilter || appliedFilters.price}
@@ -174,8 +158,6 @@ export default function RaffleFilter({
               : selectBaseClass
           }`}
         />
-
-        {/* 4. Collection Filter */}
         <Select
           options={collectionOptions}
           value={collectionFilter || appliedFilters.collection}

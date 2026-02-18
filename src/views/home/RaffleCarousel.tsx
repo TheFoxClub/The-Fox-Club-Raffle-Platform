@@ -381,9 +381,7 @@ export default function RaffleCarousel() {
         }
       }
 
-      //  INCOMING CARD (right side preview, about to become center)
       if (phase === "idle") {
-        // Resting at right as preview
         return {
           transform: `translateX(380px) scale(0.85) rotateY(35deg)`,
           opacity: 0.5,
@@ -392,7 +390,6 @@ export default function RaffleCarousel() {
         };
       }
       if (phase === "moving") {
-        // Slide from right → center
         return {
           transform: `translateX(0px) scale(1) rotateY(0deg)`,
           opacity: 1,
@@ -400,7 +397,7 @@ export default function RaffleCarousel() {
           transition: "all 0.5s ease",
         };
       }
-      // reset — stay at center, become new current
+
       return {
         transform: `translateX(0px) scale(1) rotateY(0deg)`,
         opacity: 1,
@@ -409,11 +406,8 @@ export default function RaffleCarousel() {
       };
     }
 
-    // 3+ CARDS: normal 3D carousel
     const rotateY = adjusted * 45;
-    // let cardSpacing =
-    //   raffles.length === 3 ? 380 : raffles.length === 4 ? 380 : 400;
-    // const translateX = adjusted * cardSpacing;
+
     const translateX = adjusted * 370;
     const translateZ = Math.abs(adjusted) * -150;
     const scale = adjusted === 0 ? 1 : 0.78;

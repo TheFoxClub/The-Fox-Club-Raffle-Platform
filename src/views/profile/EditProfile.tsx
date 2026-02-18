@@ -15,8 +15,7 @@ type FormData = {
   username: string;
   email: string;
   bio: string;
-  // twitter: string;
-  // discord: string;
+
   photoUrl: string;
 };
 
@@ -32,8 +31,7 @@ const EditProfile = () => {
     username: "",
     email: "",
     bio: "",
-    // twitter: "",
-    // discord: "",
+
     photoUrl: "",
   });
 
@@ -71,15 +69,13 @@ const EditProfile = () => {
     }
   }, [dispatch, user_info]);
 
-  // Populate form whenever user_info is available
   useEffect(() => {
     if (user_info) {
       setFormData({
         username: user_info.username || "",
         email: user_info.email || "",
         bio: user_info.description || "",
-        // twitter: user_info.twitter || "",
-        // discord: user_info.discord || "",
+
         photoUrl: user_info.photoUrl || "",
       });
 
@@ -169,7 +165,6 @@ const EditProfile = () => {
         email: formData.email,
         description: formData.bio,
         photoUrl: photoUrl,
-        // Add social links if backend supports
       });
 
       dispatch(
@@ -201,11 +196,6 @@ const EditProfile = () => {
   }
 
   return (
-    // <div className="container mx-auto px-4 py-2 max-w-3xl">
-    //   {/* ...the rest of your form JSX remains unchanged */}
-    //   {/* Paste your full form JSX here from previous code */}
-    // </div>
-
     <div className="container mx-auto px-4 py-2 max-w-3xl">
       <div className="space-y-6">
         <div className="space-y-2">
@@ -367,46 +357,6 @@ const EditProfile = () => {
               </div>
             </div>
           </Card>
-
-          {/* Social Links */}
-          {/* <Card className="bg-card p-6 space-y-6">
-            <h2 className="text-2xl font-bold">Social Links</h2>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="twitter"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Twitter
-                </label>
-                <Input
-                  id="twitter"
-                  value={formData.twitter}
-                  onChange={handleChange}
-                  placeholder="@username"
-                  className="mt-2 w-full bg-background-50"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="discord"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Discord
-                </label>
-                <Input
-                  id="discord"
-                  value={formData.discord}
-                  onChange={handleChange}
-                  placeholder="Username#0000"
-                  className="mt-2 w-full bg-background-50"
-                  disabled={isSaving}
-                />
-              </div>
-            </div>
-          </Card> */}
 
           <div className="flex flex-col sm:flex-row gap-4 items-center">
             <Button

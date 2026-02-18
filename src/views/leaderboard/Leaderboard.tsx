@@ -9,30 +9,23 @@ import {
   Medal,
   Star,
 } from "lucide-react";
-//import Select from "../../components/ui/Select";
+
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "../../components/ui/Tabs";
-//import { topHosts, topBuyers } from "../../dummydata/topHostsBuyers";
+
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import XPLeaderboard from "./XPLeaderboard";
 import { toast } from "react-toastify";
 
 const Leaderboard = () => {
-  //const [selectedTime, setSelectedTime] = useState("monthly");
   const [topHosts, setTopHosts] = useState<any[]>([]);
   const [topBuyers, setTopBuyers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // const timeOptions = [
-  //   { value: "weekly", label: "Weekly" },
-  //   { value: "monthly", label: "Monthly" },
-  //   { value: "alltime", label: "All Time" },
-  // ];
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -129,26 +122,6 @@ const Leaderboard = () => {
           </p>
         </div>
 
-        {/* <Card className=" p-6 border bg-card border-accent/30 rounded-lg">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Award className="h-10 w-10 text-accent" />
-              <div>
-                <h3 className="text-lg font-bold">Monthly Rewards</h3>
-                <p className="text-muted-foreground text-sm">
-                  Top 10 players receive exclusive airdrops and bonuses
-                </p>
-              </div>
-            </div>
-            <Select
-              options={timeOptions}
-              value={selectedTime}
-              onValueChange={setSelectedTime}
-              className="bg-background-50 mr-6 cursor-pointer"
-            />
-          </div>
-        </Card> */}
-
         <Tabs defaultValue="hosts" className="space-y-6 my-4">
           <TabsList className=" p-1 w-full sm:w-auto">
             <TabsTrigger value="hosts" className="gap-2 flex-1 sm:flex-none">
@@ -203,12 +176,6 @@ const Leaderboard = () => {
                               >
                                 {host.walletShort}
                               </button>
-
-                              {/* {host.reputation >= 97 && (
-                                <div className="top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
-                                  {host.reputation}% rep
-                                </div>
-                              )} */}
                             </div>
 
                             <p className="text-sm text-muted-foreground">

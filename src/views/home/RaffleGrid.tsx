@@ -156,13 +156,9 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     };
 
     const handleRaffleListUpdate = (data: any) => {
-      // console.log("Raffle grid - raffle list update received:", data);
-
       if (data.raffleId) {
         // Handle new raffle creation
         if (data.action === "raffle_created") {
-          // console.log("New raffle created, refreshing lists");
-          // Refresh the appropriate list based on raffle status
           if (data.status === "LIVE") {
             fetchRafflesForTab("live");
           } else if (data.status === "UPCOMING") {
@@ -215,11 +211,9 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     };
   }, [fetchRafflesForTab]); // Only depend on fetchRafflesForTab
 
-  // Handle tab changes - fetch data only for the new tab if not already loaded with current filters
   const handleTabChange = async (newTab: string) => {
     setActiveTab(newTab);
 
-    // Check if we need to fetch data for this tab
     const hasData =
       (newTab === "live" && raffles.length > 0) ||
       (newTab === "ended" && endedRaffles.length > 0) ||
@@ -231,14 +225,6 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       setLoading(false);
     }
   };
-
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center">
-  //       Loading raffles...
-  //     </div>
-  //   );
-  // }
 
   return (
     <Tabs

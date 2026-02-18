@@ -37,8 +37,13 @@ export default function AdminLeaderboards() {
     }
   };
 
-  const formatAmount = (amount: number, tokenType: string, tokenAddress?: string) => {
-    if (amount === null || amount === undefined) return `0 ${getTokenSymbol(tokenType, tokenAddress)}`;
+  const formatAmount = (
+    amount: number,
+    tokenType: string,
+    tokenAddress?: string,
+  ) => {
+    if (amount === null || amount === undefined)
+      return `0 ${getTokenSymbol(tokenType, tokenAddress)}`;
     return `${amount} ${getTokenSymbol(tokenType, tokenAddress)}`;
   };
 
@@ -85,17 +90,6 @@ export default function AdminLeaderboards() {
 
   if (loading) return <p>Loading leaderboards...</p>;
 
-  // const handleExport = () => {
-  //   toast.info(`
-  //     title: "✅ Exporting ${activeTab} leaderboard data...`);
-  // };
-
-  // const handleReset = () => {
-  //   toast.warning(
-  //     "⚠️ Reset leaderboard initiated. This action cannot be undone.",
-  //   );
-  // };
-
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -130,14 +124,6 @@ export default function AdminLeaderboards() {
               }`}
             />
           </Button>
-          {/* <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button> */}
-          {/* <Button variant="destructive" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset
-          </Button> */}
         </div>
       </div>
 
@@ -158,8 +144,6 @@ export default function AdminLeaderboards() {
                     <th className="p-4 font-medium">Wallet</th>
                     <th className="p-4 font-medium">Total Revenue</th>
                     <th className="p-4 font-medium">Raffles</th>
-                    {/* <th className="p-4 font-medium">XP</th>
-                    <th className="p-4 font-medium">Streak</th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -199,21 +183,15 @@ export default function AdminLeaderboards() {
                           </button>
                         </td>
                         <td className="p-4 text-primary font-bold">
-                          {formatAmount(host.totalRevenue, host.tokenType, host.tokenAddress)}
+                          {formatAmount(
+                            host.totalRevenue,
+                            host.tokenType,
+                            host.tokenAddress,
+                          )}
                         </td>
                         <td className="p-4 text-muted-foreground">
                           {host.rafflesCount}
                         </td>
-                        {/* <td className="p-4">
-                          <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-sm font-medium">
-                            {host.xp.toLocaleString()} XP
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className="text-accent font-medium">
-                            🔥 {host.streak} days
-                          </span>
-                        </td> */}
                       </tr>
                     ))
                   ) : (
@@ -283,21 +261,15 @@ export default function AdminLeaderboards() {
                           </button>
                         </td>
                         <td className="p-4 text-accent font-bold">
-                          {formatAmount(buyer.spending, buyer.tokenType, buyer.tokenAddress)}
+                          {formatAmount(
+                            buyer.spending,
+                            buyer.tokenType,
+                            buyer.tokenAddress,
+                          )}
                         </td>
                         <td className="p-4 text-muted-foreground">
                           {buyer.tickets}
                         </td>
-                        {/* <td className="p-4">
-                          <span className="px-2 py-1 rounded-md bg-accent/10 text-accent text-sm font-medium">
-                            {buyer.xp.toLocaleString()} XP
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className="text-accent font-medium">
-                            🔥 {buyer.streak} days
-                          </span>
-                        </td> */}
                       </tr>
                     ))
                   ) : (
