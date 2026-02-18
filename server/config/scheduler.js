@@ -23,7 +23,7 @@ const EVERY_MINUTE = "*/1 * * * *";
 const EVERY_SIX_HOUR = "0 */6 * * *";
 const DAILY_AT_2AM = "0 2 * * *";
 
-schedule.scheduleJob(SECONDS_20, async () => {
+schedule.scheduleJob(MINUTES_1, async () => {
   logger.info("Started Spl Token Send Transactions:");
   await checkSplTokenSendTransactions();
 });
@@ -39,7 +39,7 @@ schedule.scheduleJob(EVERY_MINUTE, async () => {
       await TicketReservationService.cleanupExpiredReservations();
     if (cleanedCount > 0) {
       logger.info(
-        `Reservation cleanup: cleaned up ${cleanedCount} expired reservations`,
+        `Reservation cleanup: cleaned up ${cleanedCount} expired reservations`
       );
     }
   } catch (error) {

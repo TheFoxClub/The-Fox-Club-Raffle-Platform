@@ -132,20 +132,13 @@ class HolderController {
 
       if (cachedData) {
         logger.info(`Cache hit for key: ${cacheKey}`);
-        //filtering verified collections
-        let cachedNfts;
-        if (allVerifiedCollections.length > 0) {
-          cachedNfts = cachedData.nfts.filter((item) =>
-            verifiedCollectionAddresses.includes(item.collection?.group_value)
-          );
-        }
         return respond(
           res,
           httpStatus.OK,
           "NFTs fetched successfully (cached)!",
           {
-            total: cachedData.total,
-            nfts: cachedNfts,
+            total: cachedData.total || 0,
+            nfts: cachedData.nfts || [],
             cached: true,
             timestamp: cachedData.timestamp,
           }
@@ -158,27 +151,31 @@ class HolderController {
         owner: publicKey(pubkey),
       };
 
-      const result = await getUmi().rpc.searchAssets(searchParams);
-
-      let nfts = result.items.map((item) => ({
-        mint: item.id,
-        name: item.content?.metadata?.name,
-        uri: item.content?.json_uri,
-        interface: item.interface,
-        collection: item.grouping[0],
-        image: item.links?.image || item.content.files?.[0]?.uri,
-        ownership: item.ownership,
-      }));
+      let result;
+      let nfts;
 
       //filtering verified collections
       if (allVerifiedCollections.length > 0) {
+        result = await getUmi().rpc.searchAssets(searchParams);
+
+        nfts = result.items.map((item) => ({
+          mint: item.id,
+          name: item.content?.metadata?.name,
+          uri: item.content?.json_uri,
+          interface: item.interface,
+          collection: item.grouping[0],
+          image: item.links?.image || item.content.files?.[0]?.uri,
+          ownership: item.ownership,
+        }));
         nfts = nfts.filter((item) =>
           verifiedCollectionAddresses.includes(item.collection?.group_value)
         );
+      } else {
+        nfts = [];
       }
 
       const responseData = {
-        total: result.total,
+        total: result?.total || 0,
         nfts,
         timestamp: new Date().toISOString(),
       };
