@@ -73,30 +73,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // useEffect(() => {
-  //   async function fetchData() {
-  //     try {
-  //       // Fetch top creators
-  //       const creatorsRes = await server.get("/admin/top-creators");
-  //       const creatorsData = creatorsRes.data.data;
-  //       setTopCreators(creatorsData);
 
-  //       // Fetch top raffles
-  //       const rafflesRes = await server.get("/admin/top-raffles");
-  //       const rafflesData = rafflesRes.data.data;
-  //       setTopRaffles(rafflesData);
-
-  //       // Fetch dashboard stats
-  //       const statsRes = await server.get("/admin/dashboard-stats");
-  //       setStats(statsRes.data.data);
-  //     } catch (error) {
-  //       console.error("Error fetching top creators:", error);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   }
-  //   fetchData();
-  // }, []);
   useEffect(() => {
     fetchDashboardData();
   }, []);

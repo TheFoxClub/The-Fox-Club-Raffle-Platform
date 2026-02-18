@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   Filter,
@@ -270,12 +270,6 @@ export default function AdminRaffles() {
     if (!selectedRaffle) return;
 
     try {
-      // Update raffle status
-      // await server.put(`/admin/raffles/${selectedRaffle.id}`, {
-      //   status: status,
-      // });
-
-      // Update featured
       const featuredUntil = isFeatured ? selectedRaffle.endDate : null;
       await server.put(`/admin/featured/${selectedRaffle.id}`, {
         isFeatured: isFeatured,
@@ -509,7 +503,7 @@ export default function AdminRaffles() {
                       </button>
                     </td>
                     <td className="p-4">
-                      <RaffleTokenBadge 
+                      <RaffleTokenBadge
                         tokenType={raffle.tokenType || 0}
                         tokenAddress={raffle.tokenAddress}
                       />
@@ -521,7 +515,7 @@ export default function AdminRaffles() {
                       </span>
                     </td>
                     <td className="p-4">
-                      <RaffleRevenueDisplay 
+                      <RaffleRevenueDisplay
                         revenue={raffle.totalRevenue}
                         tokenType={raffle.tokenType || 0}
                         tokenAddress={raffle.tokenAddress}
