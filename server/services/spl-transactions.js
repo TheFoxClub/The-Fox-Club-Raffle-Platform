@@ -25,7 +25,7 @@ const getSplTokenSendTransactions = async () => {
         [Op.between]: [new Date(fiveMinutesAgo), new Date(oneMinuteAgo)],
       },
     },
-    limit: 5,
+    // limit: 5,
     order: [["createdAt", "DESC"]],
   });
 
@@ -36,10 +36,10 @@ const getSplTokenSendTransactions = async () => {
       status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
       rewardTransferType: "creator_payout",
       createdAt: {
-        [Op.between]: [new Date(fiveMinutesAgo), new Date(thirtySecondsAgo)],
+        [Op.between]: [new Date(fiveMinutesAgo), new Date(oneMinuteAgo)],
       },
     },
-    limit: 3,
+    // limit: 3,
     order: [["createdAt", "DESC"]],
   });
 
