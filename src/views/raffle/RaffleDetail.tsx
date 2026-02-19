@@ -316,7 +316,11 @@ const RaffleDetail = () => {
       // Show reservation countdown
       toast.info(
         `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
+        { autoClose: 3000 },
       );
+
+      // Small delay so user sees the toast first
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
       // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(

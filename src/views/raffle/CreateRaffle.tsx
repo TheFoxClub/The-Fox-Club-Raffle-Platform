@@ -29,7 +29,6 @@ import NFT_PLACEHOLDER from "../../../public/uploads/nft-placeholder.svg";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
-
 const normalizeRewardType = (rewardType: any) => {
   if (!rewardType && rewardType !== 0) return null;
 
@@ -136,8 +135,6 @@ const CreateRaffle = () => {
             tokenType: token.tokenType,
             name: token.name,
           }));
-
-        
 
           const uniqueTokens = Array.from(
             new Map(tokens.map((t) => [t.value, t])).values(),
@@ -808,7 +805,12 @@ const CreateRaffle = () => {
 
           const { transaction, rewardTransferData } = transferRes.data.data;
 
-          toast.info("Please sign the reward transfer transaction...");
+          toast.info("Please sign the reward transfer transaction...", {
+            autoClose: 2000,
+          });
+
+          // Give user time to read
+          await new Promise((resolve) => setTimeout(resolve, 1200));
 
           try {
             let tx;
@@ -1460,8 +1462,6 @@ const CreateRaffle = () => {
                                       }
                                     `}
                             >
-                          
-
                               {/* Content */}
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-sm truncate">
