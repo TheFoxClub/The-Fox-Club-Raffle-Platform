@@ -2948,8 +2948,18 @@ class RaffleController {
           data.endedAt ||
           (data.endDate && new Date() > new Date(data.endDate));
 
-        const hasClaimed = !!data.creatorClaimTxId;
+        // const hasClaimed = !!data.creatorClaimTxId;
         const claimTransaction = data.creatorClaimTransaction;
+        let hasClaimed;
+        if (data.creatorClaimTxId) {
+          if (claimTransaction.txId) {
+            hasClaimed = true;
+          } else {
+            hasClaimed = false;
+          }
+        } else {
+          hasClaimed = false;
+        }
 
         let claimStatus = "not_claimed";
         if (hasClaimed && claimTransaction) {
@@ -3101,14 +3111,22 @@ class RaffleController {
 
       // Check if already claimed
       if (raffle.creatorClaimTxId) {
-        if (transaction && !transaction.finished) {
-          await transaction.rollback();
+        const creatorPayoutSplTx = await SplTokenSendTransaction.findOne({
+          where: {
+            id: raffle.creatorClaimTxId,
+          },
+          raw: true,
+        });
+        if (creatorPayoutSplTx.txId !== null) {
+          if (transaction && !transaction.finished) {
+            await transaction.rollback();
+          }
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            "Payout has already been claimed for this raffle"
+          );
         }
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Payout has already been claimed for this raffle"
-        );
       }
 
       const claimableAmount = parseFloat(raffle.claimableAmount || 0);
@@ -3233,29 +3251,40 @@ class RaffleController {
         uiAmount = Math.round(unclaimedAmount * LAMPORTS_PER_SOL).toString();
       }
 
-      const splTokenSendTxData = {
-        senderPubkey: platformWallet,
-        receiverPubkey: user.pubkey,
-        type: transactionType,
-        txId: null,
-        tokenAddress: tokenAddress,
-        decimals: decimals,
-        uiAmount: uiAmount,
-        status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
-        raffleId: raffleIdNum,
-        rewardTransferType: "creator_payout",
-        rewardName: `Payout for ${raffle.title}`,
-        rewardIndex: 0,
-        commissionRate: 0,
-        creatorAmount: 0,
-        commissionAmount: 0,
-        isNFTHolder: false,
-      };
+      let payoutTxRecord;
 
-      const payoutTxRecord = await SplTokenSendTransaction.create(
-        splTokenSendTxData,
-        { transaction }
-      );
+      if (raffle.creatorClaimTxId) {
+        payoutTxRecord = await SplTokenSendTransaction.findOne({
+          where: {
+            id: raffle.creatorClaimTxId,
+          },
+          raw: true,
+        });
+      } else {
+        const splTokenSendTxData = {
+          senderPubkey: platformWallet,
+          receiverPubkey: user.pubkey,
+          type: transactionType,
+          txId: null,
+          tokenAddress: tokenAddress,
+          decimals: decimals,
+          uiAmount: uiAmount,
+          status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+          raffleId: raffleIdNum,
+          rewardTransferType: "creator_payout",
+          rewardName: `Payout for ${raffle.title}`,
+          rewardIndex: 0,
+          commissionRate: 0,
+          creatorAmount: 0,
+          commissionAmount: 0,
+          isNFTHolder: false,
+        };
+
+        payoutTxRecord = await SplTokenSendTransaction.create(
+          splTokenSendTxData,
+          { transaction }
+        );
+      }
 
       await Raffle.update(
         {
