@@ -34,6 +34,7 @@ import AdminAnalytics from "./views/admin/AdminAnalytics";
 import { ProtectedAdminRoute } from "./components/auth/ProtectedAdminRoute";
 import Forbidden from "./views/errors/Forbidden";
 import { authenticateUser } from "./redux/actions/userAction";
+import AdminFees from "./views/admin/AdminFees";
 
 function App() {
   // let endpoint = "https://api.devnet.solana.com";
@@ -170,14 +171,14 @@ function App() {
                   </AdminLayout>
                 }
               />
-              {/* <Route
-              path="/admin/fees"
-              element={
-                <AdminLayout>
-                  <AdminFees />
-                </AdminLayout>
-              }
-            /> */}
+              <Route
+                path="/admin/fees"
+                element={
+                  <AdminLayout>
+                    <AdminFees />
+                  </AdminLayout>
+                }
+              />
               {/* <Route
               path="/admin/rewards"
               element={

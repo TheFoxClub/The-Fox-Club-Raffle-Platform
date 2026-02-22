@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   Home,
   X,
+  Settings,
 } from "lucide-react";
 import Button from "../ui/Button";
 import { useSelector } from "react-redux";
@@ -33,7 +34,7 @@ const menuItems = [
   { icon: Shield, label: "Collections", path: "/admin/collections" },
   { icon: Coins, label: "Tokens", path: "/admin/tokens" },
   { icon: Star, label: "XP Management", path: "/admin/xp" },
-  // { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
+  { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
   //{ icon: Gift, label: "Rewards", path: "/admin/rewards" },
   { icon: Trophy, label: "Leaderboards", path: "/admin/leaderboards" },
   { icon: TrendingUp, label: "Analytics", path: "/admin/analytics" },
