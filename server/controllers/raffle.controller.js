@@ -43,9 +43,13 @@ const walletKeypair = require("../helpers/solana/wallet.json");
 const logger = require("../util/logger");
 const WinnerSelectionService = require("../services/raffles/winner-selection");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
-const { MIN_PAYOUT_AMOUNT } = require("../config/constants");
+const {
+  MIN_PAYOUT_AMOUNT,
+  DEFAULT_COMMISSION,
+} = require("../config/constants");
 const { BET_RECEIVER_WALLET } = require("../config/credentials");
 const SocketService = require("../services/socket.service");
+const { getFeeData } = require("../helpers/cache/system-fee");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -511,11 +515,15 @@ class RaffleController {
         `Preparing reward transfer transaction for ${splTokenSendSummary.length} rewards from user ${fromAddress}`
       );
 
+      //transaction fee
+      const allFee = await getFeeData();
+
       // Create transaction for user to sign (but don't execute it yet)
       const transferResponse = await sendMultipleSplTokenTx({
         splTokenSendSummary,
         solCommission: 0,
         feePayer: fromAddress,
+        transactionFee: Number(allFee.transaction_fee) || DEFAULT_COMMISSION,
         fromAccount: fromAddress,
         isUserToPlatform: true,
       });

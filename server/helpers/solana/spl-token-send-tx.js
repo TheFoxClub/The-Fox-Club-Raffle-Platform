@@ -33,6 +33,8 @@ const { base64 } = require("@metaplex-foundation/umi/serializers");
 const { generateChecksum } = require("./checksum-validation.js");
 const logger = require("../../util/logger");
 const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
+const { BET_RECEIVER_WALLET } = require("../../config/credentials.js");
+const { getFeeData } = require("../cache/system-fee.js");
 
 const umi = getUmi();
 
@@ -42,6 +44,7 @@ const umi = getUmi();
  * @param {Array} params.splTokenSendSummary - Array of token transfer details
  * @param {number} params.solCommission - SOL commission amount
  * @param {string} params.feePayer - Wallet address paying for the transaction fees
+ * @param {number} params.transactionFee - Transaction Fee
  * @param {string} params.fromAccount - Source wallet address (can be user or platform)
  * @param {boolean} params.isUserToPlatform - Direction flag: true = user→platform, false = platform→user
  */
@@ -49,6 +52,7 @@ const sendMultipleSplTokenTx = async ({
   splTokenSendSummary,
   solCommission,
   feePayer,
+  transactionFee,
   fromAccount,
   isUserToPlatform = true,
 }) => {
@@ -67,6 +71,17 @@ const sendMultipleSplTokenTx = async ({
         units: 300_000,
       })
     );
+
+    //transaction fee
+    if (isUserToPlatform) {
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(feePayer),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: BigInt(transactionFee * value),
+        })
+      );
+    }
 
     let signatures = [];
     let transactionDetails = [];
@@ -385,6 +400,18 @@ const createClaimTransaction = async ({
       })
     );
 
+    //transaction fee
+    const feeData = await getFeeData();
+    const transactionFee =
+      Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(feePayer),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: BigInt(transactionFee * value),
+      })
+    );
+
     const { tokenAddress, amount, type } = reward;
 
     logger.info(
@@ -630,6 +657,18 @@ const createPayoutTransaction = async ({
     transaction.add(
       ComputeBudgetProgram.setComputeUnitLimit({
         units: 300_000,
+      })
+    );
+
+    //transaction fee
+    const feeData = await getFeeData();
+    const transactionFee =
+      Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(feePayer),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: BigInt(transactionFee * value),
       })
     );
 

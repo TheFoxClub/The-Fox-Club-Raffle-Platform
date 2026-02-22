@@ -47,6 +47,8 @@ const SocketService = require("../services/socket.service");
 const TicketReservationService = require("../services/ticket-reservation.service");
 
 const dotenv = require("dotenv");
+const { getFeeData } = require("../helpers/cache/system-fee");
+const { DEFAULT_COMMISSION } = require("../config/constants");
 dotenv.config();
 
 class TicketController {
@@ -154,10 +156,11 @@ class TicketController {
         senderPubkey
       );
       const isNFTHolder = nftHolderInfo.isHolder;
+      const feeData = await getFeeData();
 
       const commissionRate = isNFTHolder
-        ? COMMISSION_RATES.HOLDER
-        : COMMISSION_RATES.NON_HOLDER;
+        ? feeData.holder_participant_fee || COMMISSION_RATES.HOLDER
+        : feeData.non_holder_participant_fee || COMMISSION_RATES.NON_HOLDER;
 
       const ticketPrice = raffleData.ticketPrice;
       const totalSolAmount = ticketPrice * ticketCount;
@@ -236,6 +239,17 @@ class TicketController {
       transaction.add(
         ComputeBudgetProgram.setComputeUnitLimit({
           units: 200_000,
+        })
+      );
+
+      //transaction fee
+      const transactionFee =
+        Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(feePayer),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: BigInt(transactionFee * value),
         })
       );
 
