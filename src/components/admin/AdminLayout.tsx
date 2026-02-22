@@ -6,7 +6,6 @@ import {
   Shield,
   Coins,
   Star,
-  Settings,
   //  Gift,
   TrendingUp,
   Trophy,
