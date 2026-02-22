@@ -5,6 +5,7 @@ const {
   UserInfo,
   VerifiedCollection,
   VerifiedToken,
+  SystemFee,
   Sequelize,
   sequelize,
 } = require("../models");
@@ -53,13 +54,13 @@ class AdminController {
         const titleSearchCondition = Sequelize.where(
           Sequelize.fn("LOWER", Sequelize.col("raffle.title")),
           "LIKE",
-          `%${searchTerm}%`,
+          `%${searchTerm}%`
         );
 
         const userSearchCondition = Sequelize.where(
           Sequelize.fn("LOWER", Sequelize.col("user.pubkey")),
           "LIKE",
-          `%${searchTerm}%`,
+          `%${searchTerm}%`
         );
 
         const searchCondition = {
@@ -109,7 +110,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -157,14 +158,14 @@ class AdminController {
         "Featured status updated successfully",
         {
           raffle,
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -222,14 +223,14 @@ class AdminController {
         suspend
           ? "Raffle suspended successfully"
           : "Raffle resumed successfully",
-        { raffle },
+        { raffle }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -258,14 +259,14 @@ class AdminController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -286,7 +287,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.CONFLICT,
-          "Collection with this address already exists",
+          "Collection with this address already exists"
         );
       }
 
@@ -300,14 +301,14 @@ class AdminController {
         res,
         httpStatus.CREATED,
         "Verified collection created successfully!",
-        { collection },
+        { collection }
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -333,7 +334,7 @@ class AdminController {
           return respond(
             res,
             httpStatus.CONFLICT,
-            "Address already exists for another collection",
+            "Address already exists for another collection"
           );
         }
       }
@@ -353,7 +354,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -376,7 +377,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -399,7 +400,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -424,14 +425,14 @@ class AdminController {
         `Collection ${
           collection.isVerified ? "verified" : "unverified"
         } successfully`,
-        { collection },
+        { collection }
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -495,7 +496,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -515,14 +516,14 @@ class AdminController {
       return respond(
         res,
         httpStatus.OK,
-        `${deletedCount} collection(s) deleted successfully`,
+        `${deletedCount} collection(s) deleted successfully`
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -573,7 +574,7 @@ class AdminController {
         `,
         {
           type: sequelize.QueryTypes.SELECT,
-        },
+        }
       );
 
       const ranked = creators.map((creator, index) => ({
@@ -591,7 +592,7 @@ class AdminController {
         res,
         httpStatus.OK,
         "Top raffle creators fetched!",
-        ranked,
+        ranked
       );
     } catch (error) {
       console.error(error);
@@ -633,7 +634,7 @@ class AdminController {
         {
           replacements: [0], // Exclude DRAFT raffles
           type: sequelize.QueryTypes.SELECT,
-        },
+        }
       );
 
       const liveRaffleCount = await Raffle.count({
@@ -659,7 +660,7 @@ class AdminController {
           totalPlatformRevenue:
             acc.totalPlatformRevenue + Number(stat.totalPlatformRevenue || 0),
         }),
-        { totalRevenue: 0, totalTicketsSold: 0, totalPlatformRevenue: 0 },
+        { totalRevenue: 0, totalTicketsSold: 0, totalPlatformRevenue: 0 }
       );
 
       // Get SOL-only stats (tokenType = 0)
@@ -735,7 +736,7 @@ class AdminController {
         `,
         {
           replacements: [parseInt(limit, 10)],
-        },
+        }
       );
 
       const raffles = queryResult[0] || [];
@@ -758,14 +759,14 @@ class AdminController {
         res,
         httpStatus.OK,
         "Top performing raffles fetched!",
-        formattedRaffles,
+        formattedRaffles
       );
     } catch (error) {
       logger.error("Error getting top performing raffles:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to retrieve top performing raffles",
+        "Failed to retrieve top performing raffles"
       );
     }
   }
@@ -787,7 +788,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to fetch top hosts and buyers",
+        "Failed to fetch top hosts and buyers"
       );
     }
   }
@@ -816,14 +817,14 @@ class AdminController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -853,14 +854,14 @@ class AdminController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -877,7 +878,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Solana is a built-in token and cannot be added manually",
+          "Solana is a built-in token and cannot be added manually"
         );
       }
 
@@ -889,7 +890,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.CONFLICT,
-          "Token with this address already exists",
+          "Token with this address already exists"
         );
       }
 
@@ -907,7 +908,10 @@ class AdminController {
       let finalSymbol = symbol || name || null;
       if (finalSymbol && finalSymbol.length > 10) {
         logger.info(
-          `Token symbol truncated from "${finalSymbol}" to "${finalSymbol.substring(0, 10)}" for address ${address}`,
+          `Token symbol truncated from "${finalSymbol}" to "${finalSymbol.substring(
+            0,
+            10
+          )}" for address ${address}`
         );
         finalSymbol = finalSymbol.substring(0, 10);
       }
@@ -927,14 +931,14 @@ class AdminController {
         res,
         httpStatus.CREATED,
         "Verified token created successfully!",
-        { token },
+        { token }
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -953,7 +957,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Solana is a built-in token and cannot be deleted",
+          "Solana is a built-in token and cannot be deleted"
         );
       }
 
@@ -965,7 +969,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -988,7 +992,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -1007,7 +1011,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Solana is a built-in token and cannot be modified",
+          "Solana is a built-in token and cannot be modified"
         );
       }
 
@@ -1019,14 +1023,14 @@ class AdminController {
         res,
         httpStatus.OK,
         `Token ${token.isVerified ? "verified" : "unverified"} successfully`,
-        { token },
+        { token }
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -1045,7 +1049,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Solana is a built-in token and cannot be modified",
+          "Solana is a built-in token and cannot be modified"
         );
       }
 
@@ -1053,7 +1057,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Token must be verified before it can be enabled for payments",
+          "Token must be verified before it can be enabled for payments"
         );
       }
 
@@ -1064,15 +1068,17 @@ class AdminController {
       return respond(
         res,
         httpStatus.OK,
-        `Token ${token.isPaymentToken ? "enabled" : "disabled"} for payments successfully`,
-        { token },
+        `Token ${
+          token.isPaymentToken ? "enabled" : "disabled"
+        } for payments successfully`,
+        { token }
       );
     } catch (error) {
       logger.error(error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(error),
+        parseSequelizeErrors(error)
       );
     }
   }
@@ -1093,14 +1099,14 @@ class AdminController {
         "XP configuration retrieved successfully",
         {
           config,
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -1114,7 +1120,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Config key and value are required",
+          "Config key and value are required"
         );
       }
 
@@ -1122,7 +1128,7 @@ class AdminController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Config value cannot be negative",
+          "Config value cannot be negative"
         );
       }
 
@@ -1155,14 +1161,14 @@ class AdminController {
         "XP configuration updated successfully",
         {
           config,
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -1202,14 +1208,14 @@ class AdminController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -1247,7 +1253,7 @@ class AdminController {
           [
             sequelize.fn(
               "COUNT",
-              sequelize.fn("DISTINCT", sequelize.col("userId")),
+              sequelize.fn("DISTINCT", sequelize.col("userId"))
             ),
             "uniqueUsers",
           ],
@@ -1316,7 +1322,7 @@ class AdminController {
                 }
               : null,
           };
-        }),
+        })
       );
 
       return respond(
@@ -1344,14 +1350,14 @@ class AdminController {
             dailyXp: parseFloat(item.dailyXp || 0),
           })),
           topEarnersThisMonth: topEarnersWithDetails,
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -1368,14 +1374,14 @@ class AdminController {
         "XP processing status retrieved successfully",
         {
           stats,
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -1462,7 +1468,7 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -1496,7 +1502,47 @@ class AdminController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async getSystemFees(req, res) {
+    try {
+      const feeData = await SystemFee.findOne({
+        where: {
+          id: 1,
+        },
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+        raw: true,
+      });
+      return respond(res, httpStatus.OK, "success", feeData);
+    } catch (err) {
+      logger.error("Error in getSystemFees: ", err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async updateSystemFees(req, res) {
+    try {
+      const feeData = req.body;
+      console.log(feeData);
+      await SystemFee.update(feeData, {
+        where: {
+          id: 1,
+        },
+      });
+      return respond(res, httpStatus.OK, "success");
+    } catch (err) {
+      logger.error("Error in updateSystemFees: ", err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
       );
     }
   }

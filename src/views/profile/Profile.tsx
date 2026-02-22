@@ -4,7 +4,6 @@ import { Card } from "../../components/ui/Card";
 import {
   User,
   Trophy,
- 
   Award,
   Ticket,
   Calendar,
@@ -34,6 +33,7 @@ import { toast } from "react-toastify";
 import { UserXPCard } from "../../components/profile/UserXPCard";
 import { TokenDisplay } from "../../components/ui/TokenDisplay";
 import { formatRewardType } from "../../utils/rewardTypeUtils";
+import { setNotificationsCount } from "../../redux/userSlice";
 
 type HostedRaffle = {
   id: number;
@@ -114,8 +114,6 @@ const Profile = () => {
     (state: RootState) => state.user,
   );
 
-
-
   const [ticketsBought, setTicketsBought] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
   const [rafflesWon, setRafflesWon] = useState(0);
@@ -139,6 +137,10 @@ const Profile = () => {
 
   const [loadingRewards, setLoadingRewards] = useState(false);
   const unclaimedWinsCount = wins.filter((win) => !win.isClaimed).length;
+  const hostedRafflesWithUnclaimedPayouts = hostedRafflesData.filter(
+    (raffle) =>
+      raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0,
+  ).length;
 
   const formatEndDate = (dateString: string) => {
     if (!dateString) return "N/A";
@@ -395,6 +397,13 @@ const Profile = () => {
     }
   };
 
+  useEffect(() => {
+    const notificationCount =
+      unclaimedWinsCount + hostedRafflesWithUnclaimedPayouts;
+
+    dispatch(setNotificationsCount(notificationCount));
+  }, [unclaimedWinsCount, hostedRafflesWithUnclaimedPayouts, dispatch]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-300">
@@ -464,8 +473,6 @@ const Profile = () => {
             <p className="text-2xl font-bold">{ticketsBought}</p>
             <p className="text-sm text-muted-foreground">Tickets Bought</p>
           </Card>
-
-        
         </div>
 
         {/* XP Card */}
@@ -575,7 +582,6 @@ const Profile = () => {
               data-tab="won"
             >
               Wins{" "}
-            
               {unclaimedWinsCount > 0 && (
                 <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {unclaimedWinsCount}

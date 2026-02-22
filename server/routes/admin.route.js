@@ -176,20 +176,10 @@ router.patch(
 
 // XP Management Routes
 // Get XP configuration
-router.get(
-  "/xp-config",
-  auth.bearer,
-  isAdmin,
-  AdminController.getXpConfig
-);
+router.get("/xp-config", auth.bearer, isAdmin, AdminController.getXpConfig);
 
 // Update XP configuration
-router.put(
-  "/xp-config",
-  auth.bearer,
-  isAdmin,
-  AdminController.updateXpConfig
-);
+router.put("/xp-config", auth.bearer, isAdmin, AdminController.updateXpConfig);
 
 // Get XP leaderboard
 router.get(
@@ -216,12 +206,7 @@ router.get(
 );
 
 // Get XP records with filtering
-router.get(
-  "/xp-records",
-  auth.bearer,
-  isAdmin,
-  AdminController.getXpRecords
-);
+router.get("/xp-records", auth.bearer, isAdmin, AdminController.getXpRecords);
 
 // Manually recalculate user XP
 router.post(
@@ -229,6 +214,15 @@ router.post(
   auth.bearer,
   isAdmin,
   AdminController.recalculateUserXp
+);
+
+// System Fees configurations
+router.get("/system-fee", auth.bearer, isAdmin, AdminController.getSystemFees);
+router.put(
+  "/system-fee",
+  auth.bearer,
+  isAdmin,
+  AdminController.updateSystemFees
 );
 
 module.exports = router;

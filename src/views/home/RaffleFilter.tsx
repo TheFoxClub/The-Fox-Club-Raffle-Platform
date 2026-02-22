@@ -146,7 +146,7 @@ export default function RaffleFilter({
               : selectBaseClass
           }`}
         />
-        \
+
         <Select
           options={priceOptions}
           value={priceFilter || appliedFilters.price}
