@@ -6,7 +6,7 @@ import {
   ChevronRight,
   CheckCircle,
   Coins,
-  Users,
+  Ticket,
 } from "lucide-react";
 import server from "../../config/server";
 import { useNavigate } from "react-router-dom";
@@ -98,7 +98,7 @@ function RaffleCard({
           </div>
 
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
+            <Ticket className="h-4 w-4 text-primary" />
             <div>
               <p className="text-gray-400">Tickets Sold</p>
               <span className="font-bold">
@@ -428,7 +428,7 @@ export default function RaffleCarousel() {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {!isMobile && (
+        {!isMobile && raffles.length > 1 && (
           <>
             <Button
               variant="outline"

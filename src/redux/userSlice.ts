@@ -12,6 +12,7 @@ export type User = {
   isLoading: boolean;
   messages?: any[];
   isAdmin?: boolean;
+  notificationsCount?: number;
   user_info?: {
     id?: number;
     username?: string;
@@ -26,6 +27,7 @@ const initialState: User = {
   isAuthenticated: false,
   isLoading: true,
   isAdmin: false,
+  notificationsCount: 0,
 };
 
 const user = createSlice({
@@ -63,15 +65,19 @@ const user = createSlice({
       localStorage.removeItem(LOGIN_TOKEN); // Also clear localStorage if used
       // Clear any other wallet-related storage
       try {
-        localStorage.removeItem('walletName');
-        sessionStorage.removeItem('walletName');
+        localStorage.removeItem("walletName");
+        sessionStorage.removeItem("walletName");
       } catch (e) {
         // Ignore storage errors
       }
       return {
         ...initialState,
         isLoading: false,
+        notificationsCount: 0,
       };
+    },
+    setNotificationsCount: (state, action: PayloadAction<number>) => {
+      state.notificationsCount = action.payload;
     },
   },
 
@@ -119,5 +125,11 @@ const user = createSlice({
   },
 });
 
-export const { setUser, setLoading, hydrateUserState, logout } = user.actions;
+export const {
+  setUser,
+  setLoading,
+  hydrateUserState,
+  logout,
+  setNotificationsCount,
+} = user.actions;
 export default user.reducer;

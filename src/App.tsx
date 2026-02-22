@@ -27,14 +27,13 @@ import AdminRaffles from "./views/admin/AdminRaffles";
 import AdminCollections from "./views/admin/AdminCollections";
 import AdminTokens from "./views/admin/AdminTokens";
 import AdminXP from "./views/admin/AdminXP";
-// import AdminFees from "./views/admin/AdminFees";
+import AdminFees from "./views/admin/AdminFees";
 //import AdminRewards from "./views/admin/AdminRewards";
 import AdminLeaderboards from "./views/admin/AdminLeaderboards";
 import AdminAnalytics from "./views/admin/AdminAnalytics";
 import { ProtectedAdminRoute } from "./components/auth/ProtectedAdminRoute";
 import Forbidden from "./views/errors/Forbidden";
 import { authenticateUser } from "./redux/actions/userAction";
-import AdminFees from "./views/admin/AdminFees";
 
 function App() {
   // let endpoint = "https://api.devnet.solana.com";

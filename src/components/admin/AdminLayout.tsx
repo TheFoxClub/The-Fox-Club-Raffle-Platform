@@ -6,7 +6,6 @@ import {
   Shield,
   Coins,
   Star,
-  // Settings,
   //  Gift,
   TrendingUp,
   Trophy,
@@ -88,7 +87,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="p-4 border-b border-border/50 flex items-center justify-between shrink-0">
           {sidebarOpen && (
             <Link to="/admin" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-orange-500">🦊</span>
+              <img
+                src="/assets/foxclub_logo.png"
+                alt="Logo"
+                className="w-6 h-6 rounded-full"
+              />
               <span className="text-sm font-bold text-gradient">ADMIN</span>
             </Link>
           )}
