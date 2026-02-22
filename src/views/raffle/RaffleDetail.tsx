@@ -996,7 +996,7 @@ const RaffleDetail = () => {
             <div className="space-y-3 sm:space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                  <Ticket className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
                   <span className="text-xs sm:text-sm text-muted-foreground truncate">
                     {raffle.sold} / {raffle.total} tickets sold
                   </span>

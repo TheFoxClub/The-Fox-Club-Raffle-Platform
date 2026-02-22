@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
 import {
+  Ticket,
   Wallet,
   Trophy,
   PlusCircle,
@@ -25,7 +26,9 @@ export const Header = () => {
   const navigate = useNavigate();
   const { publicKey, connected } = useWallet();
   const user = useSelector((state: RootState) => state.user);
+  const notificationsCount = user.notificationsCount || 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const hasNotifications = notificationsCount > 0;
 
   // console.log("Header user:", user);
 
@@ -62,7 +65,7 @@ export const Header = () => {
               variant={isActive("/") ? "default" : "ghost"}
               className="gap-2"
             >
-              <Trophy className="h-4 w-4" /> Raffles
+              <Ticket className="h-4 w-4" /> Raffles
             </Button>
           </Link>
           <Link to="/leaderboard">
@@ -77,9 +80,18 @@ export const Header = () => {
             <Link to="/profile">
               <Button
                 variant={isActive("/profile") ? "default" : "ghost"}
-                className="gap-2"
+                className={`w-full gap-2 cursor-pointer justify-center relative rounded-md hover:bg-accent ${hasNotifications ? "w-31 pl-0 pr-4 justify-center" : ""}`}
               >
-                <User className="h-4 w-4" /> Profile
+                {/* <User className="h-4 w-4" /> Profile */}
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <span>Profile</span>
+                </div>
+                {hasNotifications && (
+                  <span className="absolute right-4 top-1/3 -translate-y-1/2 min-w-[18px] h-[18px] px-1 text-[10px] flex items-center justify-center bg-red-600 text-white font-bold rounded-full ">
+                    {notificationsCount > 9 ? "9+" : notificationsCount}
+                  </span>
+                )}
               </Button>
             </Link>
           )}
@@ -143,7 +155,7 @@ export const Header = () => {
               className="w-full gap-2 cursor-pointer"
               size="sm"
             >
-              <Trophy className="h-4 w-4" /> Raffles
+              <Ticket className="h-4 w-4" /> Raffles
             </Button>
           </Link>
           <Link to="/leaderboard" className="flex-1">
@@ -190,7 +202,17 @@ export const Header = () => {
                 className="w-full gap-2 cursor-pointer justify-center border border-border rounded-md hover:bg-accent"
                 size="sm"
               >
-                <User className="h-4 w-4" /> Profile
+                {/* <User className="h-4 w-4" /> Profile */}
+                <div className="relative flex items-center gap-2 justify-center w-full">
+                  <User className="h-4 w-4" />
+                  Profile
+                  {notificationsCount > 0 && (
+                    <span className="absolute -top-1 right-30 bg-red-500 text-white text-xs font-bold px-2 py-0.2 rounded-full">
+                      {/* {notificationsCount} */}
+                      {notificationsCount > 9 ? "9+" : notificationsCount}
+                    </span>
+                  )}
+                </div>
               </Button>
             </Link>
 

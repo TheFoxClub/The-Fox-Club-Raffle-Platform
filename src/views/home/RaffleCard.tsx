@@ -1,6 +1,6 @@
 import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
-import { CheckCircle, Clock, Users, Coins } from "lucide-react";
+import { CheckCircle, Clock, Ticket, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatPrice } from "../../helpers/formatPrice";
 import { useTokenSymbol } from "../../hooks/useTokenDisplay";
@@ -82,7 +82,7 @@ export const RaffleCard = ({
           <div className="space-y-2">
             <div className="flex justify-between text-sm items-center">
               <div className="flex items-center text-muted-foreground gap-1">
-                <Users className="h-4 w-4" />
+                <Ticket className="h-4 w-4" />
                 <span>
                   {sold} / {total} tickets
                 </span>

@@ -27,7 +27,7 @@ import AdminRaffles from "./views/admin/AdminRaffles";
 import AdminCollections from "./views/admin/AdminCollections";
 import AdminTokens from "./views/admin/AdminTokens";
 import AdminXP from "./views/admin/AdminXP";
-// import AdminFees from "./views/admin/AdminFees";
+import AdminFees from "./views/admin/AdminFees";
 //import AdminRewards from "./views/admin/AdminRewards";
 import AdminLeaderboards from "./views/admin/AdminLeaderboards";
 import AdminAnalytics from "./views/admin/AdminAnalytics";
@@ -170,14 +170,14 @@ function App() {
                   </AdminLayout>
                 }
               />
-              {/* <Route
-              path="/admin/fees"
-              element={
-                <AdminLayout>
-                  <AdminFees />
-                </AdminLayout>
-              }
-            /> */}
+              <Route
+                path="/admin/fees"
+                element={
+                  <AdminLayout>
+                    <AdminFees />
+                  </AdminLayout>
+                }
+              />
               {/* <Route
               path="/admin/rewards"
               element={

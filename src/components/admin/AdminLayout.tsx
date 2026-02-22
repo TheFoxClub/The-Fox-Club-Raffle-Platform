@@ -6,7 +6,7 @@ import {
   Shield,
   Coins,
   Star,
-  // Settings,
+  Settings,
   //  Gift,
   TrendingUp,
   Trophy,
@@ -33,7 +33,7 @@ const menuItems = [
   { icon: Shield, label: "Collections", path: "/admin/collections" },
   { icon: Coins, label: "Tokens", path: "/admin/tokens" },
   { icon: Star, label: "XP Management", path: "/admin/xp" },
-  // { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
+  { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
   //{ icon: Gift, label: "Rewards", path: "/admin/rewards" },
   { icon: Trophy, label: "Leaderboards", path: "/admin/leaderboards" },
   { icon: TrendingUp, label: "Analytics", path: "/admin/analytics" },
@@ -87,7 +87,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="p-4 border-b border-border/50 flex items-center justify-between shrink-0">
           {sidebarOpen && (
             <Link to="/admin" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-orange-500">🦊</span>
+              <img
+                src="/assets/foxclub_logo.png"
+                alt="Logo"
+                className="w-6 h-6 rounded-full"
+              />
               <span className="text-sm font-bold text-gradient">ADMIN</span>
             </Link>
           )}

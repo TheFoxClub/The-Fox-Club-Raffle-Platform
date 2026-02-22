@@ -93,6 +93,8 @@ const CreateRaffle = () => {
   const [selectedTokenType, setSelectedTokenType] = useState<any>(null);
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const FEATURED_PRICE = 0.1;
 
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
@@ -727,6 +729,7 @@ const CreateRaffle = () => {
         startDate: finalStartDate,
         endDate,
         status,
+        isFeatured,
         requiresNftVerification: false,
         imageUrl: raffleImageUrl,
         rewards: [
@@ -751,7 +754,11 @@ const CreateRaffle = () => {
             metadataJson: JSON.stringify({ programId: token.programId }),
           })),
         ],
-        additionalJson: { created: "user", category: "raffle" },
+        additionalJson: {
+          created: "user",
+          category: "raffle",
+          featuredRequested: isFeatured,
+        },
       };
 
       const draftId = isResumingDraft
@@ -969,8 +976,32 @@ const CreateRaffle = () => {
       }
 
       if (res.data.success) {
-        toast.success("Raffle created successfully!");
-        const createdId = res.data.data.raffle.id;
+        // toast.success("Raffle created successfully!");
+        // const createdId = res.data.data.raffle.id;
+        const createdRaffle = res.data.data.raffle;
+
+        //  Feature it if selected
+        if (isFeatured) {
+          try {
+            await server.put(`/admin/featured/${createdRaffle.id}`, {
+              isFeatured: true,
+              featuredPosition: null,
+              featuredUntil: createdRaffle.endDate || null,
+            });
+          } catch (featureError) {
+            console.error("Feature update failed:", featureError);
+            toast.error("Raffle created but featuring failed");
+          }
+        }
+
+        toast.success(
+          isFeatured
+            ? "Raffle created and featured successfully!"
+            : "Raffle created successfully!",
+        );
+
+        const createdId = createdRaffle.id;
+
         // Reset the resuming flag since we've successfully created/converted the raffle
         setIsResumingDraft(false);
         navigate(`/raffle/raffle-${createdId}`);
@@ -1011,6 +1042,13 @@ const CreateRaffle = () => {
       );
       setTotalTickets(draft.totalTickets ?? "");
       setNumberOfWinners(draft.numberOfWinners ?? 1);
+      const requested =
+        draft.additionalJson?.featuredRequested ??
+        draft.raffle?.additionalJson?.featuredRequested ??
+        draft.raffle_detail?.additionalJson?.featuredRequested ??
+        false;
+
+      setIsFeatured(requested);
       setStartDate(draft.startDate || "");
       setEndDate(draft.endDate || "");
       setSelectedTokenType(draft.tokenType || null);
@@ -1729,6 +1767,48 @@ const CreateRaffle = () => {
         </div>
 
         <div className=" bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Promotion (Optional)</p>
+
+            <div
+              onClick={() => setIsFeatured((prev) => !prev)}
+              className={`cursor-pointer border rounded-lg p-4 transition-all space-y-2
+      ${
+        isFeatured
+          ? "border-primary bg-primary/10 shadow-sm"
+          : "border-border hover:border-primary/50"
+      }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">Feature your raffle</p>
+                  <p className="text-xs text-muted-foreground">
+                    Appear in homepage featured section and gain more visibility
+                  </p>
+                </div>
+
+                {isFeatured && (
+                  <span className="text-xs font-bold text-primary">
+                    Selected
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-sm">Featured Fee</p>
+                <p className="text-lg font-bold">{FEATURED_PRICE} SOL</p>
+              </div>
+
+              {isFeatured && (
+                <p className="text-xs text-muted-foreground">
+                  Fee will be charged when raffle is created
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className=" bg-card rounded-lg border border-border shadow-sm p-6 space-y-6">
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             <h1 className="text-2xl font-bold">Duration</h1>
@@ -1826,12 +1906,12 @@ const CreateRaffle = () => {
             <ul className="list-disc pl-5 space-y-1">
               <li>
                 Selected NFT(s) and/or token rewards will be immediately
-                transferred and permanently locked
+                transferred and locked
               </li>
-              <li>
+              {/* <li>
                 Locked rewards will not be refunded, even if zero tickets are
                 purchased
-              </li>
+              </li> */}
               <li>
                 Once any ticket is purchased, the raffle cannot be cancelled or
                 deleted
