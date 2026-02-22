@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   Home,
   X,
+  Settings,
 } from "lucide-react";
 import Button from "../ui/Button";
 import { useSelector } from "react-redux";
