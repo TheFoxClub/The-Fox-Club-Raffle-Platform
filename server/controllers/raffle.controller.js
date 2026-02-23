@@ -50,6 +50,7 @@ const {
 const { BET_RECEIVER_WALLET } = require("../config/credentials");
 const SocketService = require("../services/socket.service");
 const { getFeeData } = require("../helpers/cache/system-fee");
+const { getRaffleRefundTransaction } = require("../services/raffles/refund");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -240,7 +241,7 @@ class RaffleController {
     try {
       const raffles = await Raffle.findAll({
         where: {
-          status: RAFFLE_STATUS.LIVE,
+          status: { [Op.in]: [RAFFLE_STATUS.LIVE, RAFFLE_STATUS.UPCOMING] },
           endedAt: null,
         },
         include: [
@@ -425,7 +426,7 @@ class RaffleController {
   static async prepareRewardTransfer(req, res) {
     try {
       const userId = req.payload?.id;
-      const { rewards, fromAddress } = req.body;
+      const { rewards, fromAddress, isFeatured = false } = req.body;
 
       if (!Array.isArray(rewards) || rewards.length === 0) {
         return respond(
@@ -523,7 +524,8 @@ class RaffleController {
         splTokenSendSummary,
         solCommission: 0,
         feePayer: fromAddress,
-        transactionFee: Number(allFee.transaction_fee) || DEFAULT_COMMISSION,
+        isFeatured: isFeatured,
+        feeData: allFee,
         fromAccount: fromAddress,
         isUserToPlatform: true,
       });
@@ -595,6 +597,7 @@ class RaffleController {
         rewardTransferSignature, // for proof of reward transfer
         rewardTransferData, // for reward transfer metadata
         draftId, // for converting existing draft to live raffle
+        isFeatured,
       } = req.body;
 
       const raffleStatus = req.body.status || RAFFLE_STATUS.UPCOMING;
@@ -776,7 +779,6 @@ class RaffleController {
             } else if (typeof reward.rewardType === "string") {
               const upperRewardType = reward.rewardType.toUpperCase();
               mappedType = RAFFLE_REWARD_TYPES[upperRewardType];
-              console.log("reward", reward, mappedType);
 
               if (mappedType === undefined) {
                 logger.warn(
@@ -785,7 +787,6 @@ class RaffleController {
                 mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
               }
             } else {
-              console.log("efautl is spl here lol");
               mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
             }
 
@@ -1130,7 +1131,8 @@ class RaffleController {
       // Create raffle details
       await RaffleDetail.create({
         raffleId: raffle.id,
-        isFeatured: false,
+        isFeatured: isFeatured,
+        featuredUntil: isFeatured === true ? endDate : null,
         requiresNftVerification: requiresNftVerification || false,
         verifiedCollectionRequired: verifiedCollectionRequired || null,
         additionalJson: additionalJson || null,
@@ -2375,6 +2377,7 @@ class RaffleController {
   static async deleteRaffle(req, res) {
     try {
       const userId = req.payload?.id;
+      const userPubkey = req.payload?.pubkey;
       const { id } = req.params;
 
       const raffle = await Raffle.findOne({
@@ -2402,23 +2405,264 @@ class RaffleController {
         );
       }
 
-      await RaffleReward.destroy({
-        where: { raffleId: id },
+      const txResult = await getRaffleRefundTransaction(raffle, userPubkey);
+
+      if (!txResult.success) {
+        return respond(
+          res,
+          httpStatus.NOT_ACCEPTABLE,
+          txResult.message || "Error creating refund transaction"
+        );
+      }
+
+      // await RaffleReward.destroy({
+      //   where: { raffleId: id },
+      // });
+
+      // await RaffleDetail.destroy({
+      //   where: { raffleId: id },
+      // });
+
+      // await SplTokenSendTransaction.destroy({
+      //   where: { raffleId: id },
+      // });
+
+      // await raffle.destroy();
+
+      return respond(res, httpStatus.OK, "Raffle deleted successfully", {
+        ...txResult.data,
       });
-
-      await RaffleDetail.destroy({
-        where: { raffleId: id },
-      });
-
-      await SplTokenSendTransaction.destroy({
-        where: { raffleId: id },
-      });
-
-      await raffle.destroy();
-
-      return respond(res, httpStatus.OK, "Raffle deleted successfully");
     } catch (err) {
       logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async confirmRaffleDelete(req, res) {
+    let dbTransaction;
+    const userPubkey = req.payload?.pubkey;
+    const userId = req.payload?.id;
+    try {
+      const { signedBase64Tx, checksum, transactionDetails, raffleId } =
+        req.body;
+
+      if (!signedBase64Tx || !checksum || !transactionDetails || !raffleId) {
+        logger.error("Insufficient data to confirm raffle delete");
+        return respond(
+          res,
+          httpStatus.NOT_ACCEPTABLE,
+          "Missing required parameters"
+        );
+      }
+
+      const raffle = await Raffle.findOne({
+        where: { id: raffleId, userId },
+        status: {
+          [Op.ne]: RAFFLE_STATUS.REFUNDED,
+        },
+      });
+
+      if (!raffle) {
+        logger.error("Could  not find raffle");
+        return respond(res, httpStatus.FORBIDDEN, "Unauthorized");
+      }
+
+      //
+      // Deserialize and validate the user-signed transaction
+      let userSignedTx;
+      let isVersioned = false;
+
+      try {
+        const txBytes = Buffer.from(signedBase64Tx, "base64");
+
+        // Try legacy transaction first
+        try {
+          userSignedTx = Transaction.from(txBytes);
+          isVersioned = false;
+        } catch (legacyError) {
+          // Try versioned transaction
+          userSignedTx = VersionedTransaction.deserialize(txBytes);
+          isVersioned = true;
+        }
+      } catch (deserializeError) {
+        logger.error("Failed to deserialize transaction:", deserializeError);
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Invalid transaction format"
+        );
+      }
+
+      // Convert to UMI transaction for checksum validation
+      const umi = createUmi(connection);
+      let umiTx;
+
+      if (isVersioned) {
+        // For versioned transactions (like pNFTs), reconstruct UMI transaction from the message
+        const versionedMessage = userSignedTx.message;
+
+        // Extract instructions from the versioned message
+        const instructions = [];
+        for (let i = 0; i < versionedMessage.compiledInstructions.length; i++) {
+          const compiledIx = versionedMessage.compiledInstructions[i];
+          instructions.push({
+            programIndex: compiledIx.programIdIndex,
+            accountIndexes: compiledIx.accountKeyIndexes,
+            data: compiledIx.data,
+          });
+        }
+
+        // Create UMI transaction for checksum validation
+        umiTx = {
+          message: {
+            accounts: versionedMessage.staticAccountKeys.map((key) =>
+              publicKey(key.toBase58())
+            ),
+            instructions: instructions,
+            recentBlockhash: versionedMessage.recentBlockhash,
+          },
+        };
+
+        logger.info(
+          "Reconstructed UMI transaction from versioned transaction for checksum validation"
+        );
+      } else {
+        // Convert legacy transaction to UMI format
+        const compiledMessage = userSignedTx.compileMessage();
+        umiTx = umi.transactions.create({
+          version: "legacy",
+          blockhash: compiledMessage.recentBlockhash,
+          instructions: userSignedTx.instructions,
+          payer: publicKey(userSignedTx.feePayer.toBase58()),
+        });
+      }
+
+      // Validate checksum to ensure transaction wasn't tampered with
+      const isValidChecksum = validateChecksum(umiTx.message, checksum);
+
+      if (!isValidChecksum) {
+        logger.error(
+          `Checksum validation failed for raffle refund  ${raffleId} by user ${userPubkey}`
+        );
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Transaction checksum validation failed. Transaction may have been tampered with."
+        );
+      }
+
+      logger.info(
+        `Checksum validated successfully for creator refund raffle ${raffleId}. Adding platform signature...`
+      );
+
+      let platformSignedTx;
+      if (isVersioned) {
+        // For VersionedTransaction (pNFT), we need to add platform signature
+        logger.info("Adding platform signature to pNFT transaction...");
+
+        const platformSigner = Keypair.fromSecretKey(
+          new Uint8Array(walletKeypair)
+        );
+
+        // Sign the versioned transaction with platform wallet
+        userSignedTx.sign([platformSigner]);
+        platformSignedTx = userSignedTx;
+
+        logger.info("Platform signature added to pNFT transaction");
+      } else {
+        // For legacy transactions, add platform signature
+        platformSignedTx = Wallet.partialSign(userSignedTx);
+        logger.info("Platform signature added to legacy transaction");
+      }
+
+      let fullySignedTxBytes;
+      if (isVersioned) {
+        fullySignedTxBytes = platformSignedTx.serialize();
+      } else {
+        fullySignedTxBytes = platformSignedTx.serialize({
+          requireAllSignatures: true,
+          verifySignatures: true,
+        });
+      }
+
+      logger.info(
+        `Platform signature added. Submitting fully-signed transaction for creator raffle refund ${raffleId}.`
+      );
+
+      try {
+        const signedTransactionBase64 =
+          Buffer.from(fullySignedTxBytes).toString("base64");
+        const submissionResult = await submitTransactionToBlockchain(
+          signedTransactionBase64
+        );
+
+        if (!submissionResult.success) {
+          throw new Error(
+            `Transaction submission failed: ${submissionResult.error}`
+          );
+        }
+
+        const signature = submissionResult.signature;
+
+        //store in db
+        dbTransaction = await sequelize.transaction();
+
+        //create spl token transaction rows
+        let lastCreatedRow;
+        for (const txDetails of transactionDetails) {
+          const splTokenSendTransactionData = {
+            status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+            senderPubkey: BET_RECEIVER_WALLET,
+            receiverPubkey: userPubkey,
+            txId: signature,
+            raffleId,
+            rewardTransferType: "raffle_refund",
+            commissionRate: 0, // No commission for reward refund
+            creatorAmount: 0,
+            commissionAmount: 0,
+            type: txDetails.type,
+            tokenAddress: txDetails.tokenAddress,
+            decimals: txDetails.decimal,
+            uiAmount: txDetails.uiAmount,
+            rewardName: `Creator Refund for ${txDetails.raffleTitle}`,
+          };
+
+          lastCreatedRow = await SplTokenSendTransaction.create(
+            splTokenSendTransactionData,
+            {
+              transaction: dbTransaction,
+            }
+          );
+        }
+        await raffle.update(
+          {
+            status: RAFFLE_STATUS.REFUNDED,
+            creatorClaimTxId: lastCreatedRow.id,
+          },
+          {
+            transaction: dbTransaction,
+          }
+        );
+        await dbTransaction.commit();
+      } catch (submissionError) {
+        logger.error("Error submitting claim transaction:", submissionError);
+        if (dbTransaction && !dbTransaction.finished) {
+          await dbTransaction.rollback();
+        }
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `Failed to submit claim transaction: ${submissionError.message}`
+        );
+      }
+
+      return respond(res, httpStatus.OK, "Refunded");
+    } catch (err) {
+      logger.error("Error in confirmRaffleDelete", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,

@@ -187,8 +187,6 @@ class AdminController {
         ],
       });
 
-      console.log("raffle data: ", raffle);
-
       if (!raffle) {
         return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
       }

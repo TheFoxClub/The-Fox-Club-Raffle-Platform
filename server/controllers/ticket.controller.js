@@ -247,9 +247,9 @@ class TicketController {
         Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
       transaction.add(
         SystemProgram.transfer({
-          fromPubkey: new PublicKey(feePayer),
+          fromPubkey: new PublicKey(senderPubkey),
           toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-          lamports: BigInt(transactionFee * value),
+          lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
         })
       );
 

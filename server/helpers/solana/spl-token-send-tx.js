@@ -21,7 +21,10 @@ const { getTokenDetail } = require("./token-program");
 const connection = getConnectionDas();
 const { Wallet } = require("./wallet.js");
 const { addCommissionToTransaction } = require("../../services/commissions.js");
-const { SOLANA_TOKEN_ADDRESS } = require("../../config/constants.js");
+const {
+  SOLANA_TOKEN_ADDRESS,
+  DEFAULT_COMMISSION,
+} = require("../../config/constants.js");
 const { addNftSendTransaction } = require("./send-nft.js");
 const { RAFFLE_REWARD_TYPES, TOKEN_TYPE } = require("../../config/data.js");
 const {
@@ -44,7 +47,8 @@ const umi = getUmi();
  * @param {Array} params.splTokenSendSummary - Array of token transfer details
  * @param {number} params.solCommission - SOL commission amount
  * @param {string} params.feePayer - Wallet address paying for the transaction fees
- * @param {number} params.transactionFee - Transaction Fee
+ * @param {boolean} params.isFeatured - Add extra fee if featured is enabled
+ * @param {number} params.feeData - Fee data
  * @param {string} params.fromAccount - Source wallet address (can be user or platform)
  * @param {boolean} params.isUserToPlatform - Direction flag: true = user→platform, false = platform→user
  */
@@ -52,7 +56,8 @@ const sendMultipleSplTokenTx = async ({
   splTokenSendSummary,
   solCommission,
   feePayer,
-  transactionFee,
+  feeData,
+  isFeatured,
   fromAccount,
   isUserToPlatform = true,
 }) => {
@@ -74,11 +79,24 @@ const sendMultipleSplTokenTx = async ({
 
     //transaction fee
     if (isUserToPlatform) {
+      const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: new PublicKey(feePayer),
           toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-          lamports: BigInt(transactionFee * value),
+          lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+        })
+      );
+    }
+
+    //featured transaction fee
+    if (isFeatured === true) {
+      const featuredFee = feeData.featured_raffle_fee || DEFAULT_COMMISSION;
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(feePayer),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: BigInt(featuredFee * LAMPORTS_PER_SOL),
         })
       );
     }
@@ -408,7 +426,7 @@ const createClaimTransaction = async ({
       SystemProgram.transfer({
         fromPubkey: new PublicKey(feePayer),
         toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-        lamports: BigInt(transactionFee * value),
+        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
       })
     );
 
@@ -423,8 +441,6 @@ const createClaimTransaction = async ({
     // Ensure type is a number for comparison
     const rewardType =
       typeof type === "string" ? RAFFLE_REWARD_TYPES[type] : type;
-
-    console.log("rewardtype: ", rewardType, type);
 
     switch (rewardType) {
       case RAFFLE_REWARD_TYPES.SOLANA:
@@ -668,7 +684,7 @@ const createPayoutTransaction = async ({
       SystemProgram.transfer({
         fromPubkey: new PublicKey(feePayer),
         toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-        lamports: BigInt(transactionFee * value),
+        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
       })
     );
 

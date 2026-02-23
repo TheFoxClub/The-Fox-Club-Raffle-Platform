@@ -139,7 +139,7 @@ const CreateRaffle = () => {
           }));
 
           const uniqueTokens = Array.from(
-            new Map(tokens.map((t) => [t.value, t])).values(),
+            new Map(tokens.map((t) => [t.value, t])).values()
           );
 
           setTokenOptions(uniqueTokens);
@@ -241,7 +241,6 @@ const CreateRaffle = () => {
                 const metaRes = await fetch(nftItem.uri);
                 if (metaRes.ok) {
                   const meta = await metaRes.json();
-                  console.log("meta.image: ", meta.image);
                   if (meta.image) image = meta.image;
                   if (meta.name) name = meta.name;
                 }
@@ -260,7 +259,7 @@ const CreateRaffle = () => {
               image: nftItem.image,
               raw: nftItem,
             };
-          }),
+          })
         );
 
         setNftCandidates(mapped);
@@ -322,7 +321,7 @@ const CreateRaffle = () => {
                 else if (contentType.includes("application/json")) {
                   const meta = await res.json();
                   image = normalizeIpfs(
-                    meta?.image || meta?.logoURI || meta?.image_url,
+                    meta?.image || meta?.logoURI || meta?.image_url
                   );
 
                   if (!t.metadata?.name && meta?.name) {
@@ -341,11 +340,10 @@ const CreateRaffle = () => {
               amount,
               programId,
             };
-          }),
+          })
         );
 
         setTokenCandidates(mapped);
-        console.log("Token candidates:", mapped);
       } catch (err) {
         console.error("Failed to fetch tokens", err);
         setTokenCandidates([]);
@@ -407,7 +405,7 @@ const CreateRaffle = () => {
               amount,
               programId,
             };
-          }),
+          })
         );
 
         setTokenCandidates(mapped);
@@ -529,8 +527,9 @@ const CreateRaffle = () => {
 
       if (t.amountToUse > walletBalance)
         if (t.amountToUse > walletBalance) {
-          newErrors[`token-${t.mint}`] =
-            `Cannot exceed available amount (${walletBalance})`;
+          newErrors[
+            `token-${t.mint}`
+          ] = `Cannot exceed available amount (${walletBalance})`;
         }
     });
 
@@ -658,7 +657,7 @@ const CreateRaffle = () => {
   const withTimeout = <T,>(
     promise: Promise<T>,
     ms: number,
-    message = "Wallet approval timed out",
+    message = "Wallet approval timed out"
   ): Promise<T> => {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -799,14 +798,15 @@ const CreateRaffle = () => {
           const transferRes = await server.post(
             "/raffle/prepare-reward-transfer",
             {
+              isFeatured: isFeatured,
               rewards: payload.rewards,
               fromAddress: publicKey.toString(),
-            },
+            }
           );
 
           if (!transferRes.data.success) {
             throw new Error(
-              transferRes.data.message || "Failed to prepare reward transfer",
+              transferRes.data.message || "Failed to prepare reward transfer"
             );
           }
 
@@ -825,7 +825,7 @@ const CreateRaffle = () => {
             try {
               // Try legacy transaction first (for standard NFTs)
               const txBytes = Uint8Array.from(atob(transaction), (c) =>
-                c.charCodeAt(0),
+                c.charCodeAt(0)
               );
               tx = Transaction.from(txBytes);
               isVersioned = false;
@@ -833,7 +833,7 @@ const CreateRaffle = () => {
               try {
                 // Fallback to versioned transaction (for pNFTs and MPL Core NFTs)
                 const txBytes = Uint8Array.from(atob(transaction), (c) =>
-                  c.charCodeAt(0),
+                  c.charCodeAt(0)
                 );
                 tx = VersionedTransaction.deserialize(txBytes);
                 isVersioned = true;
@@ -841,7 +841,7 @@ const CreateRaffle = () => {
                 console.error(
                   "Failed to deserialize transaction:",
                   error,
-                  versionedError,
+                  versionedError
                 );
                 throw new Error("Failed to deserialize transaction");
               }
@@ -849,14 +849,15 @@ const CreateRaffle = () => {
 
             const connection = new Connection(
               import.meta.env.VITE_SOLANA_RPC_HOST ||
-                "https://api.devnet.solana.com",
+                "https://api.devnet.solana.com"
             );
 
             let signature;
             let latestBlockhash;
             try {
-              latestBlockhash =
-                await connection.getLatestBlockhash("confirmed");
+              latestBlockhash = await connection.getLatestBlockhash(
+                "confirmed"
+              );
 
               if (isVersioned) {
                 tx.message.recentBlockhash = latestBlockhash.blockhash;
@@ -867,7 +868,7 @@ const CreateRaffle = () => {
               const signedTx = await withTimeout(
                 signTransaction(tx),
                 120_000,
-                "Wallet approval timed out. Please try again.",
+                "Wallet approval timed out. Please try again."
               );
 
               const txBytes = Buffer.from(signedTx.serialize());
@@ -885,14 +886,14 @@ const CreateRaffle = () => {
                   blockhash: latestBlockhash.blockhash,
                   lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
                 },
-                "confirmed",
+                "confirmed"
               );
 
               if (confirmation.value.err) {
                 throw new Error(
                   `Transaction failed: ${JSON.stringify(
-                    confirmation.value.err,
-                  )}`,
+                    confirmation.value.err
+                  )}`
                 );
               }
             } catch (submitError: any) {
@@ -934,27 +935,27 @@ const CreateRaffle = () => {
               toast.error("Reward transfer was rejected by wallet");
             } else if (
               signError.message?.includes(
-                "Programmable NFTs (pNFTs) are not currently supported",
+                "Programmable NFTs (pNFTs) are not currently supported"
               )
             ) {
               toast.error(
-                "Programmable NFTs (pNFTs) are not supported yet. Please use Legacy NFTs instead.",
+                "Programmable NFTs (pNFTs) are not supported yet. Please use Legacy NFTs instead."
               );
             } else if (
               signError.message?.includes(
-                "MPL Core NFTs are not currently supported",
+                "MPL Core NFTs are not currently supported"
               )
             ) {
               toast.error(
-                "MPL Core NFTs are not supported yet. Please use Legacy NFTs instead.",
+                "MPL Core NFTs are not supported yet. Please use Legacy NFTs instead."
               );
             } else if (
               signError.message?.includes(
-                "Mixed reward types (NFT + SPL tokens) are not currently supported",
+                "Mixed reward types (NFT + SPL tokens) are not currently supported"
               )
             ) {
               toast.error(
-                "Mixed rewards (NFT + SPL tokens) are not supported yet. Please use either NFTs only or SPL tokens only.",
+                "Mixed rewards (NFT + SPL tokens) are not supported yet. Please use either NFTs only or SPL tokens only."
               );
             } else {
               toast.error(`Reward transfer failed: ${signError.message}`);
@@ -979,26 +980,6 @@ const CreateRaffle = () => {
         // toast.success("Raffle created successfully!");
         // const createdId = res.data.data.raffle.id;
         const createdRaffle = res.data.data.raffle;
-
-        //  Feature it if selected
-        if (isFeatured) {
-          try {
-            await server.put(`/admin/featured/${createdRaffle.id}`, {
-              isFeatured: true,
-              featuredPosition: null,
-              featuredUntil: createdRaffle.endDate || null,
-            });
-          } catch (featureError) {
-            console.error("Feature update failed:", featureError);
-            toast.error("Raffle created but featuring failed");
-          }
-        }
-
-        toast.success(
-          isFeatured
-            ? "Raffle created and featured successfully!"
-            : "Raffle created successfully!",
-        );
 
         const createdId = createdRaffle.id;
 
@@ -1038,7 +1019,7 @@ const CreateRaffle = () => {
       setTicketPrice(
         draft.ticketPrice !== undefined && draft.ticketPrice !== null
           ? Number(formatPrice(draft.ticketPrice))
-          : "",
+          : ""
       );
       setTotalTickets(draft.totalTickets ?? "");
       setNumberOfWinners(draft.numberOfWinners ?? 1);
@@ -1320,7 +1301,7 @@ const CreateRaffle = () => {
                       <div className="grid grid-cols-2 gap-4">
                         {nftCandidates.map((nft) => {
                           const isSelected = selectedNFTs.some(
-                            (item) => item.id === nft.id,
+                            (item) => item.id === nft.id
                           );
 
                           return (
@@ -1483,7 +1464,7 @@ const CreateRaffle = () => {
                       <div className="grid grid-cols-2 gap-4">
                         {tokenCandidates.map((token) => {
                           const isSelected = selectedTokens.some(
-                            (t) => t.mint === token.mint,
+                            (t) => t.mint === token.mint
                           );
 
                           return (
@@ -1583,8 +1564,8 @@ const CreateRaffle = () => {
                                     prev.map((token) =>
                                       token.mint === t.mint
                                         ? { ...token, amountToUse: value }
-                                        : token,
-                                    ),
+                                        : token
+                                    )
                                   );
                                   // Clear error if any
                                   setErrors((prev) => ({
@@ -1655,7 +1636,7 @@ const CreateRaffle = () => {
                 value={selectedTokenAddress}
                 onValueChange={(tokenAddress) => {
                   const selectedToken = tokenOptions.find(
-                    (t) => t.value === tokenAddress,
+                    (t) => t.value === tokenAddress
                   );
                   setSelectedTokenType(selectedToken);
                   setSelectedTokenAddress(tokenAddress);

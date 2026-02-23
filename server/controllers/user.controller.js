@@ -215,14 +215,14 @@ class UserController {
         created
           ? "User info created successfully!"
           : "User info updated successfully!",
-        { data: updatedUserInfo },
+        { data: updatedUserInfo }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -239,14 +239,14 @@ class UserController {
         res,
         httpStatus.OK,
         "User XP retrieved successfully",
-        xpSummary,
+        xpSummary
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -254,24 +254,20 @@ class UserController {
   static async getUserXpHistory(req, res) {
     try {
       const userId = req.payload.id;
-      const {
-        page = 1,
-        limit = 20,
-        configKey,
-        startDate,
-        endDate,
-      } = req.query;
+      const { page = 1, limit = 20, configKey, startDate, endDate } = req.query;
       const offset = (page - 1) * limit;
       const { XpTable, XpConfig, Raffle } = require("../models");
       const { Op } = require("sequelize");
 
       let whereClause = { userId };
-      let includeClause = [{
-        model: XpConfig,
-        as: 'config',
-        attributes: ['configKey', 'description'],
-        required: false
-      }];
+      let includeClause = [
+        {
+          model: XpConfig,
+          as: "config",
+          attributes: ["configKey", "description"],
+          required: false,
+        },
+      ];
 
       if (configKey) {
         includeClause[0].where = { configKey };
@@ -323,7 +319,7 @@ class UserController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -389,14 +385,14 @@ class UserController {
               ? Math.round(((totalUsers - rank + 1) / totalUsers) * 100)
               : 0,
           nearbyUsers,
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }
@@ -443,14 +439,14 @@ class UserController {
             limit: parseInt(limit),
             totalPages: Math.ceil(count / limit),
           },
-        },
+        }
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }

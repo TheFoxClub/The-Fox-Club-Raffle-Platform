@@ -34,6 +34,8 @@ import { UserXPCard } from "../../components/profile/UserXPCard";
 import { TokenDisplay } from "../../components/ui/TokenDisplay";
 import { formatRewardType } from "../../utils/rewardTypeUtils";
 import { setNotificationsCount } from "../../redux/userSlice";
+import { Transaction } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 type HostedRaffle = {
   id: number;
@@ -109,29 +111,30 @@ type Win = {
 };
 
 const Profile = () => {
+  const { publicKey, signTransaction } = useWallet();
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, pubkey, user_info } = useSelector(
-    (state: RootState) => state.user,
+    (state: RootState) => state.user
   );
 
   const [ticketsBought, setTicketsBought] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
   const [rafflesWon, setRafflesWon] = useState(0);
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
-    [],
+    []
   );
 
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
   //const reversedPurchasedTickets = [...purchasedTickets].reverse();
 
   const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>(
-    [],
+    []
   );
   const [wins, setWins] = useState<Win[]>([]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [raffleToDelete, setRaffleToDelete] = useState<HostedRaffle | null>(
-    null,
+    null
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -139,7 +142,7 @@ const Profile = () => {
   const unclaimedWinsCount = wins.filter((win) => !win.isClaimed).length;
   const hostedRafflesWithUnclaimedPayouts = hostedRafflesData.filter(
     (raffle) =>
-      raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0,
+      raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0
   ).length;
 
   const formatEndDate = (dateString: string) => {
@@ -184,7 +187,7 @@ const Profile = () => {
             user_info: userData.user_info,
             isAuthenticated: true,
             isLoading: false,
-          }),
+          })
         );
 
         if (userData.id) {
@@ -217,12 +220,12 @@ const Profile = () => {
               t.Raffle?.status === 2
                 ? "active"
                 : t.Raffle?.status === 3
-                  ? "Ended"
-                  : "upcoming",
+                ? "Ended"
+                : "upcoming",
             endDate: t.endsAt ? t.endsAt.split("T")[0] : "N/A",
             totalTickets: t.progress?.total ?? 0,
             ticketsSold: t.progress?.sold ?? 0,
-          })),
+          }))
         );
       } catch (error) {
         dispatch(setLoading(false));
@@ -258,8 +261,7 @@ const Profile = () => {
                 claimedAmount: data.claimedAmount,
                 unclaimedAmount: Math.max(
                   0,
-                  (raffle.payoutInfo?.claimableAmount || 0) -
-                    data.claimedAmount,
+                  (raffle.payoutInfo?.claimableAmount || 0) - data.claimedAmount
                 ),
                 hasClaimed: true,
                 claimStatus: data.status,
@@ -268,7 +270,7 @@ const Profile = () => {
             };
           }
           return raffle;
-        }),
+        })
       );
     };
 
@@ -300,7 +302,7 @@ const Profile = () => {
           ...win,
           isClaimed: rewards.some(
             (reward: ClaimableReward) =>
-              reward.id === win.rewardId && reward.isClaimed,
+              reward.id === win.rewardId && reward.isClaimed
           ),
         }));
         setWins(updatedWins);
@@ -330,8 +332,8 @@ const Profile = () => {
       prev.map((reward) =>
         reward.id === rewardId
           ? { ...reward, isClaimed: true, claimedAt: new Date().toISOString() }
-          : reward,
-      ),
+          : reward
+      )
     );
 
     // Update wins
@@ -339,8 +341,8 @@ const Profile = () => {
       prev.map((win) =>
         win.rewardId === rewardId
           ? { ...win, isClaimed: true, claimedAt: new Date().toISOString() }
-          : win,
-      ),
+          : win
+      )
     );
 
     // Update raffles won count
@@ -352,7 +354,7 @@ const Profile = () => {
         },
         isAuthenticated: true,
         isLoading: false,
-      }),
+      })
     );
   };
 
@@ -371,19 +373,47 @@ const Profile = () => {
                 message: "Payout completed successfully",
               },
             }
-          : raffle,
-      ),
+          : raffle
+      )
     );
   };
 
   const handleDeleteRaffle = async (raffleId: number) => {
+    if (!publicKey || !signTransaction) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
     try {
       const res = await server.delete(`/raffle/${raffleId}`);
       if (res.data.success) {
-        toast.success("Raffle deleted successfully!");
-        setHostedRafflesData((prev) =>
-          prev.filter((raffle) => raffle.id !== raffleId),
+        const txData = res.data.data;
+        const transactionBuffer = Buffer.from(txData.serializedTx, "base64");
+        const deserializedTransaction = Transaction.from(transactionBuffer);
+        const signedTransaction = await signTransaction(
+          deserializedTransaction
         );
+
+        const confirmDeleteRes = await server.post(`/raffle/delete/confirm`, {
+          signedBase64Tx: Buffer.from(
+            signedTransaction.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            })
+          ).toString("base64"),
+          checksum: txData.checksum,
+          transactionDetails: txData.transactionDetails,
+          raffleId,
+        });
+        if (confirmDeleteRes.data.success) {
+          toast.success("Creator asset refunded successfully");
+          setHostedRafflesData((prev) =>
+            prev.filter((raffle) => raffle.id !== raffleId)
+          );
+        } else {
+          toast.error(
+            confirmDeleteRes.data.message || "Failed to confirm raffle delete"
+          );
+        }
       } else {
         toast.error(res.data.message || "Failed to delete raffle");
       }
@@ -392,7 +422,7 @@ const Profile = () => {
       toast.error(
         error.response?.data?.message ||
           error.message ||
-          "Failed to delete raffle",
+          "Failed to delete raffle"
       );
     }
   };
@@ -499,7 +529,7 @@ const Profile = () => {
                 className="cursor-pointer"
                 onClick={() => {
                   const element = document.querySelector(
-                    '[data-tab="won"]',
+                    '[data-tab="won"]'
                   ) as HTMLElement;
                   element?.click();
                 }}
@@ -514,7 +544,7 @@ const Profile = () => {
         {hostedRafflesData.some(
           (raffle) =>
             raffle.payoutInfo?.canClaim &&
-            raffle.payoutInfo?.unclaimedAmount > 0,
+            raffle.payoutInfo?.unclaimedAmount > 0
         ) && (
           <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 p-4">
             <div className="flex items-center justify-between">
@@ -534,7 +564,7 @@ const Profile = () => {
                 className="cursor-pointer border-green-500/30 hover:bg-green-500/10"
                 onClick={() => {
                   const element = document.querySelector(
-                    '[data-tab="hosted"]',
+                    '[data-tab="hosted"]'
                   ) as HTMLElement;
                   element?.click();
                 }}
@@ -563,14 +593,14 @@ const Profile = () => {
               {hostedRafflesData.some(
                 (raffle) =>
                   raffle.payoutInfo?.canClaim &&
-                  raffle.payoutInfo?.unclaimedAmount > 0,
+                  raffle.payoutInfo?.unclaimedAmount > 0
               ) && (
                 <span className="ml-2 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {
                     hostedRafflesData.filter(
                       (raffle) =>
                         raffle.payoutInfo?.canClaim &&
-                        raffle.payoutInfo?.unclaimedAmount > 0,
+                        raffle.payoutInfo?.unclaimedAmount > 0
                     ).length
                   }
                 </span>
@@ -769,7 +799,7 @@ const Profile = () => {
                             <p className="text-sm font-semibold">
                               <TokenDisplay
                                 amount={raffle.payoutInfo.totalRevenue.toFixed(
-                                  4,
+                                  4
                                 )}
                                 tokenType={raffle.tokenType}
                                 tokenAddress={raffle.tokenAddress}
@@ -784,7 +814,7 @@ const Profile = () => {
                             <p className="text-sm font-semibold text-orange-400">
                               <TokenDisplay
                                 amount={raffle.payoutInfo.totalCommission.toFixed(
-                                  4,
+                                  4
                                 )}
                                 tokenType={raffle.tokenType}
                                 tokenAddress={raffle.tokenAddress}
@@ -804,7 +834,7 @@ const Profile = () => {
                               )} */}
                               <TokenDisplay
                                 amount={raffle.payoutInfo.claimableAmount.toFixed(
-                                  4,
+                                  4
                                 )}
                                 tokenType={raffle.tokenType}
                                 tokenAddress={raffle.tokenAddress}
@@ -828,7 +858,7 @@ const Profile = () => {
                               {raffle.payoutInfo.unclaimedAmount > 0 ? (
                                 <TokenDisplay
                                   amount={raffle.payoutInfo.unclaimedAmount.toFixed(
-                                    4,
+                                    4
                                   )}
                                   tokenType={raffle.tokenType}
                                   tokenAddress={raffle.tokenAddress}
@@ -851,7 +881,7 @@ const Profile = () => {
                                     Ready to claim{" "}
                                     <TokenDisplay
                                       amount={raffle.payoutInfo.unclaimedAmount.toFixed(
-                                        4,
+                                        4
                                       )}
                                       tokenType={raffle.tokenType}
                                       tokenAddress={raffle.tokenAddress}
@@ -895,8 +925,8 @@ const Profile = () => {
                               raffle.payoutInfo.claimStatus === "confirmed"
                                 ? "text-green-600 bg-green-500/10 border border-green-500/20"
                                 : raffle.payoutInfo.claimStatus === "failed"
-                                  ? "text-red-600 bg-red-500/10 border border-red-500/20"
-                                  : "text-blue-600 bg-blue-500/10 border border-blue-500/20"
+                                ? "text-red-600 bg-red-500/10 border border-red-500/20"
+                                : "text-blue-600 bg-blue-500/10 border border-blue-500/20"
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -915,7 +945,7 @@ const Profile = () => {
                                       Payout completed:{" "}
                                       <TokenDisplay
                                         amount={raffle.payoutInfo.claimableAmount.toFixed(
-                                          4,
+                                          4
                                         )}
                                         tokenType={raffle.tokenType}
                                         tokenAddress={raffle.tokenAddress}
@@ -942,7 +972,7 @@ const Profile = () => {
                                 onClick={() =>
                                   window.open(
                                     `https://solscan.io/tx/${raffle.payoutInfo?.claimSignature}`,
-                                    "_blank",
+                                    "_blank"
                                   )
                                 }
                                 className="flex items-center gap-1 text-xs text-white bg-primary"
@@ -1089,7 +1119,7 @@ const Profile = () => {
                                 onClick={() =>
                                   window.open(
                                     `https://solscan.io/tx/${win.claimSignature}`,
-                                    "_blank",
+                                    "_blank"
                                   )
                                 }
                                 className="flex items-center gap-1 text-xs text-white bg-primary"
