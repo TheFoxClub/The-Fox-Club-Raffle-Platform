@@ -8,13 +8,25 @@ const router = express.Router();
 router.post("/create", auth.bearer, RaffleController.createRaffle);
 
 // Prepare reward transfer transaction (without(before) creating raffle)
-router.post("/prepare-reward-transfer", auth.bearer, RaffleController.prepareRewardTransfer);
+router.post(
+  "/prepare-reward-transfer",
+  auth.bearer,
+  RaffleController.prepareRewardTransfer
+);
 
 // Complete raffle creation after reward transfer
-router.post("/complete-creation", auth.bearer, RaffleController.completeRaffleCreation);
+router.post(
+  "/complete-creation",
+  auth.bearer,
+  RaffleController.completeRaffleCreation
+);
 
 // Store reward transfer signature
-router.post("/store-reward-signature", auth.bearer, RaffleController.storeRewardSignature);
+router.post(
+  "/store-reward-signature",
+  auth.bearer,
+  RaffleController.storeRewardSignature
+);
 
 // Claim reward
 router.post("/claim-reward", auth.bearer, RaffleController.claimReward);
@@ -61,10 +73,20 @@ router.get("/filter", RaffleController.filterRaffles);
 router.get("/user/hosted", auth.bearer, RaffleController.getUserHostedRaffles);
 
 // Claim raffle creator payout
-router.post("/payout/claim", payoutRateLimiter, auth.bearer, RaffleController.claimCreatorPayout);
+router.post(
+  "/payout/claim",
+  payoutRateLimiter,
+  auth.bearer,
+  RaffleController.claimCreatorPayout
+);
 
 // Submit payout transaction signature
-router.post("/payout/submit", payoutRateLimiter, auth.bearer, RaffleController.submitPayoutTransaction);
+router.post(
+  "/payout/submit",
+  payoutRateLimiter,
+  auth.bearer,
+  RaffleController.submitPayoutTransaction
+);
 
 // Get user's wins across all raffles
 router.get("/user/wins", auth.bearer, RaffleController.getUserWins);
@@ -80,6 +102,11 @@ router.put("/:id", auth.bearer, RaffleController.updateRaffle);
 
 // Delete Raffle : only by owner, only if no tickets sold
 router.delete("/:id", auth.bearer, RaffleController.deleteRaffle);
+router.post(
+  "/delete/confirm",
+  auth.bearer,
+  RaffleController.confirmRaffleDelete
+);
 
 // End a Raffle : only by owner
 router.post("/:id/end", auth.bearer, RaffleController.endRaffle);
@@ -89,7 +116,5 @@ router.post("/:id/select-winners", auth.bearer, RaffleController.selectWinners);
 
 // Get winners for a raffle
 router.get("/:id/winners", RaffleController.getRaffleWinners);
-
-
 
 module.exports = router;

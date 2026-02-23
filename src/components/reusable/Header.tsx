@@ -19,16 +19,17 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import SolanaSignIn from "../../helpers/solana-helpers/SolanaSignIn";
 import { handleLogout } from "../../config/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "react-toastify";
+import server from "../../config/server";
 
 export const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { publicKey, connected } = useWallet();
   const user = useSelector((state: RootState) => state.user);
-  const notificationsCount = user.notificationsCount || 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const hasNotifications = notificationsCount > 0;
+  const [notificationsCount, setNotificationsCount] = useState(0);
 
   // console.log("Header user:", user);
 
@@ -42,6 +43,41 @@ export const Header = () => {
     navigate("/");
     setMobileMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (!user.isAuthenticated) {
+      return;
+    }
+
+    const getUserWinsAndPayouts = async () => {
+      try {
+        const winsRes = await server.get("/raffle/user/wins");
+        const hostedRes = await server.get("/raffle/user/hosted");
+        if (winsRes.data.success && hostedRes.data.success) {
+          const winsData = winsRes.data.data.wins || [];
+          const hostedData = hostedRes.data.data.raffles || [];
+          const unclaimedWinsCount = winsData.filter(
+            (win) => !win.isClaimed
+          ).length;
+          const hostedRafflesWithUnclaimedPayouts = hostedData.filter(
+            (raffle) =>
+              raffle.payoutInfo?.canClaim &&
+              raffle.payoutInfo?.unclaimedAmount > 0
+          ).length;
+          setNotificationsCount(
+            unclaimedWinsCount + hostedRafflesWithUnclaimedPayouts
+          );
+        } else {
+          setNotificationsCount(0);
+        }
+      } catch (error) {
+        setNotificationsCount(0);
+        console.log("Error fetching user data");
+        toast.error("Error fetching user data");
+      }
+    };
+    getUserWinsAndPayouts();
+  }, [user]);
 
   return (
     <nav className="sticky top-0 z-50 bg-background border-b border-border/50 w-full backdrop-blur-sm">
@@ -80,14 +116,16 @@ export const Header = () => {
             <Link to="/profile">
               <Button
                 variant={isActive("/profile") ? "default" : "ghost"}
-                className={`w-full gap-2 cursor-pointer justify-center relative rounded-md hover:bg-accent ${hasNotifications ? "w-31 pl-0 pr-4 justify-center" : ""}`}
+                className={`w-full gap-2 cursor-pointer justify-center relative rounded-md hover:bg-accent ${
+                  notificationsCount > 0 ? "w-31 pl-0 pr-4 justify-center" : ""
+                }`}
               >
                 {/* <User className="h-4 w-4" /> Profile */}
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4" />
                   <span>Profile</span>
                 </div>
-                {hasNotifications && (
+                {notificationsCount > 0 && (
                   <span className="absolute right-4 top-1/3 -translate-y-1/2 min-w-[18px] h-[18px] px-1 text-[10px] flex items-center justify-center bg-red-600 text-white font-bold rounded-full ">
                     {notificationsCount > 9 ? "9+" : notificationsCount}
                   </span>
