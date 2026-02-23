@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Slider } from "../../components/ui/Slider";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -14,19 +14,45 @@ import {
 } from "../../components/ui/Dialog";
 //import { useToast } from "../../hooks/use-toast";
 import { toast } from "react-toastify";
+import server from "../../config/server";
 
 export default function AdminFees() {
-  const [holderFee, setHolderFee] = useState([2.5]);
-  const [nonHolderFee, setNonHolderFee] = useState([5]);
-  const [txFee, setTxFee] = useState("0.001");
-  const [featuredFee, setFeaturedFee] = useState("0.1");
+  const [holderFee, setHolderFee] = useState([0]);
+  const [nonHolderFee, setNonHolderFee] = useState([0]);
+  const [txFee, setTxFee] = useState("");
+  const [featuredFee, setFeaturedFee] = useState("");
   const isInvalid = holderFee[0] > nonHolderFee[0];
+  const [loading, setLoading] = useState(true);
   //const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchFees = async () => {
+      try {
+        setLoading(true);
+        const res = await server.get("/admin/system-fee");
+
+        const data = res.data.data;
+
+        setHolderFee([parseFloat(data.holder_participant_fee)]);
+        setNonHolderFee([parseFloat(data.non_holder_participant_fee)]);
+        setTxFee(parseFloat(data.transaction_fee).toString());
+        setFeaturedFee(parseFloat(data.featured_raffle_fee).toString());
+      } catch (error) {
+        toast.error("Failed to load fee configuration");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFees();
+  }, []);
 
   const handleSave = () => {
     toast.success("Fee configuration saved successfully");
   };
-
+  if (loading) {
+    return <div className="p-6">Loading configuration...</div>;
+  }
   return (
     <div className="max-w-4xl space-y-6">
       {/* Header */}

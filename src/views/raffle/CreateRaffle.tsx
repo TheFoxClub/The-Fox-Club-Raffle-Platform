@@ -94,7 +94,8 @@ const CreateRaffle = () => {
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
-  const FEATURED_PRICE = 0.1;
+  const [featuredPrice, setFeaturedPrice] = useState<number>(0);
+  const [systemFeeLoading, setSystemFeeLoading] = useState(true);
 
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
@@ -192,6 +193,28 @@ const CreateRaffle = () => {
     };
 
     fetchPaymentTokens();
+  }, []);
+
+  useEffect(() => {
+    const fetchSystemFee = async () => {
+      try {
+        setSystemFeeLoading(true);
+
+        const res = await server.get("/admin/system-fee");
+
+        if (res.data?.success && res.data?.data) {
+          const fee = Number(res.data.data.featured_raffle_fee);
+          setFeaturedPrice(fee);
+        }
+      } catch (error) {
+        console.error("Failed to fetch system fee:", error);
+        toast.error("Failed to load system fee");
+      } finally {
+        setSystemFeeLoading(false);
+      }
+    };
+
+    fetchSystemFee();
   }, []);
 
   useEffect(() => {
@@ -1796,7 +1819,10 @@ const CreateRaffle = () => {
 
               <div className="flex items-center justify-between">
                 <p className="text-sm">Featured Fee</p>
-                <p className="text-lg font-bold">{FEATURED_PRICE} SOL</p>
+                <p className="text-lg font-bold">
+                  {" "}
+                  {systemFeeLoading ? "Loading..." : `${featuredPrice} SOL`}
+                </p>
               </div>
 
               {isFeatured && (
