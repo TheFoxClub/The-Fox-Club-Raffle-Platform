@@ -14,7 +14,7 @@ router.put(
   "/featured/:id",
   auth.bearer,
   isAdmin,
-  AdminController.toggleFeaturedStatus
+  AdminController.toggleFeaturedStatus,
 );
 
 // Toggle suspend status for a raffle (suspend <=> resume)
@@ -22,7 +22,7 @@ router.put(
   "/suspend/:id",
   auth.bearer,
   isAdmin,
-  AdminController.toggleSuspendStatus
+  AdminController.toggleSuspendStatus,
 );
 
 // Upload Verified Collection via CSV
@@ -31,7 +31,7 @@ router.post(
   auth.bearer,
   isAdmin,
   upload.single("file"),
-  AdminController.bulkUploadFromCSV
+  AdminController.bulkUploadFromCSV,
 );
 
 // Create new Verified Collection
@@ -39,7 +39,7 @@ router.post(
   "/verified-collection",
   auth.bearer,
   isAdmin,
-  AdminController.createVerifiedCollection
+  AdminController.createVerifiedCollection,
 );
 
 // Get all Verified Collections (with pagination)
@@ -47,7 +47,7 @@ router.get(
   "/verified-collection",
   auth.bearer,
   isAdmin,
-  AdminController.getAllVerifiedCollections
+  AdminController.getAllVerifiedCollections,
 );
 
 // Get single Verified Collection by ID
@@ -55,7 +55,7 @@ router.get(
   "/verified-collection/:id",
   auth.bearer,
   isAdmin,
-  AdminController.getVerifiedCollectionById
+  AdminController.getVerifiedCollectionById,
 );
 
 // Update Verified Collection
@@ -63,7 +63,7 @@ router.put(
   "/verified-collection/:id",
   auth.bearer,
   isAdmin,
-  AdminController.updateVerifiedCollection
+  AdminController.updateVerifiedCollection,
 );
 
 // Delete Verified Collection
@@ -71,7 +71,7 @@ router.delete(
   "/verified-collection/:id",
   auth.bearer,
   isAdmin,
-  AdminController.deleteVerifiedCollection
+  AdminController.deleteVerifiedCollection,
 );
 
 // Bulk delete Verified Collections
@@ -79,7 +79,7 @@ router.delete(
   "/verified-collection/bulk/delete",
   auth.bearer,
   isAdmin,
-  AdminController.bulkDeleteCollections
+  AdminController.bulkDeleteCollections,
 );
 
 // Toggle verification status
@@ -87,7 +87,7 @@ router.patch(
   "/verified-collection/:id/toggle-verify",
   auth.bearer,
   isAdmin,
-  AdminController.toggleVerification
+  AdminController.toggleVerification,
 );
 
 // Get Top Creators
@@ -95,7 +95,7 @@ router.get(
   "/top-creators",
   auth.bearer,
   isAdmin,
-  AdminController.getTopRaffleCreators
+  AdminController.getTopRaffleCreators,
 );
 
 // Get Dashboard Stats
@@ -103,7 +103,7 @@ router.get(
   "/dashboard-stats",
   auth.bearer,
   isAdmin,
-  AdminController.getDashboardStats
+  AdminController.getDashboardStats,
 );
 
 // Get Top Performing Raffles
@@ -111,7 +111,7 @@ router.get(
   "/top-raffles",
   auth.bearer,
   isAdmin,
-  AdminController.getTopPerformingRaffles
+  AdminController.getTopPerformingRaffles,
 );
 
 // Get top hosts and buyers
@@ -123,7 +123,7 @@ router.post(
   "/verified-token",
   auth.bearer,
   isAdmin,
-  AdminController.createVerifiedToken
+  AdminController.createVerifiedToken,
 );
 
 // Get all Tokens (with pagination)
@@ -131,7 +131,7 @@ router.get(
   "/verified-token",
   auth.bearer,
   isAdmin,
-  AdminController.getAllTokens
+  AdminController.getAllTokens,
 );
 
 // Get All Verified Tokens
@@ -139,7 +139,7 @@ router.get(
   "/verified-token/verified",
   auth.bearer,
   isAdmin,
-  AdminController.getAllVerifiedTokens
+  AdminController.getAllVerifiedTokens,
 );
 
 // Get single Token by ID
@@ -147,7 +147,7 @@ router.get(
   "/verified-token/:id",
   auth.bearer,
   isAdmin,
-  AdminController.getVerifiedTokenById
+  AdminController.getVerifiedTokenById,
 );
 
 // Delete Token
@@ -155,7 +155,7 @@ router.delete(
   "/verified-token/:id",
   auth.bearer,
   isAdmin,
-  AdminController.deleteVerifiedToken
+  AdminController.deleteVerifiedToken,
 );
 
 // Toggle verification status
@@ -163,7 +163,7 @@ router.patch(
   "/verified-token/:id/toggle-verify",
   auth.bearer,
   isAdmin,
-  AdminController.toggleTokenVerification
+  AdminController.toggleTokenVerification,
 );
 
 // Toggle payment token status
@@ -171,7 +171,7 @@ router.patch(
   "/verified-token/:id/toggle-payment",
   auth.bearer,
   isAdmin,
-  AdminController.togglePaymentToken
+  AdminController.togglePaymentToken,
 );
 
 // XP Management Routes
@@ -186,7 +186,7 @@ router.get(
   "/xp-leaderboard",
   auth.bearer,
   isAdmin,
-  AdminController.getXpLeaderboard
+  AdminController.getXpLeaderboard,
 );
 
 // Get XP analytics
@@ -194,7 +194,7 @@ router.get(
   "/xp-analytics",
   auth.bearer,
   isAdmin,
-  AdminController.getXpAnalytics
+  AdminController.getXpAnalytics,
 );
 
 // Get XP processing status
@@ -202,7 +202,7 @@ router.get(
   "/xp-processing-status",
   auth.bearer,
   isAdmin,
-  AdminController.getXpProcessingStatus
+  AdminController.getXpProcessingStatus,
 );
 
 // Get XP records with filtering
@@ -213,16 +213,16 @@ router.post(
   "/xp-recalculate/:userId",
   auth.bearer,
   isAdmin,
-  AdminController.recalculateUserXp
+  AdminController.recalculateUserXp,
 );
 
 // System Fees configurations
-router.get("/system-fee", auth.bearer, isAdmin, AdminController.getSystemFees);
+router.get("/system-fee", auth.bearer, AdminController.getSystemFees);
 router.put(
   "/system-fee",
   auth.bearer,
   isAdmin,
-  AdminController.updateSystemFees
+  AdminController.updateSystemFees,
 );
 
 module.exports = router;

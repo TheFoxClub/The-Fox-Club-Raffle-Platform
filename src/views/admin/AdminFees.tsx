@@ -25,6 +25,14 @@ export default function AdminFees() {
   const [loading, setLoading] = useState(true);
   //const { toast } = useToast();
 
+  // Store original fetched fees to compare changes
+  const [originalFees, setOriginalFees] = useState({
+    holder: 0,
+    nonHolder: 0,
+    tx: "",
+    featured: "",
+  });
+
   useEffect(() => {
     const fetchFees = async () => {
       try {
@@ -33,10 +41,23 @@ export default function AdminFees() {
 
         const data = res.data.data;
 
-        setHolderFee([parseFloat(data.holder_participant_fee)]);
-        setNonHolderFee([parseFloat(data.non_holder_participant_fee)]);
-        setTxFee(parseFloat(data.transaction_fee).toString());
-        setFeaturedFee(parseFloat(data.featured_raffle_fee).toString());
+        const holder = parseFloat(data.holder_participant_fee);
+        const nonHolder = parseFloat(data.non_holder_participant_fee);
+        const tx = parseFloat(data.transaction_fee).toString();
+        const featured = parseFloat(data.featured_raffle_fee).toString();
+
+        setHolderFee([holder]);
+        setNonHolderFee([nonHolder]);
+        setTxFee(tx);
+        setFeaturedFee(featured);
+
+        //  Save original fees for change detection
+        setOriginalFees({
+          holder,
+          nonHolder,
+          tx,
+          featured,
+        });
       } catch (error) {
         toast.error("Failed to load fee configuration");
       } finally {
@@ -47,12 +68,44 @@ export default function AdminFees() {
     fetchFees();
   }, []);
 
-  const handleSave = () => {
-    toast.success("Fee configuration saved successfully");
+  const handleSave = async () => {
+    try {
+      const payload = {
+        holder_participant_fee: holderFee[0].toString(),
+        non_holder_participant_fee: nonHolderFee[0].toString(),
+        transaction_fee: txFee,
+        featured_raffle_fee: featuredFee,
+      };
+
+      const res = await server.put("/admin/system-fee", payload);
+
+      if (res.data.success) {
+        toast.success("Fee configuration saved successfully");
+        // Update original fees after successful save
+        setOriginalFees({
+          holder: holderFee[0],
+          nonHolder: nonHolderFee[0],
+          tx: txFee,
+          featured: featuredFee,
+        });
+      } else {
+        toast.error("Failed to save fee configuration");
+      }
+    } catch (error) {
+      toast.error("Error saving fees");
+    }
   };
+
   if (loading) {
     return <div className="p-6">Loading configuration...</div>;
   }
+
+  const hasChanges =
+    holderFee[0] !== originalFees.holder ||
+    nonHolderFee[0] !== originalFees.nonHolder ||
+    txFee !== originalFees.tx ||
+    featuredFee !== originalFees.featured;
+
   return (
     <div className="max-w-4xl space-y-6">
       {/* Header */}
@@ -223,6 +276,7 @@ export default function AdminFees() {
         className="w-full gradient-primary"
         size="lg"
         onClick={handleSave}
+        disabled={isInvalid || !hasChanges}
       >
         <Save className="h-4 w-4 mr-2" />
         Save Configuration
