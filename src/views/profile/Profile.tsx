@@ -34,6 +34,8 @@ import { UserXPCard } from "../../components/profile/UserXPCard";
 import { TokenDisplay } from "../../components/ui/TokenDisplay";
 import { formatRewardType } from "../../utils/rewardTypeUtils";
 import { setNotificationsCount } from "../../redux/userSlice";
+import { Transaction } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 type HostedRaffle = {
   id: number;
@@ -108,38 +110,50 @@ type Win = {
   winDate: string;
 };
 
+const RAFFLE_STATUS = {
+  UPCOMING: 1,
+  LIVE: 2,
+  ENDED: 3,
+  DELETED: 6,
+  REFUNDED: 7,
+};
+
 const Profile = () => {
+  const { publicKey, signTransaction } = useWallet();
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, pubkey, user_info } = useSelector(
-    (state: RootState) => state.user,
+    (state: RootState) => state.user
   );
 
   const [ticketsBought, setTicketsBought] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
   const [rafflesWon, setRafflesWon] = useState(0);
   const [hostedRafflesData, setHostedRafflesData] = useState<HostedRaffle[]>(
-    [],
+    []
   );
 
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
   //const reversedPurchasedTickets = [...purchasedTickets].reverse();
 
   const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>(
-    [],
+    []
   );
   const [wins, setWins] = useState<Win[]>([]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [raffleToDelete, setRaffleToDelete] = useState<HostedRaffle | null>(
-    null,
+    null
   );
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  const [txState, setTxState] = useState<
+    "idle" | "waitingSignature" | "confirming"
+  >("idle");
 
   const [loadingRewards, setLoadingRewards] = useState(false);
   const unclaimedWinsCount = wins.filter((win) => !win.isClaimed).length;
   const hostedRafflesWithUnclaimedPayouts = hostedRafflesData.filter(
     (raffle) =>
-      raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0,
+      raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0
   ).length;
 
   const formatEndDate = (dateString: string) => {
@@ -184,13 +198,22 @@ const Profile = () => {
             user_info: userData.user_info,
             isAuthenticated: true,
             isLoading: false,
-          }),
+          })
         );
 
         if (userData.id) {
           // Fetch hosted raffles with payout information
           const resRaffles = await server.get("/raffle/user/hosted");
-          const rafflesData = resRaffles.data.data.raffles || [];
+          // const rafflesData = resRaffles.data.data.raffles || [];
+          const rafflesData = (resRaffles.data.data.raffles || []).map(
+            (r: any) => ({
+              ...r,
+              status:
+                typeof r.status === "string"
+                  ? RAFFLE_STATUS[r.status as keyof typeof RAFFLE_STATUS]
+                  : r.status,
+            })
+          );
 
           setHostedRafflesData(rafflesData);
 
@@ -217,12 +240,12 @@ const Profile = () => {
               t.Raffle?.status === 2
                 ? "active"
                 : t.Raffle?.status === 3
-                  ? "Ended"
-                  : "upcoming",
+                ? "Ended"
+                : "upcoming",
             endDate: t.endsAt ? t.endsAt.split("T")[0] : "N/A",
             totalTickets: t.progress?.total ?? 0,
             ticketsSold: t.progress?.sold ?? 0,
-          })),
+          }))
         );
       } catch (error) {
         dispatch(setLoading(false));
@@ -258,8 +281,7 @@ const Profile = () => {
                 claimedAmount: data.claimedAmount,
                 unclaimedAmount: Math.max(
                   0,
-                  (raffle.payoutInfo?.claimableAmount || 0) -
-                    data.claimedAmount,
+                  (raffle.payoutInfo?.claimableAmount || 0) - data.claimedAmount
                 ),
                 hasClaimed: true,
                 claimStatus: data.status,
@@ -268,7 +290,7 @@ const Profile = () => {
             };
           }
           return raffle;
-        }),
+        })
       );
     };
 
@@ -300,7 +322,7 @@ const Profile = () => {
           ...win,
           isClaimed: rewards.some(
             (reward: ClaimableReward) =>
-              reward.id === win.rewardId && reward.isClaimed,
+              reward.id === win.rewardId && reward.isClaimed
           ),
         }));
         setWins(updatedWins);
@@ -330,8 +352,8 @@ const Profile = () => {
       prev.map((reward) =>
         reward.id === rewardId
           ? { ...reward, isClaimed: true, claimedAt: new Date().toISOString() }
-          : reward,
-      ),
+          : reward
+      )
     );
 
     // Update wins
@@ -339,8 +361,8 @@ const Profile = () => {
       prev.map((win) =>
         win.rewardId === rewardId
           ? { ...win, isClaimed: true, claimedAt: new Date().toISOString() }
-          : win,
-      ),
+          : win
+      )
     );
 
     // Update raffles won count
@@ -352,7 +374,7 @@ const Profile = () => {
         },
         isAuthenticated: true,
         isLoading: false,
-      }),
+      })
     );
   };
 
@@ -371,28 +393,67 @@ const Profile = () => {
                 message: "Payout completed successfully",
               },
             }
-          : raffle,
-      ),
+          : raffle
+      )
     );
   };
 
   const handleDeleteRaffle = async (raffleId: number) => {
+    if (!publicKey || !signTransaction) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
     try {
       const res = await server.delete(`/raffle/${raffleId}`);
       if (res.data.success) {
-        toast.success("Raffle deleted successfully!");
-        setHostedRafflesData((prev) =>
-          prev.filter((raffle) => raffle.id !== raffleId),
+        const txData = res.data.data;
+        const transactionBuffer = Buffer.from(txData.serializedTx, "base64");
+        const deserializedTransaction = Transaction.from(transactionBuffer);
+
+        setTxState("waitingSignature");
+        const signedTransaction = await signTransaction(
+          deserializedTransaction
         );
+
+        setTxState("confirming");
+        const confirmDeleteRes = await server.post(`/raffle/delete/confirm`, {
+          signedBase64Tx: Buffer.from(
+            signedTransaction.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            })
+          ).toString("base64"),
+          checksum: txData.checksum,
+          transactionDetails: txData.transactionDetails,
+          raffleId,
+        });
+        if (confirmDeleteRes.data.success) {
+          // toast.success("Creator asset refunded successfully");
+          toast.success(
+            "Raffle deleted successfully.Your rewards have been refunded to your wallet."
+          );
+          setHostedRafflesData((prev) =>
+            prev.filter((raffle) => raffle.id !== raffleId)
+          );
+          setDeleteModalOpen(false);
+          setRaffleToDelete(null);
+          setTxState("idle");
+        } else {
+          setTxState("idle");
+          toast.error(
+            confirmDeleteRes.data.message || "Failed to confirm raffle delete"
+          );
+        }
       } else {
         toast.error(res.data.message || "Failed to delete raffle");
       }
     } catch (error: any) {
+      setTxState("idle");
       console.error("Delete error:", error);
       toast.error(
         error.response?.data?.message ||
           error.message ||
-          "Failed to delete raffle",
+          "Failed to delete raffle"
       );
     }
   };
@@ -499,7 +560,7 @@ const Profile = () => {
                 className="cursor-pointer"
                 onClick={() => {
                   const element = document.querySelector(
-                    '[data-tab="won"]',
+                    '[data-tab="won"]'
                   ) as HTMLElement;
                   element?.click();
                 }}
@@ -514,7 +575,7 @@ const Profile = () => {
         {hostedRafflesData.some(
           (raffle) =>
             raffle.payoutInfo?.canClaim &&
-            raffle.payoutInfo?.unclaimedAmount > 0,
+            raffle.payoutInfo?.unclaimedAmount > 0
         ) && (
           <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 p-4">
             <div className="flex items-center justify-between">
@@ -534,7 +595,7 @@ const Profile = () => {
                 className="cursor-pointer border-green-500/30 hover:bg-green-500/10"
                 onClick={() => {
                   const element = document.querySelector(
-                    '[data-tab="hosted"]',
+                    '[data-tab="hosted"]'
                   ) as HTMLElement;
                   element?.click();
                 }}
@@ -563,14 +624,14 @@ const Profile = () => {
               {hostedRafflesData.some(
                 (raffle) =>
                   raffle.payoutInfo?.canClaim &&
-                  raffle.payoutInfo?.unclaimedAmount > 0,
+                  raffle.payoutInfo?.unclaimedAmount > 0
               ) && (
                 <span className="ml-2 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {
                     hostedRafflesData.filter(
                       (raffle) =>
                         raffle.payoutInfo?.canClaim &&
-                        raffle.payoutInfo?.unclaimedAmount > 0,
+                        raffle.payoutInfo?.unclaimedAmount > 0
                     ).length
                   }
                 </span>
@@ -703,6 +764,11 @@ const Profile = () => {
                               Upcoming
                             </div>
                           )}
+                          {raffle.status === 7 && (
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-500 text-white">
+                              Refunded
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center text-sm text-muted-foreground gap-4">
@@ -726,22 +792,25 @@ const Profile = () => {
                           <Button variant="outline">View</Button>
                         </Link>
                         <div className="relative group">
-                          <Button
-                            variant="outline"
-                            disabled={raffle.ticketsSold > 0}
-                            onClick={() => {
-                              setRaffleToDelete(raffle);
-                              setDeleteModalOpen(true);
-                            }}
-                            className={`flex items-center gap-1 ${
-                              raffle.ticketsSold === 0
-                                ? "text-red-500 border-red-500 hover:bg-red-500"
-                                : "opacity-50 cursor-not-allowed"
-                            }`}
-                          >
-                            <Trash2 size={16} />
-                            Delete
-                          </Button>
+                          {raffle.status !== RAFFLE_STATUS.DELETED &&
+                            raffle.status !== RAFFLE_STATUS.REFUNDED && (
+                              <Button
+                                variant="outline"
+                                disabled={raffle.ticketsSold > 0}
+                                onClick={() => {
+                                  setRaffleToDelete(raffle);
+                                  setDeleteModalOpen(true);
+                                }}
+                                className={`flex items-center gap-1 ${
+                                  raffle.ticketsSold === 0
+                                    ? "text-red-500 border-red-500 hover:bg-red-500"
+                                    : "opacity-50 cursor-not-allowed"
+                                }`}
+                              >
+                                <Trash2 size={16} />
+                                Delete
+                              </Button>
+                            )}
 
                           {/*Tooltip for disabled state */}
                           {raffle.ticketsSold > 0 && (
@@ -754,8 +823,58 @@ const Profile = () => {
                       </div>
                     </div>
 
+                    {/* Refunded State */}
+                    {raffle.status === 7 && (
+                      <div className="border-t border-border/50 pt-4">
+                        <div className="flex bg-red-500/10 border-red-600/30 text-primary rounded-lg p-3">
+                          <div className="flex flex-row justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-5 w-5" />
+                              <div>
+                                <p className="text-sm font-semibold">
+                                  Raffle Deleted & Refunded
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  All locked rewards have been successfully
+                                  refunded to your wallet.
+                                </p>
+                              </div>
+                            </div>
+                            {raffle.payoutInfo?.claimSignature && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  window.open(
+                                    `https://solscan.io/tx/${raffle.payoutInfo?.claimSignature}`,
+                                    "_blank"
+                                  )
+                                }
+                                className="flex items-center gap-1 text-xs text-white bg-primary"
+                              >
+                                <svg
+                                  className="h-3 w-3"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                  />
+                                </svg>
+                                View Transaction
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Payout Information */}
-                    {raffle.payoutInfo && (
+                    {raffle.payoutInfo && raffle.status !== 7 && (
                       <div className="border-t border-border/50 pt-4">
                         <h4 className="text-sm font-semibold mb-3 text-muted-foreground">
                           Revenue & Payout Information
@@ -769,7 +888,7 @@ const Profile = () => {
                             <p className="text-sm font-semibold">
                               <TokenDisplay
                                 amount={raffle.payoutInfo.totalRevenue.toFixed(
-                                  4,
+                                  4
                                 )}
                                 tokenType={raffle.tokenType}
                                 tokenAddress={raffle.tokenAddress}
@@ -784,7 +903,7 @@ const Profile = () => {
                             <p className="text-sm font-semibold text-orange-400">
                               <TokenDisplay
                                 amount={raffle.payoutInfo.totalCommission.toFixed(
-                                  4,
+                                  4
                                 )}
                                 tokenType={raffle.tokenType}
                                 tokenAddress={raffle.tokenAddress}
@@ -804,7 +923,7 @@ const Profile = () => {
                               )} */}
                               <TokenDisplay
                                 amount={raffle.payoutInfo.claimableAmount.toFixed(
-                                  4,
+                                  4
                                 )}
                                 tokenType={raffle.tokenType}
                                 tokenAddress={raffle.tokenAddress}
@@ -828,7 +947,7 @@ const Profile = () => {
                               {raffle.payoutInfo.unclaimedAmount > 0 ? (
                                 <TokenDisplay
                                   amount={raffle.payoutInfo.unclaimedAmount.toFixed(
-                                    4,
+                                    4
                                   )}
                                   tokenType={raffle.tokenType}
                                   tokenAddress={raffle.tokenAddress}
@@ -851,7 +970,7 @@ const Profile = () => {
                                     Ready to claim{" "}
                                     <TokenDisplay
                                       amount={raffle.payoutInfo.unclaimedAmount.toFixed(
-                                        4,
+                                        4
                                       )}
                                       tokenType={raffle.tokenType}
                                       tokenAddress={raffle.tokenAddress}
@@ -874,7 +993,7 @@ const Profile = () => {
                           )}
 
                         {/* Status Messages */}
-                        {!raffle.payoutInfo.hasEnded && (
+                        {!raffle.payoutInfo.hasEnded && raffle.status !== 7 && (
                           <div className="flex items-center gap-2 text-orange-600 bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
                             <AlertCircle className="h-5 w-5" />
                             <div>
@@ -895,8 +1014,8 @@ const Profile = () => {
                               raffle.payoutInfo.claimStatus === "confirmed"
                                 ? "text-green-600 bg-green-500/10 border border-green-500/20"
                                 : raffle.payoutInfo.claimStatus === "failed"
-                                  ? "text-red-600 bg-red-500/10 border border-red-500/20"
-                                  : "text-blue-600 bg-blue-500/10 border border-blue-500/20"
+                                ? "text-red-600 bg-red-500/10 border border-red-500/20"
+                                : "text-blue-600 bg-blue-500/10 border border-blue-500/20"
                             }`}
                           >
                             <div className="flex items-center gap-2">
@@ -915,7 +1034,7 @@ const Profile = () => {
                                       Payout completed:{" "}
                                       <TokenDisplay
                                         amount={raffle.payoutInfo.claimableAmount.toFixed(
-                                          4,
+                                          4
                                         )}
                                         tokenType={raffle.tokenType}
                                         tokenAddress={raffle.tokenAddress}
@@ -942,7 +1061,7 @@ const Profile = () => {
                                 onClick={() =>
                                   window.open(
                                     `https://solscan.io/tx/${raffle.payoutInfo?.claimSignature}`,
-                                    "_blank",
+                                    "_blank"
                                   )
                                 }
                                 className="flex items-center gap-1 text-xs text-white bg-primary"
@@ -1089,7 +1208,7 @@ const Profile = () => {
                                 onClick={() =>
                                   window.open(
                                     `https://solscan.io/tx/${win.claimSignature}`,
-                                    "_blank",
+                                    "_blank"
                                   )
                                 }
                                 className="flex items-center gap-1 text-xs text-white bg-primary"
@@ -1115,50 +1234,58 @@ const Profile = () => {
         {deleteModalOpen && raffleToDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <Card className="w-full max-w-md bg-card border border-border p-6">
-              <h3 className="text-lg font-bold mb-2">Delete Raffle</h3>
+              {txState === "idle" && (
+                <>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p className="text-base text-foreground">
+                      Delete{" "}
+                      <span className="font-bold">{raffleToDelete.title}</span>?
+                    </p>
 
-              <p className="text-sm text-muted-foreground mb-4">
-                Are you sure you want to delete{" "}
-                <span className="font-semibold text-foreground">
-                  {raffleToDelete.title}
-                </span>
-                ?
-                <br />
-                This action{" "}
-                <span className="text-foreground font-semibold">
-                  cannot be undone
-                </span>
-                .
-              </p>
+                    <span className="text-xs">
+                      This will permanently remove the raffle and refund all
+                      locked rewards to your wallet.
+                    </span>
+                  </div>
 
-              <div className="flex justify-between gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setDeleteModalOpen(false);
-                    setRaffleToDelete(null);
-                  }}
-                >
-                  Cancel
-                </Button>
+                  <div className="flex justify-between gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      disabled={txState !== "idle"}
+                      onClick={() => {
+                        setDeleteModalOpen(false);
+                        setRaffleToDelete(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
 
-                <Button
-                  variant="destructive"
-                  disabled={isDeleting}
-                  className="hover:bg-red-500 hover:text-white flex-1"
-                  onClick={async () => {
-                    if (!raffleToDelete) return;
-                    setIsDeleting(true);
-                    await handleDeleteRaffle(raffleToDelete.id);
-                    setIsDeleting(false);
-                    setDeleteModalOpen(false);
-                    setRaffleToDelete(null);
-                  }}
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </Button>
-              </div>
+                    <Button
+                      variant="destructive"
+                      className="hover:bg-red-500 hover:text-white flex-1"
+                      disabled={txState !== "idle"}
+                      onClick={() => handleDeleteRaffle(raffleToDelete.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {txState === "waitingSignature" && (
+                <div className="text-center py-6">
+                  <p className="font-semibold">
+                    Waiting for wallet approval...
+                  </p>
+                </div>
+              )}
+
+              {txState === "confirming" && (
+                <div className="text-center py-6">
+                  <p className="font-semibold">Confirming transaction...</p>
+                </div>
+              )}
             </Card>
           </div>
         )}

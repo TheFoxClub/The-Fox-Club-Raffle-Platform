@@ -55,7 +55,7 @@ const getSplTokenSendTransactions = async () => {
       },
     },
     attributes: ["id", "raffleId"],
-    limit: 10,
+    // limit: 10,
     order: [["createdAt", "DESC"]],
   });
 

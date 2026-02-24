@@ -84,6 +84,7 @@ const statusMap: Record<number, string> = {
   2: "Live",
   3: "Ended",
   5: "Suspended",
+  7: "Refunded",
 };
 
 const mapRaffle = (r: any): Raffle => ({

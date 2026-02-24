@@ -6,6 +6,7 @@ const {
   MessageV0,
   TransactionInstruction,
   TransactionMessage,
+  LAMPORTS_PER_SOL,
 } = require("@solana/web3.js");
 
 const {
@@ -31,6 +32,7 @@ const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
 const {
   fromWeb3JsKeypair,
   toWeb3JsTransaction,
+  fromWeb3JsInstruction,
 } = require("@metaplex-foundation/umi-web3js-adapters");
 
 const {
@@ -71,6 +73,9 @@ const { Wallet } = require("./wallet");
 const { generateChecksum } = require("./checksum-validation");
 const logger = require("../../util/logger");
 const { default: bs58 } = require("bs58");
+const { BET_RECEIVER_WALLET } = require("../../config/credentials");
+const { getFeeData } = require("../cache/system-fee");
+const { DEFAULT_COMMISSION } = require("../../config/constants");
 
 const connection = getConnectionDas();
 const MPL_CORE_PROGRAM_ID = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
@@ -204,12 +209,21 @@ const handlePNFT = async ({
     logger.info(
       `Processing pNFT transfer (${direction}): ${fromAccountAddress} → ${toAccountAddress}`
     );
+    const feeData = await getFeeData();
+    const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
 
     const umiTo = publicKey(toAccountAddress);
     const umiFrom = publicKey(fromAccountAddress);
     const mintPubkey = publicKey(mint.toBase58());
 
     if (direction === "platform_to_user") {
+      //transaction fee
+      const solTransferIx = SystemProgram.transfer({
+        fromPubkey: new PublicKey(toAccountAddress),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: transactionFee * LAMPORTS_PER_SOL,
+      });
+
       logger.info(`Fetching pNFT asset...`);
       const asset = await fetchDigitalAssetWithAssociatedToken(
         umi,
@@ -263,6 +277,8 @@ const handlePNFT = async ({
         authorizationData: undefined,
         payer: userPayerSigner, // User pays fees
         amount: 1,
+      }).add({
+        instruction: fromWeb3JsInstruction(solTransferIx),
       });
 
       const builtTx = await txBuilder.useV0().buildWithLatestBlockhash(tempUmi);
@@ -293,6 +309,11 @@ const handlePNFT = async ({
       // User is sending to platform - create unsigned transaction for user to sign
       const transferUmi = createUmi(connection);
       const userSigner = createNoopSigner(umiFrom);
+      const solTransferIx = SystemProgram.transfer({
+        fromPubkey: new PublicKey(fromAccountAddress),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: transactionFee * LAMPORTS_PER_SOL,
+      });
 
       transferUmi
         .use(signerIdentity(userSigner))
@@ -324,6 +345,8 @@ const handlePNFT = async ({
         authorizationRulesProgram: getMplTokenAuthRulesProgramId(transferUmi),
         authorizationData: undefined,
         payer: userSigner,
+      }).add({
+        instruction: fromWeb3JsInstruction(solTransferIx),
       });
 
       const builtTx = await txBuilder
@@ -365,7 +388,8 @@ const handleMPLCore = async ({
     logger.info(
       `Processing MPL Core NFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`
     );
-
+    const feeData = await getFeeData();
+    const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
     // Use the existing UMI instance with platform signer for fetching asset data
     const coreAsset = await fetchAsset(umi, publicKey(mint.toBase58()));
     logger.info(`MPL Core asset fetched:`, {
@@ -385,6 +409,11 @@ const handleMPLCore = async ({
 
     let builtTx;
     if (direction === "platform_to_user") {
+      const solTransferIx = SystemProgram.transfer({
+        fromPubkey: new PublicKey(toAccountAddress),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: transactionFee * LAMPORTS_PER_SOL,
+      });
       const platformNoopSigner = createNoopSigner(
         publicKey(fromAccountAddress)
       );
@@ -405,6 +434,9 @@ const handleMPLCore = async ({
         newOwner: publicKey(toAccountAddress), // Transfer to user wallet
         payer: userPayer, // User pays fees
       })
+        .add({
+          instruction: fromWeb3JsInstruction(solTransferIx),
+        })
         .useV0()
         .buildWithLatestBlockhash(tempUmi);
 
@@ -413,6 +445,11 @@ const handleMPLCore = async ({
       );
     } else {
       // Build transaction with a user identity to avoid extra required signers
+      const solTransferIx = SystemProgram.transfer({
+        fromPubkey: new PublicKey(fromAccountAddress),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: transactionFee * LAMPORTS_PER_SOL,
+      });
       const userSigner = createNoopSigner(publicKey(fromAccountAddress));
       const transferUmi = createUmi(connection);
 
@@ -423,6 +460,9 @@ const handleMPLCore = async ({
         collection,
         newOwner: publicKey(toAccountAddress), // Transfer to platform wallet
       })
+        .add({
+          instruction: fromWeb3JsInstruction(solTransferIx),
+        })
         .useV0()
         .buildWithLatestBlockhash(transferUmi);
     }
@@ -484,13 +524,31 @@ const handleCNFT = async ({
 
     let builtTx;
 
+    const feeData = await getFeeData();
+    const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
     if (direction === "platform_to_user") {
+      const solTransferIx = SystemProgram.transfer({
+        fromPubkey: new PublicKey(toAccountAddress),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: transactionFee * LAMPORTS_PER_SOL,
+      });
       builtTx = await cnftTransferBuilder
+        .add({
+          instruction: fromWeb3JsInstruction(solTransferIx),
+        })
         .setFeePayer(createNoopSigner(publicKey(toAccountAddress)))
         .useV0()
         .buildWithLatestBlockhash(umi);
     } else {
+      const solTransferIx = SystemProgram.transfer({
+        fromPubkey: new PublicKey(fromAccountAddress),
+        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        lamports: transactionFee * LAMPORTS_PER_SOL,
+      });
       builtTx = await cnftTransferBuilder
+        .add({
+          instruction: fromWeb3JsInstruction(solTransferIx),
+        })
         .setFeePayer(createNoopSigner(publicKey(fromAccountAddress)))
         .useV0()
         .buildWithLatestBlockhash(umi);

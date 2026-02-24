@@ -26,6 +26,8 @@ const {
   getTopHosts,
   getTopBuyers,
 } = require("../services/leaderboard.service");
+const redisClient = require("../util/redisClient");
+const { getFeeData } = require("../helpers/cache/system-fee");
 
 class AdminController {
   static async getAllRaffles(req, res) {
@@ -184,8 +186,6 @@ class AdminController {
           },
         ],
       });
-
-      console.log("raffle data: ", raffle);
 
       if (!raffle) {
         return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
@@ -1509,13 +1509,7 @@ class AdminController {
 
   static async getSystemFees(req, res) {
     try {
-      const feeData = await SystemFee.findOne({
-        where: {
-          id: 1,
-        },
-        attributes: { exclude: ["createdAt", "updatedAt"] },
-        raw: true,
-      });
+      const feeData = await getFeeData();
       return respond(res, httpStatus.OK, "success", feeData);
     } catch (err) {
       logger.error("Error in getSystemFees: ", err);
@@ -1530,12 +1524,14 @@ class AdminController {
   static async updateSystemFees(req, res) {
     try {
       const feeData = req.body;
-      console.log(feeData);
       await SystemFee.update(feeData, {
         where: {
           id: 1,
         },
       });
+      const cacheKey = "systemFee:id:1";
+      await redisClient.del(cacheKey);
+      logger.info("Redis cache cleaned for System Fee");
       return respond(res, httpStatus.OK, "success");
     } catch (err) {
       logger.error("Error in updateSystemFees: ", err);

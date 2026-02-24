@@ -21,7 +21,11 @@ const checkRaffleAndFeaturedStatus = async () => {
       ],
       where: {
         status: {
-          [Op.notIn]: [RAFFLE_STATUS.CANCELLED, RAFFLE_STATUS.SUSPENDED],
+          [Op.notIn]: [
+            RAFFLE_STATUS.CANCELLED,
+            RAFFLE_STATUS.SUSPENDED,
+            RAFFLE_STATUS.REFUNDED,
+          ],
         },
       },
     });
@@ -78,13 +82,18 @@ const checkRaffleAndFeaturedStatus = async () => {
         });
 
         // Emit Socket.IO event for raffle status change
-        SocketService.emitRaffleStatusChange(raffle.id, getStatusName(oldStatus), getStatusName(newStatus), {
-          reason: endedEarlyBySoldOut ? "sold_out" : "scheduled",
-          ticketsSold: raffle.ticketsSold,
-          totalTickets: raffle.totalTickets,
-          endedAt: raffle.endedAt,
-          endDate: raffle.endDate,
-        });
+        SocketService.emitRaffleStatusChange(
+          raffle.id,
+          getStatusName(oldStatus),
+          getStatusName(newStatus),
+          {
+            reason: endedEarlyBySoldOut ? "sold_out" : "scheduled",
+            ticketsSold: raffle.ticketsSold,
+            totalTickets: raffle.totalTickets,
+            endedAt: raffle.endedAt,
+            endDate: raffle.endDate,
+          }
+        );
 
         // If raffle just ended, select winners
         if (
@@ -102,7 +111,7 @@ const checkRaffleAndFeaturedStatus = async () => {
               numberOfWinners: winnerResult.numberOfWinners,
               winners: winnerResult.winners,
             });
-            
+
             // Emit Socket.IO event for winners selection
             SocketService.emitWinnersSelected(raffle.id, {
               numberOfWinners: winnerResult.numberOfWinners,
@@ -110,7 +119,7 @@ const checkRaffleAndFeaturedStatus = async () => {
               selectionSeed: winnerResult.selectionSeed,
               selectedAt: winnerResult.selectedAt,
             });
-            
+
             logger.info(
               `Winners automatically selected for raffle ${raffle.id}: ${winnerResult.numberOfWinners} winners`
             );

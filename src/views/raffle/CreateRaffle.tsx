@@ -94,7 +94,8 @@ const CreateRaffle = () => {
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
-  const FEATURED_PRICE = 0.1;
+  const [featuredPrice, setFeaturedPrice] = useState<number>(0);
+  const [systemFeeLoading, setSystemFeeLoading] = useState(true);
 
   const [startNow, setStartNow] = useState(true);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
@@ -195,6 +196,28 @@ const CreateRaffle = () => {
   }, []);
 
   useEffect(() => {
+    const fetchSystemFee = async () => {
+      try {
+        setSystemFeeLoading(true);
+
+        const res = await server.get("/admin/system-fee");
+
+        if (res.data?.success && res.data?.data) {
+          const fee = Number(res.data.data.featured_raffle_fee);
+          setFeaturedPrice(fee);
+        }
+      } catch (error) {
+        console.error("Failed to fetch system fee:", error);
+        toast.error("Failed to load system fee");
+      } finally {
+        setSystemFeeLoading(false);
+      }
+    };
+
+    fetchSystemFee();
+  }, []);
+
+  useEffect(() => {
     if (user.isAuthenticated) {
       fetchDrafts();
     }
@@ -241,7 +264,6 @@ const CreateRaffle = () => {
                 const metaRes = await fetch(nftItem.uri);
                 if (metaRes.ok) {
                   const meta = await metaRes.json();
-                  console.log("meta.image: ", meta.image);
                   if (meta.image) image = meta.image;
                   if (meta.name) name = meta.name;
                 }
@@ -345,7 +367,6 @@ const CreateRaffle = () => {
         );
 
         setTokenCandidates(mapped);
-        console.log("Token candidates:", mapped);
       } catch (err) {
         console.error("Failed to fetch tokens", err);
         setTokenCandidates([]);
@@ -799,6 +820,7 @@ const CreateRaffle = () => {
           const transferRes = await server.post(
             "/raffle/prepare-reward-transfer",
             {
+              isFeatured: isFeatured,
               rewards: payload.rewards,
               fromAddress: publicKey.toString(),
             },
@@ -979,26 +1001,6 @@ const CreateRaffle = () => {
         // toast.success("Raffle created successfully!");
         // const createdId = res.data.data.raffle.id;
         const createdRaffle = res.data.data.raffle;
-
-        //  Feature it if selected
-        if (isFeatured) {
-          try {
-            await server.put(`/admin/featured/${createdRaffle.id}`, {
-              isFeatured: true,
-              featuredPosition: null,
-              featuredUntil: createdRaffle.endDate || null,
-            });
-          } catch (featureError) {
-            console.error("Feature update failed:", featureError);
-            toast.error("Raffle created but featuring failed");
-          }
-        }
-
-        toast.success(
-          isFeatured
-            ? "Raffle created and featured successfully!"
-            : "Raffle created successfully!",
-        );
 
         const createdId = createdRaffle.id;
 
@@ -1796,7 +1798,10 @@ const CreateRaffle = () => {
 
               <div className="flex items-center justify-between">
                 <p className="text-sm">Featured Fee</p>
-                <p className="text-lg font-bold">{FEATURED_PRICE} SOL</p>
+                <p className="text-lg font-bold">
+                  {" "}
+                  {systemFeeLoading ? "Loading..." : `${featuredPrice} SOL`}
+                </p>
               </div>
 
               {isFeatured && (
