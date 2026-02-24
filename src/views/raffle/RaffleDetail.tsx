@@ -225,7 +225,7 @@ const RaffleDetail = () => {
 
   const getTokenTypeForAPI = (
     tokenTypeNumber: number,
-    tokenAddress?: string,
+    tokenAddress?: string
   ): string => {
     switch (tokenTypeNumber) {
       case 0:
@@ -238,7 +238,7 @@ const RaffleDetail = () => {
           return tokenAddress;
         }
         console.warn(
-          `Token type ${tokenTypeNumber} requires token address but none provided`,
+          `Token type ${tokenTypeNumber} requires token address but none provided`
         );
         return "solana"; // Fallback to prevent errors
       default:
@@ -280,7 +280,7 @@ const RaffleDetail = () => {
 
     if (balance === 0) {
       toast.error(
-        "Insufficient balance. Please add SOL to your wallet to buy tickets.",
+        "Insufficient balance. Please add SOL to your wallet to buy tickets."
       );
       setIsBuying(false);
       return;
@@ -300,7 +300,7 @@ const RaffleDetail = () => {
 
       if (!transactionResponse.data.success) {
         throw new Error(
-          transactionResponse.data.message || "Failed to reserve tickets",
+          transactionResponse.data.message || "Failed to reserve tickets"
         );
       }
 
@@ -316,7 +316,7 @@ const RaffleDetail = () => {
       // Show reservation countdown
       toast.info(
         `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
-        { autoClose: 3000 },
+        { autoClose: 3000 }
       );
 
       // Small delay so user sees the toast first
@@ -324,7 +324,7 @@ const RaffleDetail = () => {
 
       // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(
-        Buffer.from(transaction, "base64"),
+        Buffer.from(transaction, "base64")
       );
 
       const signedTransaction = await signTransaction(solanaTransaction);
@@ -333,7 +333,7 @@ const RaffleDetail = () => {
       const connection = new Connection(SOLANA_RPC_HOST);
 
       const signature = await connection.sendRawTransaction(
-        signedTransaction.serialize(),
+        signedTransaction.serialize()
       );
 
       // Step 4: Confirm reservation with signature
@@ -350,7 +350,7 @@ const RaffleDetail = () => {
         ticketCount,
         raffle.id,
         reservationId, // Pass reservation ID
-        reservationId, // Pass reservation ID
+        reservationId // Pass reservation ID
       );
 
       if (confirmResponse.success) {
@@ -358,7 +358,7 @@ const RaffleDetail = () => {
         await fetchRaffle();
       } else {
         throw new Error(
-          confirmResponse.data.message || "Failed to confirm purchase",
+          confirmResponse.data.message || "Failed to confirm purchase"
         );
       }
     } catch (error: any) {
@@ -384,7 +384,7 @@ const RaffleDetail = () => {
 
         if (isInsufficientFundsError(error)) {
           toast.error(
-            "Insufficient balance. Please add funds to your wallet and try again.",
+            "Insufficient balance. Please add funds to your wallet and try again."
           );
           return;
         }
@@ -448,7 +448,7 @@ const RaffleDetail = () => {
         if (mappedRaffle.hostId) {
           try {
             const hostRes = await server.get(
-              `/user/info/${mappedRaffle.hostId}`,
+              `/user/info/${mappedRaffle.hostId}`
             );
             if (
               hostRes.data.success &&
@@ -456,7 +456,7 @@ const RaffleDetail = () => {
             ) {
               setHostPhotoUrl(
                 // `${server.defaults.baseURL}${hostRes.data.data.user.user_info.photoUrl}`
-                hostRes.data.data.user.user_info.photoUrl,
+                hostRes.data.data.user.user_info.photoUrl
               );
             }
           } catch (err) {
@@ -503,13 +503,13 @@ const RaffleDetail = () => {
         if (raffle.status === RAFFLE_STATUS.UPCOMING) {
           // Automatically move to LIVE when start date is reached
           setRaffle((prev) =>
-            prev ? { ...prev, status: RAFFLE_STATUS.LIVE } : prev,
+            prev ? { ...prev, status: RAFFLE_STATUS.LIVE } : prev
           );
           setCountdown(formatCountdown(raffle.endDate!));
         } else if (raffle.status === RAFFLE_STATUS.LIVE) {
           // Automatically move to ENDED when end date is reached
           setRaffle((prev) =>
-            prev ? { ...prev, status: RAFFLE_STATUS.ENDED } : prev,
+            prev ? { ...prev, status: RAFFLE_STATUS.ENDED } : prev
           );
           setCountdown("Ended");
         }
@@ -579,7 +579,7 @@ const RaffleDetail = () => {
         // Show toast for other users (not the buyer)
         if (publicKey && data.buyerPubkey !== publicKey.toBase58()) {
           toast.info(
-            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`,
+            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`
           );
         }
       }
@@ -598,7 +598,7 @@ const RaffleDetail = () => {
                 data.reason === "sold_out"
                   ? "All tickets sold!"
                   : "Time expired!"
-              }`,
+              }`
             );
           }
 
@@ -614,7 +614,7 @@ const RaffleDetail = () => {
 
         if (participated) {
           toast.success(
-            `Winners have been selected! ${data.numberOfWinners} winner(s)`,
+            `Winners have been selected! ${data.numberOfWinners} winner(s)`
           );
         }
 
@@ -652,7 +652,7 @@ const RaffleDetail = () => {
     if (!participated) return;
 
     const userRewards = raffle.winnersData?.filter(
-      (w) => w.winnerPubkey === publicKey.toBase58(),
+      (w) => w.winnerPubkey === publicKey.toBase58()
     );
 
     const isWinner = (userRewards?.length ?? 0) > 0;
@@ -692,8 +692,8 @@ const RaffleDetail = () => {
   const countdownTarget = isUpcoming
     ? raffle.startDate
     : isLive
-      ? raffle.endDate
-      : null;
+    ? raffle.endDate
+    : null;
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -1072,7 +1072,7 @@ const RaffleDetail = () => {
                       if (e.key === "ArrowUp") {
                         e.preventDefault();
                         setTicketCount((prev) =>
-                          Math.min((prev || 1) + 1, ticketsLeft),
+                          Math.min((prev || 1) + 1, ticketsLeft)
                         );
                       }
 
@@ -1091,12 +1091,12 @@ const RaffleDetail = () => {
                       }
 
                       setTicketCount(
-                        Math.min(Math.max(1, numeric), ticketsLeft),
+                        Math.min(Math.max(1, numeric), ticketsLeft)
                       );
                     }}
                     onBlur={() => {
                       setTicketCount((prev) =>
-                        Math.min(Math.max(1, prev), ticketsLeft),
+                        Math.min(Math.max(1, prev), ticketsLeft)
                       );
                     }}
                     className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold"

@@ -46,18 +46,26 @@ export default function AdminDashboard() {
         server.get("admin/top-creators"),
         server.get("/admin/top-raffles"),
         server.get("/admin/dashboard-stats"),
-        server.get("/admin/xp-analytics").catch(() => ({ data: { data: null } })), // XP might not be available yet
+        server
+          .get("/admin/xp-analytics")
+          .catch(() => ({ data: { data: null } })), // XP might not be available yet
       ]);
       setTopCreators(creatorsRes.data.data);
       setTopRaffles(rafflesRes.data.data);
       setStats({
-        totalRevenue: statsRes.data.data.totalRevenue,
-        totalTicketsSold: statsRes.data.data.totalTicketsSold,
-        totalPlatformRevenue: statsRes.data.data.totalPlatformRevenue,
-        liveRaffleCount: statsRes.data.data.liveRaffleCount,
-        tokenType: "MIXED", // contains mixed token types
+        // totalRevenue: statsRes.data.data.totalRevenue,
+        // totalTicketsSold: statsRes.data.data.totalTicketsSold,
+        // totalPlatformRevenue: statsRes.data.data.totalPlatformRevenue,
+        // liveRaffleCount: statsRes.data.data.liveRaffleCount,
+        // tokenType: "MIXED", //for mixed of sol and other tokens
+        totalRevenue: statsRes.data.data.primaryTokenStats.totalRevenue,
+        totalTicketsSold: statsRes.data.data.primaryTokenStats.totalTicketsSold,
+        totalPlatformRevenue:
+          statsRes.data.data.primaryTokenStats.totalPlatformRevenue,
+        liveRaffleCount: statsRes.data.data.primaryTokenStats.liveRaffleCount,
+        tokenType: "SOL", //sol only
       });
-      
+
       // Set XP stats if available
       if (xpRes.data.data?.totalStats) {
         setXpStats({
@@ -72,7 +80,6 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
-
 
   useEffect(() => {
     fetchDashboardData();
@@ -130,7 +137,9 @@ export default function AdminDashboard() {
           value={
             stats.tokenType === "MIXED"
               ? `${stats.totalPlatformRevenue.toFixed(4)} (Mixed)`
-              : `${stats.totalPlatformRevenue} ${getTokenSymbol(stats.tokenType)}`
+              : `${stats.totalPlatformRevenue} ${getTokenSymbol(
+                  stats.tokenType
+                )}`
           }
           // change={0}
           // trend="up"
@@ -230,7 +239,10 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               {topCreators.length > 0 ? (
                 topCreators.map((creator) => (
-                  <TopCreatorItem key={creator.walletAddress} creator={creator} />
+                  <TopCreatorItem
+                    key={creator.walletAddress}
+                    creator={creator}
+                  />
                 ))
               ) : (
                 <p className="text-muted-foreground">
