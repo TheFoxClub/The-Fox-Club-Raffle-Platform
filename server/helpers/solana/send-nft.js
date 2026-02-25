@@ -281,7 +281,9 @@ const handlePNFT = async ({
         instruction: fromWeb3JsInstruction(solTransferIx),
       });
 
-      const builtTx = await txBuilder.useV0().buildWithLatestBlockhash(tempUmi);
+      const builtTx = await txBuilder
+        .useLegacyVersion()
+        .buildWithLatestBlockhash(tempUmi);
 
       logger.info(
         `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`
@@ -350,7 +352,7 @@ const handlePNFT = async ({
       });
 
       const builtTx = await txBuilder
-        .useV0()
+        .useLegacyVersion()
         .buildWithLatestBlockhash(transferUmi);
 
       logger.info(`Transaction built successfully`);
@@ -437,7 +439,7 @@ const handleMPLCore = async ({
         .add({
           instruction: fromWeb3JsInstruction(solTransferIx),
         })
-        .useV0()
+        .useLegacyVersion()
         .buildWithLatestBlockhash(tempUmi);
 
       logger.info(
@@ -537,7 +539,7 @@ const handleCNFT = async ({
           instruction: fromWeb3JsInstruction(solTransferIx),
         })
         .setFeePayer(createNoopSigner(publicKey(toAccountAddress)))
-        .useV0()
+        .useLegacyVersion()
         .buildWithLatestBlockhash(umi);
     } else {
       const solTransferIx = SystemProgram.transfer({
@@ -550,7 +552,7 @@ const handleCNFT = async ({
           instruction: fromWeb3JsInstruction(solTransferIx),
         })
         .setFeePayer(createNoopSigner(publicKey(fromAccountAddress)))
-        .useV0()
+        .useLegacyVersion()
         .buildWithLatestBlockhash(umi);
     }
 
