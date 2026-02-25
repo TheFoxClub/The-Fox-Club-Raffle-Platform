@@ -2,11 +2,15 @@ const {
   SPL_TOKEN_SEND_TX_STATUS,
   mapEnumValue,
   TOKEN_TYPE,
+  SPL_TOKEN_ADDRESS,
 } = require("../config/data");
 const { sequelize } = require("../models");
 const logger = require("../util/logger");
+const PriceService = require("./price.service");
+const { getTokenUsdPrice } = require("./price.service");
+const { getXpRates } = require("./xp.service");
 
-const getTopHosts = async (limit = 10) => {
+const getTopHosts = async (limit = 10, xpConfig) => {
   try {
     // Get top hosts by SOL revenue only (tokenType = 0) from raffles table
     const results = await sequelize.query(
@@ -31,21 +35,32 @@ const getTopHosts = async (limit = 10) => {
       }
     );
 
-    return results.map((host, index) => ({
+    //converting sol to usd, and converting usd to XP as per XP Configs
+    const solToUsdPrice = await PriceService.getTokenUsdPrice(
+      SPL_TOKEN_ADDRESS.SOLANA
+    );
+
+    //converting each revenue to XP
+    const xpResults = results.map((host, index) => ({
       rank: index + 1,
       walletAddress: host.walletAddress,
-      totalRevenue: parseFloat(host.totalRevenue || 0),
+      totalRevenue:
+        (parseFloat(host.totalRevenue || 0) * solToUsdPrice) /
+        xpConfig.raffle_revenue_rate,
       rafflesCount: parseInt(host.rafflesCount || 0, 10),
       tokenType: mapEnumValue(TOKEN_TYPE, host.tokenType),
-      tokenAddress: null, 
+      isXPValue: true,
+      tokenAddress: null,
     }));
+
+    return xpResults;
   } catch (error) {
     logger.error("Error getting top hosts:", error);
     return [];
   }
 };
 
-const getTopBuyers = async (limit = 10) => {
+const getTopBuyers = async (limit = 10, xpConfig) => {
   try {
     // Get top buyers by SOL spending only (type = 0)
     const results = await sequelize.query(
@@ -114,16 +129,25 @@ const getTopBuyers = async (limit = 10) => {
       return acc;
     }, {});
 
-    return buyers.map((buyer, index) => ({
+    //converting sol to usd, and converting usd to XP as per XP Configs
+    const solToUsdPrice = await PriceService.getTokenUsdPrice(
+      SPL_TOKEN_ADDRESS.SOLANA
+    );
+
+    const xpBuyers = buyers.map((buyer, index) => ({
       rank: index + 1,
       walletAddress: buyer.walletAddress,
-      totalSpent: parseFloat(buyer.totalSpent || 0),
+      totalSpent:
+        (parseFloat(buyer.totalSpent || 0) * solToUsdPrice) /
+        xpConfig.ticket_purchase_rate,
       ticketsBought: parseInt(ticketCounts[buyer.walletAddress] || 0, 10),
       transactionsCount: parseInt(buyer.transactionsCount || 0, 10),
       totalWins: winsLookup[buyer.walletAddress] || 0,
       tokenType: mapEnumValue(TOKEN_TYPE, buyer.tokenType),
-      tokenAddress: null, 
+      tokenAddress: null,
     }));
+
+    return xpBuyers;
   } catch (error) {
     logger.error("Error getting top buyers:", error);
     return [];

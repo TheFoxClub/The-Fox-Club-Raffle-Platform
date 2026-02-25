@@ -28,6 +28,7 @@ const {
 } = require("../services/leaderboard.service");
 const redisClient = require("../util/redisClient");
 const { getFeeData } = require("../helpers/cache/system-fee");
+const XpService = require("../services/xp.service");
 
 class AdminController {
   static async getAllRaffles(req, res) {
@@ -774,14 +775,16 @@ class AdminController {
   static async getTopHostsAndBuyers(req, res) {
     try {
       const { limit = 10 } = req.query;
+      const xpConfig = await XpService.getXpRates();
 
-      const topHosts = await getTopHosts(limit);
+      const topHosts = await getTopHosts(limit, xpConfig);
 
-      const topBuyers = await getTopBuyers(limit);
+      const topBuyers = await getTopBuyers(limit, xpConfig);
 
       return respond(res, httpStatus.OK, "Top hosts and buyers fetched!", {
         topHosts,
         topBuyers,
+        xpConfig,
       });
     } catch (error) {
       logger.error("Error getting top hosts and buyers:", error);
