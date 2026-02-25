@@ -110,6 +110,30 @@ class RedisClient {
     }
   }
 
+  async deleteByPattern(pattern) {
+    try {
+      if (!this.client || this.client.status !== "ready") {
+        return false;
+      }
+
+      const stream = this.client.scanStream({
+        match: pattern,
+        count: 100,
+      });
+
+      for await (const keys of stream) {
+        if (keys.length) {
+          await this.client.del(...keys);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      logger.error(`Redis deleteByPattern error for ${pattern}:`, error);
+      return false;
+    }
+  }
+
   disconnect() {
     if (this.client) {
       this.client.quit();
