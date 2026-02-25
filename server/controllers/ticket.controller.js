@@ -159,8 +159,9 @@ class TicketController {
       const feeData = await getFeeData();
 
       const commissionRate = isNFTHolder
-        ? feeData.holder_participant_fee || COMMISSION_RATES.HOLDER
-        : feeData.non_holder_participant_fee || COMMISSION_RATES.NON_HOLDER;
+        ? feeData.holder_participant_fee / 100 || COMMISSION_RATES.HOLDER
+        : feeData.non_holder_participant_fee / 100 ||
+          COMMISSION_RATES.NON_HOLDER;
 
       const ticketPrice = raffleData.ticketPrice;
       const totalSolAmount = ticketPrice * ticketCount;
