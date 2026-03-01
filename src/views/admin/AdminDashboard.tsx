@@ -62,7 +62,7 @@ export default function AdminDashboard() {
         totalTicketsSold: statsRes.data.data.primaryTokenStats.totalTicketsSold,
         totalPlatformRevenue:
           statsRes.data.data.primaryTokenStats.totalPlatformRevenue,
-        liveRaffleCount: statsRes.data.data.primaryTokenStats.liveRaffleCount,
+        liveRaffleCount: statsRes.data.data.liveRaffleCount,
         tokenType: "SOL", //sol only
       });
 
