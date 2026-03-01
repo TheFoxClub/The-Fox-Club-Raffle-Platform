@@ -21,6 +21,7 @@ const {
   SPL_TOKEN_ADDRESS,
   SPL_TOKEN_SEND_TRANSACTION_TYPE,
   SPL_TOKEN_SEND_TX_STATUS,
+  COLLECTION_ISVERIFIED,
 } = require("../config/data");
 const getFormattedDate = require("../util/getFormattedDate");
 const {
@@ -624,6 +625,14 @@ class RaffleController {
         );
       }
 
+      //updating verifiedCollectionRequired
+      let verifiedCollectionAddress = undefined;
+      if (rewards.length === 1 && rewards[0].rewardType === "NFT") {
+        verifiedCollectionAddress = JSON.parse(
+          rewards[0].metadataJson
+        ).collection;
+      }
+
       // Handle existing draft conversion to live raffle
       if (draftId && statusEnum !== RAFFLE_STATUS.DRAFT) {
         // User wants to convert existing draft to live raffle
@@ -740,7 +749,7 @@ class RaffleController {
 
         if (
           requiresNftVerification !== undefined ||
-          verifiedCollectionRequired !== undefined ||
+          verifiedCollectionAddress !== undefined ||
           additionalJson !== undefined
         ) {
           await RaffleDetail.update(
@@ -750,8 +759,8 @@ class RaffleController {
                   ? requiresNftVerification
                   : existingDraft.raffle_detail?.requiresNftVerification,
               verifiedCollectionRequired:
-                verifiedCollectionRequired !== undefined
-                  ? verifiedCollectionRequired
+                verifiedCollectionAddress !== undefined
+                  ? verifiedCollectionAddress
                   : existingDraft.raffle_detail?.verifiedCollectionRequired,
               additionalJson:
                 additionalJson !== undefined
@@ -1134,7 +1143,7 @@ class RaffleController {
         isFeatured: isFeatured,
         featuredUntil: isFeatured === true ? endDate : null,
         requiresNftVerification: requiresNftVerification || false,
-        verifiedCollectionRequired: verifiedCollectionRequired || null,
+        verifiedCollectionRequired: verifiedCollectionAddress || null,
         additionalJson: additionalJson || null,
       });
 
@@ -2767,6 +2776,9 @@ class RaffleController {
       if (collection === "verified") {
         const verifiedAddresses = await VerifiedCollection.findAll({
           attributes: ["address"],
+          where: {
+            isVerified: COLLECTION_ISVERIFIED.TRUE,
+          },
         });
         const addresses = verifiedAddresses.map((v) => v.address);
 
@@ -2907,12 +2919,19 @@ class RaffleController {
         tokenType: tokenType ? TOKEN_TYPE[tokenType] : draft.tokenType,
       });
 
+      let verifiedCollectionAddress = undefined;
+      if (rewards.length === 1 && rewards[0].rewardType === "NFT") {
+        verifiedCollectionAddress = JSON.parse(
+          rewards[0].metadataJson
+        ).collection;
+      }
+
       await draft.raffle_detail.update({
         requiresNftVerification:
           requiresNftVerification ??
           draft.raffle_detail.requiresNftVerification,
         verifiedCollectionRequired:
-          verifiedCollectionRequired ??
+          verifiedCollectionAddress ??
           draft.raffle_detail.verifiedCollectionRequired,
         additionalJson: additionalJson ?? draft.raffle_detail.additionalJson,
       });
