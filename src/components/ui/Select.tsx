@@ -59,6 +59,14 @@ export const Select: React.FC<SelectProps> = ({
     };
   }, [options]);
 
+  // Re-populate the map after the dropdown closes, because SelectItem cleanup
+  // (unregisterItem) clears the map entries when SelectContent unmounts.
+  useEffect(() => {
+    if (!open && options) {
+      options.forEach((opt) => itemsRef.current.set(opt.value, opt.label));
+    }
+  }, [open, options]);
+
   const setValue = useCallback(
     (v: string) => {
       if (!isControlled) setInternalValue(v);
