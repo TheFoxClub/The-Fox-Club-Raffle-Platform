@@ -29,6 +29,8 @@ const {
 const redisClient = require("../util/redisClient");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const XpService = require("../services/xp.service");
+const { publicKey } = require("@metaplex-foundation/umi");
+const { getUmi } = require("../config/solana");
 
 class AdminController {
   static async getAllRaffles(req, res) {
@@ -539,6 +541,22 @@ class AdminController {
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(error)
       );
+    }
+  }
+
+  static async lookupCollectionByAddress(req, res) {
+    try {
+      const { address } = req.query;
+      if (!address || address.trim().length < 32) {
+        return respond(res, httpStatus.BAD_REQUEST, "Valid collection address is required");
+      }
+      const umi = getUmi();
+      const asset = await umi.rpc.getAsset(publicKey(address.trim()));
+      const name = asset?.content?.metadata?.name?.replace(/\0/g, "").trim() || null;
+      return respond(res, httpStatus.OK, "Collection metadata fetched", { name });
+    } catch (error) {
+      // Address not found on-chain or invalid — return null name instead of error to allow manual entry
+      return respond(res, httpStatus.OK, "No on-chain metadata found", { name: null });
     }
   }
 
