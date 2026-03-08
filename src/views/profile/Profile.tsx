@@ -702,25 +702,6 @@ const Profile = () => {
                           <span>{formatEndDate(ticket.endDate)}</span>
                         </div>
                       </div>
-
-                      {ticket.ticketNumbers?.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
-                          <span className="text-muted-foreground">
-                            {ticket.ticketNumbers.length === 1
-                              ? "Ticket Number:"
-                              : "Ticket Numbers:"}
-                          </span>
-
-                          {ticket.ticketNumbers.map((num: number) => (
-                            <span
-                              key={num}
-                              className="px-2 py-0.5 rounded-md bg-secondary/20 text-secondary border border-secondary/30"
-                            >
-                              #{num}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
                     <Link to={`/raffle/${ticket.raffleId}`}>
