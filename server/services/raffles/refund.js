@@ -74,18 +74,19 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
       lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
     })
   );
-  if (
-    raffleRewards.length === 1 &&
-    raffleRewards[0].rewardType === RAFFLE_REWARD_TYPES.NFT
-  ) {
+  // NFT refund — handles both single and multiple NFT rewards in one batched transaction
+  const allAreNFTs = raffleRewards.every(
+    (r) => r.rewardType === RAFFLE_REWARD_TYPES.NFT
+  );
+  if (allAreNFTs) {
+    const mintAddresses = raffleRewards.map((r) => ({
+      address: r.mintAddress,
+      nftType: "auto",
+    }));
+
     const nftTxResult = await addNftSendTransaction({
       transaction,
-      mintAddresses: [
-        {
-          address: raffleRewards[0].mintAddress,
-          nftType: "auto", // Auto-detect NFT type
-        },
-      ],
+      mintAddresses,
       toAccountAddress: toAccount,
       fromAccountAddress: fromAccount,
       direction: "platform_to_user",
@@ -96,15 +97,13 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
       message: "NFT refund",
       data: {
         ...nftTxResult,
-        transactionDetails: [
-          {
-            tokenAddress: raffleRewards[0].mintAddress,
-            uiAmount: 1,
-            raffleTitle: raffle.title,
-            decimal: 0,
-            type: RAFFLE_REWARD_TYPES.NFT,
-          },
-        ],
+        transactionDetails: raffleRewards.map((r) => ({
+          tokenAddress: r.mintAddress,
+          uiAmount: 1,
+          raffleTitle: raffle.title,
+          decimal: 0,
+          type: RAFFLE_REWARD_TYPES.NFT,
+        })),
       },
     };
   }
@@ -152,9 +151,34 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
     }
 
     if (!tokenDetail) {
-      throw new Error(
-        `Failed to get token details for ${tokenAddress}. This might be an NFT - please check the reward type.`
+      // getTokenDetail returned null — mint is likely an NFT stored with wrong rewardType.
+      // Fall back to NFT transfer to avoid crashing the refund flow.
+      logger.warn(
+        `getTokenDetail returned null for ${tokenAddress} in refund — falling back to NFT transfer`
       );
+      const nftResult = await addNftSendTransaction({
+        transaction,
+        mintAddresses: [{ address: tokenAddress, nftType: "auto" }],
+        toAccountAddress: toAccount,
+        fromAccountAddress: fromAccount,
+        direction: "platform_to_user",
+      });
+      return {
+        success: true,
+        message: "NFT refund",
+        data: {
+          ...nftResult,
+          transactionDetails: [
+            {
+              tokenAddress,
+              uiAmount: 1,
+              raffleTitle: raffle.title,
+              decimal: 0,
+              type: RAFFLE_REWARD_TYPES.NFT,
+            },
+          ],
+        },
+      };
     }
 
     const { transferFeeConfig, decimals, tokenProgramId } = tokenDetail;

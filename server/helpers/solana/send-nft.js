@@ -281,7 +281,7 @@ const handlePNFT = async ({
       logger.info(`Destination token account: ${destinationTokenAccount[0]}`);
       logger.info(`Destination token record: ${destinationTokenRecord[0]}`);
 
-      const txBuilder = transferV1(tempUmi, {
+      let txBuilder = transferV1(tempUmi, {
         mint: asset.mint.publicKey,
         authority: platformNoopSigner, // Platform wallet (owns the pNFT) - noop for now
         tokenOwner: umiFrom,
@@ -298,9 +298,27 @@ const handlePNFT = async ({
         authorizationData: undefined,
         payer: userPayerSigner, // User pays fees
         amount: 1,
-      }).add({
-        instruction: fromWeb3JsInstruction(solTransferIx),
       });
+
+      // Only add fee instruction for standalone transactions.
+      // In batch mode the outer transaction already carries the fee.
+      if (!returnInstructionsOnly) {
+        txBuilder = txBuilder.add({
+          instruction: fromWeb3JsInstruction(solTransferIx),
+        });
+      }
+
+      // Extract raw instructions before compilation for batch mode
+      if (returnInstructionsOnly) {
+        const items = txBuilder.items.flat();
+        const instructions = items.map((item) =>
+          toWeb3JsInstruction(item.instruction)
+        );
+        logger.info(
+          `pNFT (p2u) instructions extracted for batching (${instructions.length} instructions)`
+        );
+        return { instructions, type: "pnft" };
+      }
 
       const builtTx = await txBuilder
         .useLegacyVersion()
@@ -456,11 +474,6 @@ const handleMPLCore = async ({
 
     let builtTx;
     if (direction === "platform_to_user") {
-      const solTransferIx = SystemProgram.transfer({
-        fromPubkey: new PublicKey(toAccountAddress),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-        lamports: transactionFee * LAMPORTS_PER_SOL,
-      });
       const platformNoopSigner = createNoopSigner(
         publicKey(fromAccountAddress)
       );
@@ -474,16 +487,40 @@ const handleMPLCore = async ({
         `Building UNSIGNED MPL Core transfer transaction for user to sign first`
       );
 
-      builtTx = await transferCoreV1(tempUmi, {
+      let coreP2UBuilder = transferCoreV1(tempUmi, {
         asset: coreAsset.publicKey,
         collection,
         authority: platformNoopSigner, // Platform wallet owns the asset - noop for now
         newOwner: publicKey(toAccountAddress), // Transfer to user wallet
         payer: userPayer, // User pays fees
-      })
-        .add({
+      });
+
+      // Only add fee instruction when building a standalone transaction.
+      // In batch mode the outer transaction already carries the fee.
+      if (!returnInstructionsOnly) {
+        const solTransferIx = SystemProgram.transfer({
+          fromPubkey: new PublicKey(toAccountAddress),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: transactionFee * LAMPORTS_PER_SOL,
+        });
+        coreP2UBuilder = coreP2UBuilder.add({
           instruction: fromWeb3JsInstruction(solTransferIx),
-        })
+        });
+      }
+
+      // Extract raw instructions before compilation for batch mode
+      if (returnInstructionsOnly) {
+        const items = coreP2UBuilder.items.flat();
+        const instructions = items.map((item) =>
+          toWeb3JsInstruction(item.instruction)
+        );
+        logger.info(
+          `MPL Core (p2u) instructions extracted for batching (${instructions.length} instructions)`
+        );
+        return { instructions, type: "mpl_core" };
+      }
+
+      builtTx = await coreP2UBuilder
         .useLegacyVersion()
         .buildWithLatestBlockhash(tempUmi);
 
@@ -598,16 +635,36 @@ const handleCNFT = async ({
     const feeData = await getFeeData();
     const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
     if (direction === "platform_to_user") {
-      const solTransferIx = SystemProgram.transfer({
-        fromPubkey: new PublicKey(toAccountAddress),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-        lamports: transactionFee * LAMPORTS_PER_SOL,
-      });
-      builtTx = await cnftTransferBuilder
-        .add({
+      let cnftP2UBuilder = cnftTransferBuilder.setFeePayer(
+        createNoopSigner(publicKey(toAccountAddress))
+      );
+
+      // Only add fee instruction for standalone transactions.
+      // In batch mode the outer transaction already carries the fee.
+      if (!returnInstructionsOnly) {
+        const solTransferIx = SystemProgram.transfer({
+          fromPubkey: new PublicKey(toAccountAddress),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: transactionFee * LAMPORTS_PER_SOL,
+        });
+        cnftP2UBuilder = cnftP2UBuilder.add({
           instruction: fromWeb3JsInstruction(solTransferIx),
-        })
-        .setFeePayer(createNoopSigner(publicKey(toAccountAddress)))
+        });
+      }
+
+      // Extract raw instructions before compilation for batch mode
+      if (returnInstructionsOnly) {
+        const items = cnftP2UBuilder.items.flat();
+        const instructions = items.map((item) =>
+          toWeb3JsInstruction(item.instruction)
+        );
+        logger.info(
+          `cNFT (p2u) instructions extracted for batching (${instructions.length} instructions)`
+        );
+        return { instructions, type: "cnft" };
+      }
+
+      builtTx = await cnftP2UBuilder
         .useLegacyVersion()
         .buildWithLatestBlockhash(umi);
     } else {
