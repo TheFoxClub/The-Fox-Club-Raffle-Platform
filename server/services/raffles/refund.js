@@ -50,9 +50,33 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
   const toAccount = raffleCreatorPubkey;
 
   //NFT refund
+  let transaction = new Transaction();
+
+  // Set compute budget for optimal performance
+  transaction.add(
+    ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: 300_000,
+    })
+  );
+
+  transaction.add(
+    ComputeBudgetProgram.setComputeUnitLimit({
+      units: 300_000,
+    })
+  );
+
+  //transaction fee
+  const transactionFee = Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
+  transaction.add(
+    SystemProgram.transfer({
+      fromPubkey: new PublicKey(toAccount),
+      toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+      lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+    })
+  );
   if (
     raffleRewards.length === 1 &&
-    raffleRewards[0].type === RAFFLE_REWARD_TYPES.NFT
+    raffleRewards[0].rewardType === RAFFLE_REWARD_TYPES.NFT
   ) {
     const nftTxResult = await addNftSendTransaction({
       transaction,
@@ -86,30 +110,6 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
   }
 
   //token refunds
-  let transaction = new Transaction();
-
-  // Set compute budget for optimal performance
-  transaction.add(
-    ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: 300_000,
-    })
-  );
-
-  transaction.add(
-    ComputeBudgetProgram.setComputeUnitLimit({
-      units: 300_000,
-    })
-  );
-
-  //transaction fee
-  const transactionFee = Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
-  transaction.add(
-    SystemProgram.transfer({
-      fromPubkey: new PublicKey(toAccount),
-      toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-      lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-    })
-  );
 
   let tokenTransactionDetails = [];
   for (const tokenReward of raffleRewards) {

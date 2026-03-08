@@ -9,6 +9,7 @@ const { DEFAULT_COMMISSION } = require("../config/constants");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const logger = require("../util/logger");
 const SocketService = require("./socket.service");
+const { getFeeData } = require("../helpers/cache/system-fee");
 
 const getSplTokenSendTransactions = async () => {
   const now = Date.now();
@@ -21,9 +22,9 @@ const getSplTokenSendTransactions = async () => {
     where: {
       txId: { [Op.not]: null },
       status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
-      createdAt: {
-        [Op.between]: [new Date(fiveMinutesAgo), new Date(oneMinuteAgo)],
-      },
+      // createdAt: {
+      //   [Op.between]: [new Date(fiveMinutesAgo), new Date(oneMinuteAgo)],
+      // },
     },
     // limit: 5,
     order: [["createdAt", "DESC"]],
@@ -132,14 +133,18 @@ const updateDbAndConfirmTransactions = async (op) => {
         return;
       }
 
-      const commissionInLamports = DEFAULT_COMMISSION * LAMPORTS_PER_SOL;
+      const feeData = await getFeeData();
+      const commissionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
+      const commissionInLamports = commissionFee * LAMPORTS_PER_SOL;
       const checks = () => {
         if (tx.details.txType === "solana") {
           return tx.details.amounts.some(
             (amount) =>
               amount ===
                 Number(existingTransaction.uiAmount) + commissionInLamports || // <-- transferring commission and amount to same wallet.
-              amount === Number(existingTransaction.uiAmount)
+              amount === Number(existingTransaction.uiAmount) ||
+              amount ===
+                Number(existingTransaction.uiAmount) - commissionInLamports // <-- transferring commission and amount to same wallet.
           );
         }
         return Number(existingTransaction.uiAmount) === tx.details.amount;

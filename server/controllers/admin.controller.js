@@ -28,6 +28,7 @@ const {
 } = require("../services/leaderboard.service");
 const redisClient = require("../util/redisClient");
 const { getFeeData } = require("../helpers/cache/system-fee");
+const XpService = require("../services/xp.service");
 
 class AdminController {
   static async getAllRaffles(req, res) {
@@ -371,6 +372,11 @@ class AdminController {
 
       await collection.destroy();
 
+      //delete user cache
+      const key = "nfts:all:*";
+      await redisClient.deleteByPattern(key);
+      logger.info("Deleted User NFTs cache after updating collection status");
+
       return respond(res, httpStatus.OK, "Collection deleted successfully");
     } catch (error) {
       logger.error(error);
@@ -419,6 +425,11 @@ class AdminController {
         isVerified: !collection.isVerified,
       });
 
+      //delete user cache
+      const key = "nfts:all:*";
+      await redisClient.deleteByPattern(key);
+      logger.info("Deleted User NFTs cache after updating collection status");
+
       return respond(
         res,
         httpStatus.OK,
@@ -458,7 +469,10 @@ class AdminController {
         const row = rows[i].trim();
         if (!row) continue;
 
-        const columns = row.split(",").map((col) => col.trim());
+        const cleanValue = (value) => value.trim().replace(/^['"]|['"]$/g, "");
+
+        const columns = row.split(",").map(cleanValue);
+
         const address = columns[0];
         const name = columns[1] || null;
 
@@ -774,14 +788,16 @@ class AdminController {
   static async getTopHostsAndBuyers(req, res) {
     try {
       const { limit = 10 } = req.query;
+      const xpConfig = await XpService.getXpRates();
 
-      const topHosts = await getTopHosts(limit);
+      const topHosts = await getTopHosts(limit, xpConfig);
 
-      const topBuyers = await getTopBuyers(limit);
+      const topBuyers = await getTopBuyers(limit, xpConfig);
 
       return respond(res, httpStatus.OK, "Top hosts and buyers fetched!", {
         topHosts,
         topBuyers,
+        xpConfig,
       });
     } catch (error) {
       logger.error("Error getting top hosts and buyers:", error);

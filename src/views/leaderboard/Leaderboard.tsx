@@ -22,9 +22,16 @@ import server from "../../config/server";
 import XPLeaderboard from "./XPLeaderboard";
 import { toast } from "react-toastify";
 
+interface TXpConfig {
+  ticket_purchase_rate: number;
+  raffle_revenue_rate: number;
+  raffle_creation_reward: number;
+}
+
 const Leaderboard = () => {
   const [topHosts, setTopHosts] = useState<any[]>([]);
   const [topBuyers, setTopBuyers] = useState<any[]>([]);
+  const [xpConfig, setXpConfig] = useState<TXpConfig>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -69,6 +76,7 @@ const Leaderboard = () => {
 
           setTopHosts(mappedHosts);
           setTopBuyers(mappedBuyers);
+          setXpConfig(json.data.xpConfig);
         }
       } catch (error) {
         console.error("Failed to fetch leaderboard:", error);
@@ -185,12 +193,16 @@ const Leaderboard = () => {
                         </div>
                         <div className="text-right">
                           <div className="flex items-center gap-2 justify-end mb-1">
-                            <Coins className="h-5 w-5 text-accent" />
-                            <p className="font-bold text-xl">{host.revenue}</p>
+                            {/* <Coins className="h-5 w-5 text-accent" />
+                            <p className="font-bold text-xl">{host.revenue}</p> */}
+                            <Star className="h- w-6 text-primary" />
+                            <span className="text-lg font-bold text-primary">
+                              {host.revenue.toLocaleString()} XP
+                            </span>
                           </div>
-                          <p className="text-sm text-muted-foreground">
+                          {/* <p className="text-sm text-muted-foreground">
                             {host.tokenType} earned
-                          </p>
+                          </p> */}
                         </div>
                       </div>
                     </Card>
@@ -252,12 +264,20 @@ const Leaderboard = () => {
                         </div>
                         <div className="text-right">
                           <div className="flex items-center gap-2 justify-end mb-1">
-                            <Coins className="h-5 w-5 text-accent" />
-                            <p className="font-bold text-xl">{buyer.spent}</p>
+                            {/* <Coins className="h-5 w-5 text-accent" />
+                            <p className="font-bold text-xl">{buyer.spent}</p> */}
+                            <div className="flex items-center gap-2 justify-end mb-1">
+                              {/* <Coins className="h-5 w-5 text-accent" />
+                            <p className="font-bold text-xl">{host.revenue}</p> */}
+                              <Star className="h- w-6 text-primary" />
+                              <span className="text-lg font-bold text-primary">
+                                {buyer.spent.toLocaleString()} XP
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground">
+                          {/* <p className="text-sm text-muted-foreground">
                             {buyer.tokenType} spent
-                          </p>
+                          </p> */}
                         </div>
                       </div>
                     </Card>
@@ -271,6 +291,32 @@ const Leaderboard = () => {
             <XPLeaderboard />
           </TabsContent>
         </Tabs>
+        {/* XP Conversion Info */}
+        {xpConfig && (
+          <Card className="bg-muted/40 border border-border p-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Award className="h-5 w-5 text-primary" />
+              <p className="font-semibold text-lg">XP Conversion Rates</p>
+            </div>
+
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">Top Hosts:</span>{" "}
+                1 XP = ${(1 / xpConfig.raffle_revenue_rate).toFixed(2)}
+              </p>
+
+              <p>
+                <span className="font-medium text-foreground">Top Buyers:</span>{" "}
+                1 XP = ${(1 / xpConfig.ticket_purchase_rate).toFixed(2)}
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-4">
+              XP is automatically calculated based on revenue generated and
+              ticket purchases.
+            </p>
+          </Card>
+        )}
       </div>
     </div>
   );

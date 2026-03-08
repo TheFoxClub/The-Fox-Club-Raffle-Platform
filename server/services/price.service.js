@@ -10,7 +10,7 @@ class PriceService {
    * @param {string} tokenSymbol - Token symbol for logging
    * @returns {Promise<number>} USD price or 0 if not found
    */
-  static async getTokenUsdPrice(tokenAddress, tokenSymbol = 'Unknown') {
+  static async getTokenUsdPrice(tokenAddress, tokenSymbol = "Unknown") {
     try {
       // USDC is always 1:1 with USD
       if (tokenAddress === SPL_TOKEN_ADDRESS.USDC) {
@@ -30,19 +30,27 @@ class PriceService {
       }
 
       // Try real-time price APIs
-      const realTimePrice = await this.fetchRealTimePrice(tokenAddress, tokenSymbol);
+      const realTimePrice = await this.fetchRealTimePrice(
+        tokenAddress,
+        tokenSymbol
+      );
       if (realTimePrice > 0) {
         await this.cachePrice(tokenAddress, realTimePrice);
-        logger.info(`Fetched real-time price for ${tokenSymbol}: $${realTimePrice}`);
+        logger.info(
+          `Fetched real-time price for ${tokenSymbol}: $${realTimePrice}`
+        );
         return realTimePrice;
       }
 
       // No price found - award 0 XP with warning
-      logger.warn(`No USDC equivalent price found for token ${tokenSymbol} (${tokenAddress}), awarding 0 XP`);
+      logger.warn(
+        `No USDC equivalent price found for token ${tokenSymbol} (${tokenAddress}), awarding 0 XP`
+      );
       return 0;
-
     } catch (error) {
-      logger.error(`Error getting token price for ${tokenSymbol}: ${error.message}`);
+      logger.error(
+        `Error getting token price for ${tokenSymbol}: ${error.message}`
+      );
       return 0;
     }
   }
@@ -61,7 +69,7 @@ class PriceService {
       }
 
       // Try cache first
-      const cachedPrice = await this.getCachedPrice('SOL');
+      const cachedPrice = await this.getCachedPrice("SOL");
       if (cachedPrice !== null) {
         return cachedPrice;
       }
@@ -69,7 +77,7 @@ class PriceService {
       // Try CoinGecko API for SOL
       const solPrice = await this.fetchSolFromCoinGecko();
       if (solPrice > 0) {
-        await this.cachePrice('SOL', solPrice);
+        await this.cachePrice("SOL", solPrice);
         logger.info(`Fetched SOL price from CoinGecko: $${solPrice}`);
         return solPrice;
       }
@@ -77,14 +85,13 @@ class PriceService {
       // Try Jupiter API as fallback
       const jupiterPrice = await this.fetchSolFromJupiter();
       if (jupiterPrice > 0) {
-        await this.cachePrice('SOL', jupiterPrice);
+        await this.cachePrice("SOL", jupiterPrice);
         logger.info(`Fetched SOL price from Jupiter: $${jupiterPrice}`);
         return jupiterPrice;
       }
 
-      logger.warn('No SOL price found from any source, awarding 0 XP');
+      logger.warn("No SOL price found from any source, awarding 0 XP");
       return 0;
-
     } catch (error) {
       logger.error(`Error fetching SOL price: ${error.message}`);
       return 0;
@@ -100,12 +107,12 @@ class PriceService {
     const nodeEnv = process.env.NODE_ENV;
     const solanaCluster = process.env.SOLANA_CLUSTER;
     const useMockPrices = process.env.USE_MOCK_PRICES;
-    
+
     return (
-      nodeEnv === 'development' ||
-      solanaCluster === 'devnet' ||
-      solanaCluster === 'testnet' ||
-      useMockPrices === 'true'
+      nodeEnv === "development" ||
+      solanaCluster === "devnet" ||
+      solanaCluster === "testnet" ||
+      useMockPrices === "true"
     );
   }
 
@@ -115,7 +122,7 @@ class PriceService {
    */
   static getMockSolPrice() {
     // Use environment variable if set, otherwise default to $97
-    const mockPrice = parseFloat(process.env.MOCK_SOL_PRICE || '97.0');
+    const mockPrice = parseFloat(process.env.MOCK_SOL_PRICE || "97.0");
     return mockPrice;
   }
 
@@ -134,15 +141,19 @@ class PriceService {
       }
 
       // Try CoinGecko as fallback
-      const coinGeckoPrice = await this.fetchFromCoinGecko(tokenAddress, tokenSymbol);
+      const coinGeckoPrice = await this.fetchFromCoinGecko(
+        tokenAddress,
+        tokenSymbol
+      );
       if (coinGeckoPrice > 0) {
         return coinGeckoPrice;
       }
 
       return 0;
-
     } catch (error) {
-      logger.error(`Error fetching real-time price for ${tokenSymbol}: ${error.message}`);
+      logger.error(
+        `Error fetching real-time price for ${tokenSymbol}: ${error.message}`
+      );
       return 0;
     }
   }
@@ -153,14 +164,15 @@ class PriceService {
    */
   static async fetchSolFromCoinGecko() {
     try {
-      const https = require('https');
-      const url = 'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd';
-      
+      const https = require("https");
+      const url =
+        "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd";
+
       return new Promise((resolve, reject) => {
         const req = https.get(url, (res) => {
-          let data = '';
-          res.on('data', (chunk) => data += chunk);
-          res.on('end', () => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
             try {
               const parsed = JSON.parse(data);
               const price = parsed?.solana?.usd;
@@ -170,14 +182,13 @@ class PriceService {
             }
           });
         });
-        
-        req.on('error', () => resolve(0));
+
+        req.on("error", () => resolve(0));
         req.setTimeout(5000, () => {
           req.destroy();
           resolve(0);
         });
       });
-
     } catch (error) {
       return 0;
     }
@@ -190,14 +201,14 @@ class PriceService {
    */
   static async fetchFromJupiter(tokenAddress) {
     try {
-      const https = require('https');
+      const https = require("https");
       const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}`;
-      
+
       return new Promise((resolve, reject) => {
         const req = https.get(url, (res) => {
-          let data = '';
-          res.on('data', (chunk) => data += chunk);
-          res.on('end', () => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
             try {
               const parsed = JSON.parse(data);
               const price = parsed?.data?.[tokenAddress]?.price;
@@ -207,14 +218,13 @@ class PriceService {
             }
           });
         });
-        
-        req.on('error', () => resolve(0));
+
+        req.on("error", () => resolve(0));
         req.setTimeout(5000, () => {
           req.destroy();
           resolve(0);
         });
       });
-
     } catch (error) {
       return 0;
     }
@@ -284,7 +294,7 @@ class PriceService {
    */
   static async getBatchTokenPrices(tokens) {
     const prices = {};
-    
+
     // Process tokens in parallel but limit concurrency
     const batchSize = 5;
     for (let i = 0; i < tokens.length; i += batchSize) {
@@ -293,13 +303,13 @@ class PriceService {
         const price = await this.getTokenUsdPrice(token.address, token.symbol);
         return { address: token.address, price };
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
-      batchResults.forEach(result => {
+      batchResults.forEach((result) => {
         prices[result.address] = result.price;
       });
     }
-    
+
     return prices;
   }
 }

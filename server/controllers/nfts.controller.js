@@ -121,6 +121,9 @@ class HolderController {
       //filtering nfts with collections
       const allVerifiedCollections = await VerifiedCollection.findAll({
         raw: true,
+        where: {
+          isVerified: true,
+        },
       });
       const verifiedCollectionAddresses = allVerifiedCollections.map(
         (item) => item.address
