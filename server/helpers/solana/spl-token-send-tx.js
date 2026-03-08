@@ -104,7 +104,15 @@ const sendMultipleSplTokenTx = async ({
     let signatures = [];
     let transactionDetails = [];
 
-    for (const txDetail of splTokenSendSummary) {
+    // Handle each reward type cleanly.
+    const nftItems = splTokenSendSummary.filter(
+      (item) => item.type === RAFFLE_REWARD_TYPES.NFT
+    );
+    const nonNftItems = splTokenSendSummary.filter(
+      (item) => item.type !== RAFFLE_REWARD_TYPES.NFT
+    );
+
+    for (const txDetail of nonNftItems) {
       const { tokenAddress, toAccount, amount, type, metadata = {} } = txDetail;
 
       switch (type) {
@@ -127,64 +135,6 @@ const sendMultipleSplTokenTx = async ({
               ? "user_to_platform"
               : "platform_to_user",
           });
-          break;
-
-        case RAFFLE_REWARD_TYPES.NFT:
-          // NFT transfers cannot be combined with other transfers in the same transaction
-          // If there are multiple rewards including NFTs, we need to handle them separately
-          if (splTokenSendSummary.length > 1) {
-            throw new Error(
-              "Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only."
-            );
-          }
-
-          // Single NFT transfer
-          try {
-            const serializedTx = await addNftSendTransaction({
-              transaction,
-              mintAddresses: [
-                {
-                  address: tokenAddress,
-                  nftType: "auto", // Auto-detect NFT type
-                },
-              ],
-              toAccountAddress: toAccount,
-              fromAccountAddress: fromAccount,
-              direction: isUserToPlatform
-                ? "user_to_platform"
-                : "platform_to_user",
-            });
-
-            if (serializedTx && serializedTx.serializedTx) {
-              // For NFT transfers, we return immediately with the serialized transaction
-              // The frontend needs to sign and submit this
-              return {
-                success: true,
-                data: serializedTx,
-                message: "Created NFT transfer transaction",
-                metadata: {
-                  type: "NFT",
-                  mint: tokenAddress,
-                  direction: isUserToPlatform
-                    ? "user_to_platform"
-                    : "platform_to_user",
-                },
-              };
-            }
-
-            transactionDetails.push({
-              type: "NFT",
-              mint: tokenAddress,
-              from: fromAccount,
-              to: toAccount,
-              direction: isUserToPlatform
-                ? "user_to_platform"
-                : "platform_to_user",
-            });
-          } catch (nftError) {
-            // logger.error(`NFT transfer failed for ${tokenAddress}:`, nftError);
-            throw new Error(`NFT transfer failed: ${nftError.message}`);
-          }
           break;
 
         default:
@@ -292,6 +242,42 @@ const sendMultipleSplTokenTx = async ({
             );
           }
           break;
+      }
+    }
+
+    // Batch all NFTs into a single transaction and returns one combined serialized tx.
+    if (nftItems.length > 0) {
+      const toAccount = nftItems[0].toAccount;
+      const mintAddresses = nftItems.map((item) => ({
+        address: item.tokenAddress,
+        nftType: "auto",
+      }));
+
+      try {
+        const nftResult = await addNftSendTransaction({
+          transaction,
+          mintAddresses,
+          toAccountAddress: toAccount,
+          fromAccountAddress: fromAccount,
+          direction: isUserToPlatform ? "user_to_platform" : "platform_to_user",
+        });
+
+        if (nftResult && nftResult.serializedTx) {
+          return {
+            success: true,
+            data: nftResult,
+            message: `Created NFT transfer transaction (${nftItems.length} NFT${nftItems.length > 1 ? "s" : ""})`,
+            metadata: {
+              type: "NFT",
+              mints: mintAddresses.map((m) => m.address),
+              direction: isUserToPlatform
+                ? "user_to_platform"
+                : "platform_to_user",
+            },
+          };
+        }
+      } catch (nftError) {
+        throw new Error(`NFT transfer failed: ${nftError.message}`);
       }
     }
 

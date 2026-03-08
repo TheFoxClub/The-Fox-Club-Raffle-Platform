@@ -34,7 +34,7 @@ import { UserXPCard } from "../../components/profile/UserXPCard";
 import { TokenDisplay } from "../../components/ui/TokenDisplay";
 import { formatRewardType } from "../../utils/rewardTypeUtils";
 import { setNotificationsCount } from "../../redux/userSlice";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 type HostedRaffle = {
@@ -408,21 +408,37 @@ const Profile = () => {
       if (res.data.success) {
         const txData = res.data.data;
         const transactionBuffer = Buffer.from(txData.serializedTx, "base64");
-        const deserializedTransaction = Transaction.from(transactionBuffer);
+
+        // Handle both legacy and versioned (pNFT) transactions
+        let deserializedTransaction: Transaction | VersionedTransaction;
+        let isVersioned = false;
+        try {
+          deserializedTransaction = Transaction.from(transactionBuffer);
+        } catch {
+          deserializedTransaction =
+            VersionedTransaction.deserialize(transactionBuffer);
+          isVersioned = true;
+        }
 
         setTxState("waitingSignature");
         const signedTransaction = await signTransaction(
-          deserializedTransaction
+          deserializedTransaction as any
         );
 
         setTxState("confirming");
+        const serializedSigned = isVersioned
+          ? Buffer.from(
+              (signedTransaction as VersionedTransaction).serialize()
+            )
+          : Buffer.from(
+              (signedTransaction as Transaction).serialize({
+                requireAllSignatures: false,
+                verifySignatures: false,
+              })
+            );
+
         const confirmDeleteRes = await server.post(`/raffle/delete/confirm`, {
-          signedBase64Tx: Buffer.from(
-            signedTransaction.serialize({
-              requireAllSignatures: false,
-              verifySignatures: false,
-            })
-          ).toString("base64"),
+          signedBase64Tx: serializedSigned.toString("base64"),
           checksum: txData.checksum,
           transactionDetails: txData.transactionDetails,
           raffleId,
