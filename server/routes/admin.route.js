@@ -90,6 +90,14 @@ router.patch(
   AdminController.toggleVerification,
 );
 
+// Get Collection Name from Collection Address
+router.get(
+  "/collection-name/lookup",
+  auth.bearer,
+  isAdmin,
+  AdminController.lookupCollectionByAddress,
+);
+
 // Get Top Creators
 router.get(
   "/top-creators",

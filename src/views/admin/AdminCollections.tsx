@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plus,
   CheckCircle,
@@ -38,6 +38,8 @@ export default function AdminCollections() {
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionAddress, setNewCollectionAddress] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fetchingName, setFetchingName] = useState(false);
+  const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [deletingCollection, setDeletingCollection] =
     useState<Collection | null>(null);
 
@@ -50,6 +52,33 @@ export default function AdminCollections() {
   // Bulk delete states
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewCollectionAddress(value);
+
+    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+
+    if (value.trim().length < 32) {
+      setFetchingName(false);
+      return;
+    }
+
+    addressDebounceRef.current = setTimeout(async () => {
+      try {
+        setFetchingName(true);
+        const res = await server.get("/admin/collection-name/lookup", {
+          params: { address: value.trim() },
+        });
+        const name = res.data?.data?.name;
+        if (name) setNewCollectionName(name);
+      } catch {
+        // silently ignore — admin can still type the name manually
+      } finally {
+        setFetchingName(false);
+      }
+    }, 700);
+  };
 
   // FETCH VERIFIED COLLECTIONS
   const fetchCollections = async () => {
@@ -310,8 +339,9 @@ export default function AdminCollections() {
                 <div className="space-y-2">
                   <Label>Collection Name</Label>
                   <Input
-                    placeholder="Fox Club Genesis"
+                    placeholder={fetchingName ? "Looking up on-chain..." : "Fox Club Genesis"}
                     value={newCollectionName}
+                    disabled={fetchingName}
                     onChange={(e) => setNewCollectionName(e.target.value)}
                   />
                 </div>
@@ -321,7 +351,7 @@ export default function AdminCollections() {
                     placeholder="FoxC...xyz1"
                     value={newCollectionAddress}
                     maxLength={50}
-                    onChange={(e) => setNewCollectionAddress(e.target.value)}
+                    onChange={handleAddressChange}
                   />
                 </div>
                 <Button

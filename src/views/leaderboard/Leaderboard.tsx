@@ -302,12 +302,12 @@ const Leaderboard = () => {
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
                 <span className="font-medium text-foreground">Top Hosts:</span>{" "}
-                1 XP = ${(1 / xpConfig.raffle_revenue_rate).toFixed(2)}
+                ${(1 / xpConfig.raffle_revenue_rate).toFixed(2)} = 1 XP
               </p>
 
               <p>
                 <span className="font-medium text-foreground">Top Buyers:</span>{" "}
-                1 XP = ${(1 / xpConfig.ticket_purchase_rate).toFixed(2)}
+                ${(1 / xpConfig.ticket_purchase_rate).toFixed(2)} = 1 XP
               </p>
             </div>
 
