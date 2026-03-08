@@ -33,6 +33,7 @@ const {
   fromWeb3JsKeypair,
   toWeb3JsTransaction,
   fromWeb3JsInstruction,
+  toWeb3JsInstruction,
 } = require("@metaplex-foundation/umi-web3js-adapters");
 
 const {
@@ -116,6 +117,9 @@ const createAssetWithProof = (rpcAsset, rpcAssetProof) => {
 
 /**
  * Handle legacy NFT transfer
+ * @param {boolean} returnInstructionsOnly - When true, return raw web3.js instructions instead of a
+ *   serialized transaction. Used by addNftSendTransaction when batching multiple NFTs; the caller is
+ *   responsible for adding fees and building the final transaction.
  */
 const handleLegacyNFT = async ({
   umi,
@@ -124,6 +128,7 @@ const handleLegacyNFT = async ({
   fromAccountAddress,
   toAccountAddress,
   direction,
+  returnInstructionsOnly = false,
 }) => {
   try {
     logger.info(
@@ -136,16 +141,29 @@ const handleLegacyNFT = async ({
     const fromAta = await getAssociatedTokenAddress(mint, from);
     const toAta = await getAssociatedTokenAddress(mint, to);
 
+    const instructions = [];
+
     // Check/create destination token account
     const toAtaInfo = await connection.getAccountInfo(toAta);
     if (!toAtaInfo) {
-      transaction.add(
+      instructions.push(
         createAssociatedTokenAccountInstruction(from, toAta, to, mint)
       );
     }
 
     // Add transfer instruction
-    transaction.add(createTransferInstruction(fromAta, toAta, from, 1));
+    instructions.push(createTransferInstruction(fromAta, toAta, from, 1));
+
+    // Instruction-only mode: let the caller assemble the final transaction
+    if (returnInstructionsOnly) {
+      logger.info(
+        `Legacy NFT instructions extracted for batching (${instructions.length} instructions)`
+      );
+      return { instructions, type: "legacy" };
+    }
+
+    // Legacy mode: add instructions to the passed-in transaction and serialize
+    instructions.forEach((ix) => transaction.add(ix));
 
     let blockhashResult = await umi.rpc.getLatestBlockhash();
 
@@ -197,6 +215,8 @@ const handleLegacyNFT = async ({
 
 /**
  * Handle pNFT (Programmable NFT) transfer
+ * @param {boolean} returnInstructionsOnly - When true, return raw web3.js instructions instead of a
+ *   serialized transaction. No fee instruction is included; the caller must add fees.
  */
 const handlePNFT = async ({
   umi,
@@ -204,6 +224,7 @@ const handlePNFT = async ({
   toAccountAddress,
   fromAccountAddress,
   direction = "user_to_platform",
+  returnInstructionsOnly = false,
 }) => {
   try {
     logger.info(
@@ -311,11 +332,6 @@ const handlePNFT = async ({
       // User is sending to platform - create unsigned transaction for user to sign
       const transferUmi = createUmi(connection);
       const userSigner = createNoopSigner(umiFrom);
-      const solTransferIx = SystemProgram.transfer({
-        fromPubkey: new PublicKey(fromAccountAddress),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-        lamports: transactionFee * LAMPORTS_PER_SOL,
-      });
 
       transferUmi
         .use(signerIdentity(userSigner))
@@ -332,8 +348,10 @@ const handlePNFT = async ({
 
       logger.info(`Building pNFT transfer transaction...`);
 
-      // Build the transfer - user is both authority and payer
-      const txBuilder = transferV1(transferUmi, {
+      // Build the transfer - user is both authority and payer.
+      // When returnInstructionsOnly=true we skip the fee instruction; the outer
+      // transaction (built by sendMultipleSplTokenTx) already carries it.
+      let txBuilder = transferV1(transferUmi, {
         mint: asset.mint.publicKey,
         authority: userSigner,
         tokenOwner: umiFrom,
@@ -347,9 +365,33 @@ const handlePNFT = async ({
         authorizationRulesProgram: getMplTokenAuthRulesProgramId(transferUmi),
         authorizationData: undefined,
         payer: userSigner,
-      }).add({
-        instruction: fromWeb3JsInstruction(solTransferIx),
       });
+
+      if (!returnInstructionsOnly) {
+        const solTransferIx = SystemProgram.transfer({
+          fromPubkey: new PublicKey(fromAccountAddress),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: transactionFee * LAMPORTS_PER_SOL,
+        });
+        txBuilder = txBuilder.add({
+          instruction: fromWeb3JsInstruction(solTransferIx),
+        });
+      }
+
+      // Extract instructions from the builder BEFORE compiling when in batch
+      // mode.  builder.items holds uncompiled UMI instructions with explicit
+      // pubkeys, so toWeb3JsInstruction() converts them cleanly without the
+      // decompilation issues that toWeb3JsTransaction() can cause.
+      if (returnInstructionsOnly) {
+        const items = txBuilder.items.flat();
+        const instructions = items.map((item) =>
+          toWeb3JsInstruction(item.instruction)
+        );
+        logger.info(
+          `pNFT instructions extracted for batching (${instructions.length} instructions)`
+        );
+        return { instructions, type: "pnft" };
+      }
 
       const builtTx = await txBuilder
         .useLegacyVersion()
@@ -377,6 +419,8 @@ const handlePNFT = async ({
 
 /**
  * Handle MPL Core NFT transfer - Build unsigned transaction for user signing
+ * @param {boolean} returnInstructionsOnly - When true, return raw web3.js instructions instead of a
+ *   serialized transaction. No fee instruction is included; the caller must add fees.
  */
 const handleMPLCore = async ({
   umi,
@@ -385,6 +429,7 @@ const handleMPLCore = async ({
   fromAccountAddress,
   direction,
   frontEndSigner,
+  returnInstructionsOnly = false,
 }) => {
   try {
     logger.info(
@@ -446,26 +491,47 @@ const handleMPLCore = async ({
         `Transaction built with ${builtTx.message.instructions.length} instructions (UNSIGNED)`
       );
     } else {
-      // Build transaction with a user identity to avoid extra required signers
-      const solTransferIx = SystemProgram.transfer({
-        fromPubkey: new PublicKey(fromAccountAddress),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-        lamports: transactionFee * LAMPORTS_PER_SOL,
-      });
+      // Build transaction with a user identity to avoid extra required signers.
+      // When returnInstructionsOnly=true we skip the fee instruction; the outer
+      // transaction (built by sendMultipleSplTokenTx) already carries it.
       const userSigner = createNoopSigner(publicKey(fromAccountAddress));
       const transferUmi = createUmi(connection);
 
       transferUmi.use(signerIdentity(userSigner)).use(mplCore());
 
-      builtTx = await transferCoreV1(transferUmi, {
+      let coreBuilder = transferCoreV1(transferUmi, {
         asset: coreAsset.publicKey,
         collection,
         newOwner: publicKey(toAccountAddress), // Transfer to platform wallet
-      })
-        .add({
+      });
+
+      if (!returnInstructionsOnly) {
+        const solTransferIx = SystemProgram.transfer({
+          fromPubkey: new PublicKey(fromAccountAddress),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: transactionFee * LAMPORTS_PER_SOL,
+        });
+        coreBuilder = coreBuilder.add({
           instruction: fromWeb3JsInstruction(solTransferIx),
-        })
-        .useV0()
+        });
+      }
+
+      // Extract instructions from the builder BEFORE compiling when in batch
+      // mode.  builder.items holds uncompiled UMI instructions with explicit
+      // pubkeys, so toWeb3JsInstruction() converts them cleanly.
+      if (returnInstructionsOnly) {
+        const items = coreBuilder.items.flat();
+        const instructions = items.map((item) =>
+          toWeb3JsInstruction(item.instruction)
+        );
+        logger.info(
+          `MPL Core instructions extracted for batching (${instructions.length} instructions)`
+        );
+        return { instructions, type: "mpl_core" };
+      }
+
+      builtTx = await coreBuilder
+        .useLegacyVersion()
         .buildWithLatestBlockhash(transferUmi);
     }
 
@@ -503,6 +569,8 @@ const handleMPLCore = async ({
 
 /**
  * Handle cNFT (Compressed NFT) transfer
+ * @param {boolean} returnInstructionsOnly - When true, return raw web3.js instructions instead of a
+ *   serialized transaction. No fee instruction is included; the caller must add fees.
  */
 const handleCNFT = async ({
   umi,
@@ -510,6 +578,7 @@ const handleCNFT = async ({
   toAccountAddress,
   fromAccountAddress,
   direction,
+  returnInstructionsOnly = false,
 }) => {
   try {
     logger.info(
@@ -542,16 +611,38 @@ const handleCNFT = async ({
         .useLegacyVersion()
         .buildWithLatestBlockhash(umi);
     } else {
-      const solTransferIx = SystemProgram.transfer({
-        fromPubkey: new PublicKey(fromAccountAddress),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
-        lamports: transactionFee * LAMPORTS_PER_SOL,
-      });
-      builtTx = await cnftTransferBuilder
-        .add({
+      // When returnInstructionsOnly=true we skip the fee instruction; the outer
+      // transaction (built by sendMultipleSplTokenTx) already carries it.
+      let cnftBuilder = cnftTransferBuilder.setFeePayer(
+        createNoopSigner(publicKey(fromAccountAddress))
+      );
+
+      if (!returnInstructionsOnly) {
+        const solTransferIx = SystemProgram.transfer({
+          fromPubkey: new PublicKey(fromAccountAddress),
+          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          lamports: transactionFee * LAMPORTS_PER_SOL,
+        });
+        cnftBuilder = cnftBuilder.add({
           instruction: fromWeb3JsInstruction(solTransferIx),
-        })
-        .setFeePayer(createNoopSigner(publicKey(fromAccountAddress)))
+        });
+      }
+
+      // Extract instructions from the builder BEFORE compiling when in batch
+      // mode.  builder.items holds uncompiled UMI instructions with explicit
+      // pubkeys, so toWeb3JsInstruction() converts them cleanly.
+      if (returnInstructionsOnly) {
+        const items = cnftBuilder.items.flat();
+        const instructions = items.map((item) =>
+          toWeb3JsInstruction(item.instruction)
+        );
+        logger.info(
+          `cNFT instructions extracted for batching (${instructions.length} instructions)`
+        );
+        return { instructions, type: "cnft" };
+      }
+
+      builtTx = await cnftBuilder
         .useLegacyVersion()
         .buildWithLatestBlockhash(umi);
     }
@@ -609,7 +700,19 @@ const detectNFTType = async (umi, mint, ownerPublicKey) => {
 };
 
 /**
- * Main function to add NFT transfer instructions
+ * Main function to add NFT transfer instructions.
+ *
+ * For a SINGLE mint the function keeps backward-compatible behaviour and returns a
+ * fully serialized transaction (includes fee instructions added by each handler).
+ *
+ * For MULTIPLE mints the function operates in batch mode:
+ *  - Each handler is called with `returnInstructionsOnly=true` so it returns raw
+ *    web3.js TransactionInstruction[] without a fee instruction (fees are expected
+ *    to already be present in the `transaction` argument that comes from
+ *    sendMultipleSplTokenTx).
+ *  - All instructions (outer + per-NFT) are merged into a single UMI legacy
+ *    transaction, serialized once and returned in the same shape as the single
+ *    NFT case so callers don't need to change.
  */
 const addNftSendTransaction = async ({
   transaction,
@@ -620,7 +723,7 @@ const addNftSendTransaction = async ({
 }) => {
   try {
     logger.info(`Starting NFT transfer process:`, {
-      mintAddresses,
+      mintCount: mintAddresses.length,
       toAccountAddress,
       fromAccountAddress,
       direction,
@@ -637,14 +740,14 @@ const addNftSendTransaction = async ({
       .use(mplTokenMetadata())
       .use(mplCore());
 
-    // Create noop signer for the user (for building unsigned transactions)
-    const userSigner = createNoopSigner(publicKey(fromAccountAddress));
+    const isBatchMode = mintAddresses.length > 1;
 
-    for (const { address, nftType } of mintAddresses) {
+    if (!isBatchMode) {
+      // ── Single NFT: original behaviour ──────────────────────────────────────
+      const { address, nftType } = mintAddresses[0];
       const mint = new PublicKey(address);
       let detectedType = nftType;
 
-      // Auto-detect if type not specified
       if (detectedType === "auto" || !detectedType) {
         detectedType = await detectNFTType(umi, mint, fromAccountAddress);
       }
@@ -667,14 +770,13 @@ const addNftSendTransaction = async ({
 
         case "pnft":
         case "programmable":
-          const serializedPNFT = await handlePNFT({
+          return await handlePNFT({
             umi,
             mint,
             toAccountAddress,
             fromAccountAddress,
             direction,
           });
-          return serializedPNFT;
 
         case "mplcore":
         case "core":
@@ -710,6 +812,125 @@ const addNftSendTransaction = async ({
           });
       }
     }
+
+    // ── Multiple NFTs: batch mode ──────────────────────────────────────────────
+    // The `transaction` passed in from sendMultipleSplTokenTx already contains
+    // compute budget and fee instructions.  We collect raw web3.js instructions
+    // from every handler and append them, then build a single combined tx.
+    logger.info(
+      `Batch mode: processing ${mintAddresses.length} NFTs into a single transaction`
+    );
+
+    for (const { address, nftType } of mintAddresses) {
+      const mint = new PublicKey(address);
+      let detectedType = nftType;
+
+      if (detectedType === "auto" || !detectedType) {
+        detectedType = await detectNFTType(umi, mint, fromAccountAddress);
+      }
+
+      logger.info(
+        `[batch] NFT ${address} detected type: ${detectedType}`
+      );
+
+      let handlerResult;
+
+      switch (detectedType.toLowerCase()) {
+        case "legacy":
+        case "standard":
+          handlerResult = await handleLegacyNFT({
+            umi,
+            transaction,
+            mint,
+            fromAccountAddress,
+            toAccountAddress,
+            direction,
+            returnInstructionsOnly: true,
+          });
+          break;
+
+        case "pnft":
+        case "programmable":
+          handlerResult = await handlePNFT({
+            umi,
+            mint,
+            toAccountAddress,
+            fromAccountAddress,
+            direction,
+            returnInstructionsOnly: true,
+          });
+          break;
+
+        case "mplcore":
+        case "core":
+          handlerResult = await handleMPLCore({
+            umi,
+            mint,
+            toAccountAddress,
+            fromAccountAddress,
+            direction,
+            returnInstructionsOnly: true,
+          });
+          break;
+
+        case "cnft":
+        case "compressed":
+          handlerResult = await handleCNFT({
+            umi,
+            mint,
+            toAccountAddress,
+            fromAccountAddress,
+            direction,
+            returnInstructionsOnly: true,
+          });
+          break;
+
+        default:
+          logger.warn(
+            `Unknown NFT type: ${detectedType}. Falling back to legacy transfer.`
+          );
+          handlerResult = await handleLegacyNFT({
+            umi,
+            transaction,
+            mint,
+            fromAccountAddress,
+            toAccountAddress,
+            direction,
+            returnInstructionsOnly: true,
+          });
+      }
+
+      // Append this NFT's instructions to the shared transaction
+      handlerResult.instructions.forEach((ix) => transaction.add(ix));
+    }
+
+    // Build one combined UMI transaction from all accumulated instructions
+    const latestBlockhash = await umi.rpc.getLatestBlockhash();
+
+    const combinedTx = umi.transactions.create({
+      version: "legacy",
+      blockhash: latestBlockhash.blockhash,
+      instructions: transaction.instructions,
+      payer: publicKey(fromAccountAddress),
+    });
+
+    const serializedCombined = umi.transactions.serialize(combinedTx);
+    const txBase64 = base64.deserialize(serializedCombined)[0];
+    const checksum = generateChecksum(combinedTx.message);
+
+    logger.info(
+      `Batch NFT transaction built: ${mintAddresses.length} NFTs, ` +
+        `${transaction.instructions.length} total instructions`
+    );
+
+    return {
+      serializedTx: txBase64,
+      checksum,
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      type: "multi_nft",
+      direction,
+    };
   } catch (error) {
     logger.error("Error in addNftSendTransaction: ", error);
     throw error;

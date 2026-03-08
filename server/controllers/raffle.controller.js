@@ -1194,7 +1194,8 @@ class RaffleController {
               nftTypeInfo === "mpl_core" ||
               nftTypeInfo === "mplcore" ||
               nftTypeInfo === "cnft" ||
-              nftTypeInfo === "core"
+              nftTypeInfo === "core" ||
+              nftTypeInfo === "multi_nft"
             ) {
               mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
               logger.info(
