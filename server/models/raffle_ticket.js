@@ -26,7 +26,19 @@ module.exports = (sequelize, DataTypes) => {
       splTokenSendTxId: DataTypes.STRING,
       isWinner: DataTypes.BOOLEAN,
       commissionRate: DataTypes.DECIMAL(10, 4),
-      creatorAmount: DataTypes.DECIMAL(10, 9),
+      creatorAmount: {
+        type: DataTypes.STRING(30),
+        get() {
+          const val = this.getDataValue("creatorAmount");
+          return val !== null && val !== undefined ? parseFloat(val) : 0;
+        },
+        set(val) {
+          this.setDataValue(
+            "creatorAmount",
+            val !== null && val !== undefined ? String(val) : "0"
+          );
+        },
+      },
     },
     {
       sequelize,

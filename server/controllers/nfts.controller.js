@@ -167,7 +167,12 @@ class HolderController {
           uri: item.content?.json_uri,
           interface: item.interface,
           collection: item.grouping[0],
-          image: item.links?.image || item.content.files?.[0]?.uri,
+          image:
+            item.content?.links?.image ||
+            item.links?.image ||
+            item.content?.files?.[0]?.cdn_uri ||
+            item.content?.files?.[0]?.uri ||
+            null,
           ownership: item.ownership,
         }));
         nfts = nfts.filter((item) =>

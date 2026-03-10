@@ -74,7 +74,7 @@ const { Wallet } = require("./wallet");
 const { generateChecksum } = require("./checksum-validation");
 const logger = require("../../util/logger");
 const { default: bs58 } = require("bs58");
-const { BET_RECEIVER_WALLET } = require("../../config/credentials");
+const { FUND_RECEIVER_WALLET } = require("../../config/credentials");
 const { getFeeData } = require("../cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../../config/constants");
 
@@ -241,7 +241,7 @@ const handlePNFT = async ({
       //transaction fee
       const solTransferIx = SystemProgram.transfer({
         fromPubkey: new PublicKey(toAccountAddress),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
         lamports: transactionFee * LAMPORTS_PER_SOL,
       });
 
@@ -267,10 +267,10 @@ const handlePNFT = async ({
       const platformNoopSigner = createNoopSigner(umiFrom);
       const userPayerSigner = createNoopSigner(umiTo);
 
-      // Create a temporary UMI instance with noop signer for platform
+      // Create a temporary UMI instance with user as fee payer (platform has no SOL)
       const tempUmi = createUmi(connection);
       tempUmi
-        .use(signerIdentity(platformNoopSigner))
+        .use(signerIdentity(userPayerSigner))
         .use(dasApi())
         .use(mplTokenMetadata())
         .use(mplCore());
@@ -388,7 +388,7 @@ const handlePNFT = async ({
       if (!returnInstructionsOnly) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(fromAccountAddress),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: transactionFee * LAMPORTS_PER_SOL,
         });
         txBuilder = txBuilder.add({
@@ -479,9 +479,9 @@ const handleMPLCore = async ({
       );
       const userPayer = createNoopSigner(publicKey(toAccountAddress));
 
-      // Create a temporary UMI instance with noop signer for platform
+      // Create a temporary UMI instance with user as fee payer (platform has no SOL)
       const tempUmi = createUmi(connection);
-      tempUmi.use(signerIdentity(platformNoopSigner)).use(mplCore());
+      tempUmi.use(signerIdentity(userPayer)).use(mplCore());
 
       logger.info(
         `Building UNSIGNED MPL Core transfer transaction for user to sign first`
@@ -500,7 +500,7 @@ const handleMPLCore = async ({
       if (!returnInstructionsOnly) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(toAccountAddress),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: transactionFee * LAMPORTS_PER_SOL,
         });
         coreP2UBuilder = coreP2UBuilder.add({
@@ -545,7 +545,7 @@ const handleMPLCore = async ({
       if (!returnInstructionsOnly) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(fromAccountAddress),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: transactionFee * LAMPORTS_PER_SOL,
         });
         coreBuilder = coreBuilder.add({
@@ -644,7 +644,7 @@ const handleCNFT = async ({
       if (!returnInstructionsOnly) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(toAccountAddress),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: transactionFee * LAMPORTS_PER_SOL,
         });
         cnftP2UBuilder = cnftP2UBuilder.add({
@@ -677,7 +677,7 @@ const handleCNFT = async ({
       if (!returnInstructionsOnly) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(fromAccountAddress),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: transactionFee * LAMPORTS_PER_SOL,
         });
         cnftBuilder = cnftBuilder.add({
@@ -964,11 +964,15 @@ const addNftSendTransaction = async ({
     // Build one combined UMI transaction from all accumulated instructions
     const latestBlockhash = await umi.rpc.getLatestBlockhash();
 
+    // For platform_to_user, the user (toAccount) is the fee payer — platform wallet should not pay.
+    // For user_to_platform, the user (fromAccount) is the fee payer.
+    const feePayer = direction === "platform_to_user" ? toAccountAddress : fromAccountAddress;
+
     const combinedTx = umi.transactions.create({
       version: "legacy",
       blockhash: latestBlockhash.blockhash,
       instructions: transaction.instructions,
-      payer: publicKey(fromAccountAddress),
+      payer: publicKey(feePayer),
     });
 
     const serializedCombined = umi.transactions.serialize(combinedTx);
