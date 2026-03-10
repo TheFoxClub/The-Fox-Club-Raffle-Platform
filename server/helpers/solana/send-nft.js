@@ -267,10 +267,10 @@ const handlePNFT = async ({
       const platformNoopSigner = createNoopSigner(umiFrom);
       const userPayerSigner = createNoopSigner(umiTo);
 
-      // Create a temporary UMI instance with noop signer for platform
+      // Create a temporary UMI instance with user as fee payer (platform has no SOL)
       const tempUmi = createUmi(connection);
       tempUmi
-        .use(signerIdentity(platformNoopSigner))
+        .use(signerIdentity(userPayerSigner))
         .use(dasApi())
         .use(mplTokenMetadata())
         .use(mplCore());
@@ -479,9 +479,9 @@ const handleMPLCore = async ({
       );
       const userPayer = createNoopSigner(publicKey(toAccountAddress));
 
-      // Create a temporary UMI instance with noop signer for platform
+      // Create a temporary UMI instance with user as fee payer (platform has no SOL)
       const tempUmi = createUmi(connection);
-      tempUmi.use(signerIdentity(platformNoopSigner)).use(mplCore());
+      tempUmi.use(signerIdentity(userPayer)).use(mplCore());
 
       logger.info(
         `Building UNSIGNED MPL Core transfer transaction for user to sign first`

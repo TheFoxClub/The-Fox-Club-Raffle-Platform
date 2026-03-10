@@ -501,7 +501,7 @@ class RaffleController {
 
         return {
           tokenAddress,
-          toAccount: BET_RECEIVER_WALLET,
+          toAccount: Wallet.getWalletPubkey().toString(),
           amount,
           type,
           metadata: {
@@ -560,7 +560,7 @@ class RaffleController {
               transferIndex: index,
               nftType: nftTypeInfo, // NFT type info ("legacy", "pnft")
             })),
-            platformWallet: BET_RECEIVER_WALLET,
+            platformWallet: Wallet.getWalletPubkey().toString(),
             totalRewards: rewards.length,
             nftTypeInfo,
           },
@@ -744,7 +744,7 @@ class RaffleController {
           startDate: raffleStartDate,
           endDate: raffleEndDate,
           status: correctStatus, // Use calculated status based on dates
-          platformWallet: BET_RECEIVER_WALLET,
+          platformWallet: Wallet.getWalletPubkey().toString(),
         });
 
         if (
@@ -1134,7 +1134,7 @@ class RaffleController {
         startDate: startDate || getFormattedDate(3),
         endDate: endDate || getFormattedDate(10),
         status: finalStatus, // Use calculated status based on dates
-        platformWallet: BET_RECEIVER_WALLET,
+        platformWallet: Wallet.getWalletPubkey().toString(),
       });
 
       // Create raffle details
