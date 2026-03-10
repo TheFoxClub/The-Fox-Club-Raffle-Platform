@@ -36,7 +36,7 @@ const { base64 } = require("@metaplex-foundation/umi/serializers");
 const { generateChecksum } = require("./checksum-validation.js");
 const logger = require("../../util/logger");
 const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
-const { BET_RECEIVER_WALLET } = require("../../config/credentials.js");
+const { FUND_RECEIVER_WALLET } = require("../../config/credentials.js");
 const { getFeeData } = require("../cache/system-fee.js");
 
 const umi = getUmi();
@@ -83,7 +83,7 @@ const sendMultipleSplTokenTx = async ({
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: new PublicKey(feePayer),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
         })
       );
@@ -95,7 +95,7 @@ const sendMultipleSplTokenTx = async ({
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: new PublicKey(feePayer),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: BigInt(featuredFee * LAMPORTS_PER_SOL),
         })
       );
@@ -411,7 +411,7 @@ const createClaimTransaction = async ({
     transaction.add(
       SystemProgram.transfer({
         fromPubkey: new PublicKey(feePayer),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
         lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
       })
     );
@@ -669,7 +669,7 @@ const createPayoutTransaction = async ({
     transaction.add(
       SystemProgram.transfer({
         fromPubkey: new PublicKey(feePayer),
-        toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
         lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
       })
     );

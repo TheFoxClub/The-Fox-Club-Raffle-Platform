@@ -48,7 +48,7 @@ const {
   MIN_PAYOUT_AMOUNT,
   DEFAULT_COMMISSION,
 } = require("../config/constants");
-const { BET_RECEIVER_WALLET } = require("../config/credentials");
+const { FUND_RECEIVER_WALLET } = require("../config/credentials");
 const SocketService = require("../services/socket.service");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { getRaffleRefundTransaction } = require("../services/raffles/refund");
@@ -441,11 +441,11 @@ class RaffleController {
         return respond(res, httpStatus.BAD_REQUEST, "fromAddress is required");
       }
 
-      if (!BET_RECEIVER_WALLET) {
+      if (!FUND_RECEIVER_WALLET) {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Bet Receiver wallet not configured"
+          "Fund Receiver wallet not configured"
         );
       }
 
@@ -617,11 +617,11 @@ class RaffleController {
         );
       }
 
-      if (!BET_RECEIVER_WALLET) {
+      if (!FUND_RECEIVER_WALLET) {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Bet Receiver wallet not configured"
+          "Fund Receiver wallet not configured"
         );
       }
 
@@ -861,7 +861,7 @@ class RaffleController {
                 const rewardData = rewards[index];
                 const splTokenSendTxData = {
                   senderPubkey: user.pubkey,
-                  receiverPubkey: BET_RECEIVER_WALLET,
+                  receiverPubkey: Wallet.getWalletPubkey().toString(),
                   type:
                     reward.rewardType === RAFFLE_REWARD_TYPES.NFT
                       ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN
@@ -1000,11 +1000,11 @@ class RaffleController {
         }
       }
 
-      if (!BET_RECEIVER_WALLET) {
+      if (!FUND_RECEIVER_WALLET) {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Bet Receiver wallet not configured"
+          "Fund Receiver wallet not configured"
         );
       }
 
@@ -1240,7 +1240,7 @@ class RaffleController {
               const rewardData = rewards[index];
               const splTokenSendTxData = {
                 senderPubkey: user.pubkey,
-                receiverPubkey: BET_RECEIVER_WALLET,
+                receiverPubkey: Wallet.getWalletPubkey().toString(),
                 type:
                   reward.rewardType === RAFFLE_REWARD_TYPES.NFT
                     ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN
@@ -2159,7 +2159,7 @@ class RaffleController {
         );
 
         const splTokenSendTxData = {
-          senderPubkey: raffle.platformWallet || BET_RECEIVER_WALLET,
+          senderPubkey: raffle.platformWallet || Wallet.getWalletPubkey().toString(),
           receiverPubkey: user.pubkey,
           type:
             reward.rewardType === RAFFLE_REWARD_TYPES.SOLANA
@@ -2626,7 +2626,7 @@ class RaffleController {
         for (const txDetails of transactionDetails) {
           const splTokenSendTransactionData = {
             status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
-            senderPubkey: BET_RECEIVER_WALLET,
+            senderPubkey: Wallet.getWalletPubkey().toString(),
             receiverPubkey: userPubkey,
             txId: signature,
             raffleId,
@@ -3430,7 +3430,7 @@ class RaffleController {
       }
 
       // Check if platform wallet has sufficient balance (basic validation)
-      const platformWallet = BET_RECEIVER_WALLET;
+      const platformWallet = Wallet.getWalletPubkey().toString();
       if (!platformWallet) {
         if (transaction && !transaction.finished) {
           await transaction.rollback();

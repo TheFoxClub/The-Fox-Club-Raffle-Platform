@@ -5,7 +5,8 @@ const {
   PublicKey,
   LAMPORTS_PER_SOL,
 } = require("@solana/web3.js");
-const { BET_RECEIVER_WALLET } = require("../../config/credentials");
+const { FUND_RECEIVER_WALLET } = require("../../config/credentials");
+const { Wallet } = require("../../helpers/solana/wallet");
 const { RAFFLE_REWARD_TYPES } = require("../../config/data");
 const { SplTokenSendTransaction, RaffleReward } = require("../../models");
 const { getFeeData } = require("../../helpers/cache/system-fee");
@@ -46,7 +47,7 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
       data: null,
     };
   }
-  const fromAccount = BET_RECEIVER_WALLET;
+  const fromAccount = Wallet.getWalletPubkey().toString();
   const toAccount = raffleCreatorPubkey;
 
   //NFT refund
@@ -70,7 +71,7 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
   transaction.add(
     SystemProgram.transfer({
       fromPubkey: new PublicKey(toAccount),
-      toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+      toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
       lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
     })
   );

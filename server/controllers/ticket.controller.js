@@ -26,7 +26,8 @@ const {
 } = require("@solana/spl-token");
 
 const { getUmi } = require("../config/solana");
-const { BET_RECEIVER_WALLET } = require("../config/credentials");
+const { FUND_RECEIVER_WALLET } = require("../config/credentials");
+const { Wallet } = require("../helpers/solana/wallet");
 const { status: httpStatus } = require("http-status");
 const respond = require("../util/respond");
 const logger = require("../util/logger");
@@ -170,8 +171,9 @@ class TicketController {
       const creatorAmount = totalSolAmount * (1 - commissionRate);
 
       const senderPublicKey = new PublicKey(senderPubkey);
-      const receiverPubkey = BET_RECEIVER_WALLET;
-      const receiverPublicKey = new PublicKey(receiverPubkey);
+      // Commission portion goes to FUND_RECEIVER_WALLET, creator portion goes to platform wallet
+      const commissionReceiverPublicKey = new PublicKey(FUND_RECEIVER_WALLET);
+      const platformPublicKey = Wallet.getWalletPubkey();
 
       const umi = getUmi();
 
@@ -249,29 +251,42 @@ class TicketController {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: new PublicKey(senderPubkey),
-          toPubkey: new PublicKey(BET_RECEIVER_WALLET),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
         })
       );
 
       switch (type) {
         case "solana":
+          // Commission portion → FUND_RECEIVER_WALLET
           transaction.add(
             SystemProgram.transfer({
               fromPubkey: senderPublicKey,
-              lamports: Math.round(totalSolAmount * LAMPORTS_PER_SOL),
-              toPubkey: receiverPublicKey,
+              lamports: Math.round(commissionAmount * LAMPORTS_PER_SOL),
+              toPubkey: commissionReceiverPublicKey,
+            })
+          );
+          // Creator portion → platform wallet
+          transaction.add(
+            SystemProgram.transfer({
+              fromPubkey: senderPublicKey,
+              lamports: Math.round(creatorAmount * LAMPORTS_PER_SOL),
+              toPubkey: platformPublicKey,
             })
           );
           tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
           break;
 
-        default:
-          // SPL Token transfer
-          const tokenAmount = Math.round(
-            totalSolAmount * Math.pow(10, tokenDecimals)
+        default: {
+          // SPL Token transfer — split into commission and creator portions
+          const commissionTokenAmount = Math.round(
+            commissionAmount * Math.pow(10, tokenDecimals)
+          );
+          const creatorTokenAmount = Math.round(
+            creatorAmount * Math.pow(10, tokenDecimals)
           );
           const mint = new PublicKey(tokenAddress);
+          const rpcConnection = getUmi().rpc;
 
           const senderTokenAccount = getAssociatedTokenAddressSync(
             mint,
@@ -280,24 +295,23 @@ class TicketController {
             tokenProgramId
           );
 
-          const receiverTokenAccount = getAssociatedTokenAddressSync(
+          // Commission receiver ATA (FUND_RECEIVER_WALLET)
+          const commissionReceiverTokenAccount = getAssociatedTokenAddressSync(
             mint,
-            receiverPublicKey,
+            commissionReceiverPublicKey,
             false,
             tokenProgramId
           );
-
           try {
-            const connection = getUmi().rpc;
-            const accountInfo = await connection.getAccount(
-              receiverTokenAccount
+            const accountInfo = await rpcConnection.getAccount(
+              commissionReceiverTokenAccount
             );
             if (!accountInfo.exists) {
               transaction.add(
                 createAssociatedTokenAccountInstruction(
                   senderPublicKey,
-                  receiverTokenAccount,
-                  receiverPublicKey,
+                  commissionReceiverTokenAccount,
+                  commissionReceiverPublicKey,
                   mint,
                   tokenProgramId,
                   ASSOCIATED_TOKEN_PROGRAM_ID
@@ -308,8 +322,8 @@ class TicketController {
             transaction.add(
               createAssociatedTokenAccountInstruction(
                 senderPublicKey,
-                receiverTokenAccount,
-                receiverPublicKey,
+                commissionReceiverTokenAccount,
+                commissionReceiverPublicKey,
                 mint,
                 tokenProgramId,
                 ASSOCIATED_TOKEN_PROGRAM_ID
@@ -317,17 +331,69 @@ class TicketController {
             );
           }
 
-          transaction.add(
-            createTransferInstruction(
-              senderTokenAccount,
-              receiverTokenAccount,
-              senderPublicKey,
-              BigInt(tokenAmount),
-              [],
-              tokenProgramId
-            )
+          // Platform wallet ATA (creator portion)
+          const platformTokenAccount = getAssociatedTokenAddressSync(
+            mint,
+            platformPublicKey,
+            false,
+            tokenProgramId
           );
+          try {
+            const accountInfo = await rpcConnection.getAccount(
+              platformTokenAccount
+            );
+            if (!accountInfo.exists) {
+              transaction.add(
+                createAssociatedTokenAccountInstruction(
+                  senderPublicKey,
+                  platformTokenAccount,
+                  platformPublicKey,
+                  mint,
+                  tokenProgramId,
+                  ASSOCIATED_TOKEN_PROGRAM_ID
+                )
+              );
+            }
+          } catch (error) {
+            transaction.add(
+              createAssociatedTokenAccountInstruction(
+                senderPublicKey,
+                platformTokenAccount,
+                platformPublicKey,
+                mint,
+                tokenProgramId,
+                ASSOCIATED_TOKEN_PROGRAM_ID
+              )
+            );
+          }
+
+          if (commissionTokenAmount > 0) {
+            transaction.add(
+              createTransferInstruction(
+                senderTokenAccount,
+                commissionReceiverTokenAccount,
+                senderPublicKey,
+                BigInt(commissionTokenAmount),
+                [],
+                tokenProgramId
+              )
+            );
+          }
+
+          if (creatorTokenAmount > 0) {
+            transaction.add(
+              createTransferInstruction(
+                senderTokenAccount,
+                platformTokenAccount,
+                senderPublicKey,
+                BigInt(creatorTokenAmount),
+                [],
+                tokenProgramId
+              )
+            );
+          }
           break;
+        }
       }
 
       const latestBlockhash = await umi.rpc.getLatestBlockhash();
@@ -444,7 +510,7 @@ class TicketController {
       switch (type) {
         case "load":
           senderPubkey = pubkey;
-          receiverPubkey = BET_RECEIVER_WALLET;
+          receiverPubkey = FUND_RECEIVER_WALLET;
           break;
         default:
           break;
