@@ -279,7 +279,7 @@ const CreateRaffle = () => {
               mint: nftItem.mint,
               name,
               collection: nftItem.collection?.group_value || "",
-              image: nftItem.image,
+              image: image,
               raw: nftItem,
             };
           }),
