@@ -378,17 +378,18 @@ class TicketController {
         signature,
         pubkey,
         type,
-        lamports,
         entryToken,
-        ticketCount,
-        raffleId,
-        commissionRate,
-        creatorAmount,
-        commissionAmount,
-        isNFTHolder = false,
         reservationId,
         tokenDecimals = 9,
       } = req.body;
+
+      const lamports = Number(req.body.lamports);
+      const ticketCount = Number(req.body.ticketCount);
+      const raffleId = req.body.raffleId;
+      const commissionRate = parseFloat(req.body.commissionRate);
+      const creatorAmount = parseFloat(req.body.creatorAmount);
+      const commissionAmount = parseFloat(req.body.commissionAmount);
+      const isNFTHolder = req.body.isNFTHolder ?? false;
 
       // CRITICAL: Validate reservation before processing
       if (!reservationId) {

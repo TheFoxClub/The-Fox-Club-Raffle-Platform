@@ -53,11 +53,56 @@ module.exports = (sequelize, DataTypes) => {
       startDate: DataTypes.DATE,
       endDate: DataTypes.DATE,
       endedAt: DataTypes.DATE,
-      totalCommission: DataTypes.DECIMAL(10, 9),
-      claimableAmount: DataTypes.DECIMAL(10, 9),
-      claimedAmount: DataTypes.DECIMAL(10, 9),
-      platformRevenue: DataTypes.DECIMAL(10, 9),
-      totalRevenue: DataTypes.DECIMAL(10, 9),
+      totalCommission: {
+        type: DataTypes.STRING(30),
+        get() {
+          const val = this.getDataValue("totalCommission");
+          return val !== null && val !== undefined ? parseFloat(val) : 0;
+        },
+        set(val) {
+          this.setDataValue("totalCommission", val !== null && val !== undefined ? String(val) : "0");
+        },
+      },
+      claimableAmount: {
+        type: DataTypes.STRING(30),
+        get() {
+          const val = this.getDataValue("claimableAmount");
+          return val !== null && val !== undefined ? parseFloat(val) : 0;
+        },
+        set(val) {
+          this.setDataValue("claimableAmount", val !== null && val !== undefined ? String(val) : "0");
+        },
+      },
+      claimedAmount: {
+        type: DataTypes.STRING(30),
+        get() {
+          const val = this.getDataValue("claimedAmount");
+          return val !== null && val !== undefined ? parseFloat(val) : 0;
+        },
+        set(val) {
+          this.setDataValue("claimedAmount", val !== null && val !== undefined ? String(val) : "0");
+        },
+      },
+      platformRevenue: {
+        type: DataTypes.STRING(30),
+        get() {
+          const val = this.getDataValue("platformRevenue");
+          return val !== null && val !== undefined ? parseFloat(val) : 0;
+        },
+        set(val) {
+          this.setDataValue("platformRevenue", val !== null && val !== undefined ? String(val) : "0");
+        },
+      },
+      totalRevenue: {
+        type: DataTypes.STRING(30),
+        get() {
+          const val = this.getDataValue("totalRevenue");
+          return val !== null && val !== undefined ? parseFloat(val) : 0;
+        },
+        set(val) {
+          this.setDataValue("totalRevenue", val !== null && val !== undefined ? String(val) : "0");
+        },
+      },
       winnersSelected: DataTypes.BOOLEAN,
       winnersSelectedAt: DataTypes.DATE,
       winnerSelectionSeed: DataTypes.STRING,
