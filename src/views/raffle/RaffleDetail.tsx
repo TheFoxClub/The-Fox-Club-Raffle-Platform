@@ -21,6 +21,8 @@ import {
   Ticket,
   AlertCircle,
   Copy,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import server from "../../config/server";
 import { toast } from "react-toastify";
@@ -186,6 +188,7 @@ const RaffleDetail = () => {
   const [ticketCount, setTicketCount] = useState(1);
   const [countdown, setCountdown] = useState<string>("");
   const [showAllRewards, setShowAllRewards] = useState(false);
+  const [heroIndex, setHeroIndex] = useState(0);
   const [winnerModalVisible, setWinnerModalVisible] = useState(false);
   const [nonWinnerBannerVisible, setNonWinnerBannerVisible] = useState(false);
   //const [raffleEndedFetched, setRaffleEndedFetched] = useState(false);
@@ -738,18 +741,77 @@ const RaffleDetail = () => {
       <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 overflow-hidden">
-            <div className="relative aspect-video">
-              <img
-                src={raffle.image}
-                alt={raffle.title}
-                className="w-full h-full object-cover"
-              />
-              {raffle.isVerified && (
-                <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
-                  <CheckCircle size={16} /> Verified Collection
+            {(() => {
+              const rewardImages = raffle.rewards
+                ?.map((r) => r.imageUrl)
+                .filter(Boolean) as string[];
+              const heroImages =
+                rewardImages && rewardImages.length > 0
+                  ? rewardImages
+                  : [raffle.image];
+              return (
+                <div className="relative aspect-video">
+                  <img
+                    src={heroImages[heroIndex] || raffle.image}
+                    alt={raffle.title}
+                    className="w-full h-full object-cover"
+                  />
+
+                  {/* Prev / Next arrows — only when multiple images */}
+                  {heroImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={() =>
+                          setHeroIndex(
+                            (i) => (i - 1 + heroImages.length) % heroImages.length
+                          )
+                        }
+                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"
+                        aria-label="Previous image"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setHeroIndex((i) => (i + 1) % heroImages.length)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"
+                        aria-label="Next image"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+
+                      {/* Dot indicators */}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {heroImages.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setHeroIndex(i)}
+                            className={`rounded-full transition-all ${
+                              i === heroIndex
+                                ? "w-4 h-2 bg-white"
+                                : "w-2 h-2 bg-white/50 hover:bg-white/80"
+                            }`}
+                            aria-label={`Go to image ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Counter badge */}
+                      <div className="absolute top-3 left-3 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
+                        {heroIndex + 1} / {heroImages.length}
+                      </div>
+                    </>
+                  )}
+
+                  {raffle.isVerified && (
+                    <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
+                      <CheckCircle size={16} /> Verified Collection
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
           </Card>
 
           {/* Raffle Info */}
