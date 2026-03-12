@@ -1805,9 +1805,15 @@ const CreateRaffle = () => {
               </div>
 
               {isFeatured && (
-                <p className="text-xs text-muted-foreground">
-                  Fee will be charged when raffle is created
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Fee will be charged when raffle is created
+                  </p>
+                  <p className="text-xs text-amber-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Featured fee is non-refundable if raffle is canceled by host
+                  </p>
+                </div>
               )}
             </div>
           </div>
