@@ -1,4 +1,4 @@
-import { FaXTwitter, FaDiscord, FaGlobe, FaArrowUpRightFromSquare } from 'react-icons/fa6'
+import { FaXTwitter, FaDiscord, FaArrowUpRightFromSquare } from 'react-icons/fa6'
 
 // Raydium SVG copied from offical Raydium website
 const RaydiumIcon = ({className}: {className?: string}) => (
@@ -25,7 +25,7 @@ const RaydiumIcon = ({className}: {className?: string}) => (
 )
 
 const socialLinks = [
-    { name: "Website", url: "https://www.thefox.club/", icon: FaArrowUpRightFromSquare },
+  { name: "Website", url: "https://www.thefox.club/", icon: FaArrowUpRightFromSquare },
   { name: "Twitter", url: "https://www.twitter.com/The_FoxClub", icon: FaXTwitter },
   { name: "Discord", url: "https://www.discord.gg/p9Yk7Emejn", icon: FaDiscord },
   { name: "Raydium", url: "https://raydium.io/swap/?inputMint=sol&outputMint=DNBcqTU47f7BkgsSZMHY1cKr17eNDK6BckhZnE1vej2Q", icon: RaydiumIcon },
