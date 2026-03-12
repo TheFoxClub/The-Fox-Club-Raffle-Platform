@@ -42,7 +42,7 @@ module.exports = (sequelize, DataTypes) => {
       rewardName: DataTypes.STRING,
       mintAddress: DataTypes.STRING,
       amount: DataTypes.DECIMAL(18, 6),
-      imageUrl: DataTypes.STRING,
+      imageUrl: DataTypes.TEXT,
       metadataJson: DataTypes.JSON,
       winnerId: DataTypes.INTEGER,
       winnerTicketId: DataTypes.INTEGER,
