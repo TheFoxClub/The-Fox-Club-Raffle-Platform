@@ -1,3 +1,4 @@
+import Footer from "./reusable/Footer";
 import { Header } from "./reusable/Header";
 import type { ReactNode } from "react";
 
@@ -10,6 +11,7 @@ export default function Layout({ children }: LayoutProps) {
     <div className="page-wrapper">
       <Header />
       <main className="page-content">{children}</main>
+      <Footer />
     </div>
   );
 }
