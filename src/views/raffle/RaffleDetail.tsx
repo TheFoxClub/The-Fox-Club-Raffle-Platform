@@ -740,7 +740,7 @@ const RaffleDetail = () => {
       )}
       <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 overflow-hidden">
+          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 overflow-hidden rounded-none">
             {(() => {
               const rewardImages = raffle.rewards
                 ?.map((r) => r.imageUrl)
@@ -750,11 +750,11 @@ const RaffleDetail = () => {
                   ? rewardImages
                   : [raffle.image];
               return (
-                <div className="relative aspect-video">
+                <div className="relative">
                   <img
                     src={heroImages[heroIndex] || raffle.image}
                     alt={raffle.title}
-                    className="w-full h-full object-cover"
+                    className=" w-full h-full object-contain"
                   />
 
                   {/* Prev / Next arrows — only when multiple images */}
@@ -763,7 +763,8 @@ const RaffleDetail = () => {
                       <button
                         onClick={() =>
                           setHeroIndex(
-                            (i) => (i - 1 + heroImages.length) % heroImages.length
+                            (i) =>
+                              (i - 1 + heroImages.length) % heroImages.length
                           )
                         }
                         className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"
@@ -787,7 +788,7 @@ const RaffleDetail = () => {
                           <button
                             key={i}
                             onClick={() => setHeroIndex(i)}
-                            className={`rounded-full transition-all ${
+                            className={`transition-all ${
                               i === heroIndex
                                 ? "w-4 h-2 bg-white"
                                 : "w-2 h-2 bg-white/50 hover:bg-white/80"
@@ -1235,8 +1236,8 @@ const RaffleDetail = () => {
               <div className="text-xs sm:text-sm space-y-1">
                 <p className="font-semibold">NFT Holder Discount</p>
                 <p className="text-muted-foreground">
-                  Connect a wallet with verified NFTs to get 2.5% fees instead
-                  of 5%
+                  Connect a wallet with any The Fox Club NFTs to get 2.5% fees
+                  instead of 5%
                 </p>
               </div>
             </div>
