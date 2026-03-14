@@ -18,61 +18,78 @@ class NFTService {
         throw new Error("Missing wallet address");
       }
 
+      const collections = Array.isArray(COLLECTION_ADDRESS)
+        ? COLLECTION_ADDRESS
+        : [COLLECTION_ADDRESS];
+
+      const normalizedCollections = collections.filter(Boolean).sort();
       const cacheKey = `nfts:collection:${pubkey}:${
-        COLLECTION_ADDRESS || "all"
+        normalizedCollections.join(",") || "all"
       }`;
 
       const cachedData = await redisClient.get(cacheKey);
 
       if (cachedData) {
+        const parsed = JSON.parse(cachedData);
+
         logger.info(`Cache hit for key: ${cacheKey}`);
+
         return {
-          isHolder: cachedData.total > 0,
-          nftCount: cachedData.total,
-          total: cachedData.total,
-          nfts: cachedData.nfts,
+          isHolder: parsed.total > 0,
+          nftCount: parsed.total,
+          total: parsed.total,
+          nfts: parsed.nfts,
           cached: true,
-          timestamp: cachedData.timestamp,
+          timestamp: parsed.timestamp,
         };
       }
 
       logger.info(`Cache miss for key: ${cacheKey}, fetching from blockchain`);
 
-      const searchParams = {
-        owner: publicKey(pubkey),
-      };
+      let nfts = [];
+      let total = 0;
 
-      const collection = COLLECTION_ADDRESS;
-      if (collection) {
-        searchParams.grouping = ["collection", collection];
+      for (const collection of normalizedCollections) {
+        const searchParams = {
+          owner: publicKey(pubkey),
+          grouping: ["collection", collection],
+        };
+
+        const result = await getUmi().rpc.searchAssets(searchParams);
+
+        const items = result.items.map((item) => ({
+          mint: item.id,
+          name: item.content?.metadata?.name,
+          uri: item.content?.json_uri,
+          interface: item.interface,
+          grouping: item.grouping,
+          ownership: item.ownership,
+        }));
+
+        nfts.push(...items);
+        total += result.total;
       }
 
-      const result = await getUmi().rpc.searchAssets(searchParams);
-
-      const nfts = result.items.map((item) => ({
-        mint: item.id,
-        name: item.content?.metadata?.name,
-        uri: item.content?.json_uri,
-        interface: item.interface,
-        grouping: item.grouping,
-        ownership: item.ownership,
-      }));
-
       const responseData = {
-        total: result.total,
+        total,
         nfts,
         timestamp: new Date().toISOString(),
       };
 
-      // Cache the result
-      await redisClient.set(cacheKey, responseData, CACHE_TTL);
+      await redisClient.set(
+        cacheKey,
+        JSON.stringify(responseData),
+        "EX",
+        CACHE_TTL
+      );
+
       logger.info(`Cached data for key: ${cacheKey} with TTL ${CACHE_TTL}s`);
 
       return {
-        isHolder: result.total > 0,
-        nftCount: result.total,
-        total: result.total,
-        nfts: nfts,
+        isHolder: total > 0,
+        nftCount: total,
+        total,
+        nfts,
         cached: false,
         timestamp: responseData.timestamp,
       };
