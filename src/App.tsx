@@ -28,7 +28,7 @@ import AdminCollections from "./views/admin/AdminCollections";
 import AdminTokens from "./views/admin/AdminTokens";
 import AdminXP from "./views/admin/AdminXP";
 import AdminFees from "./views/admin/AdminFees";
-//import AdminRewards from "./views/admin/AdminRewards";
+import AdminRewards from "./views/admin/AdminRewards";
 import AdminLeaderboards from "./views/admin/AdminLeaderboards";
 import AdminAnalytics from "./views/admin/AdminAnalytics";
 import { ProtectedAdminRoute } from "./components/auth/ProtectedAdminRoute";
@@ -178,14 +178,14 @@ function App() {
                   </AdminLayout>
                 }
               />
-              {/* <Route
+              <Route
               path="/admin/rewards"
               element={
                 <AdminLayout>
                   <AdminRewards />
                 </AdminLayout>
               }
-            /> */}
+            />
               <Route
                 path="/admin/leaderboards"
                 element={

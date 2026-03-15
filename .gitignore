@@ -26,5 +26,6 @@ dist-ssr
 .env
 
 wallet.json
+airdrop-wallet.json
 
 /public/uploads/
