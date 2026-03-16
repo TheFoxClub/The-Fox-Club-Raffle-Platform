@@ -119,7 +119,7 @@ export default function AdminAnalytics() {
           activeWallets: data.activeUsers,
           avgTicketPrice: data.averageTicketPrice.average,
           avgTicketTokenType: mapNumericTokenType(
-            data.averageTicketPrice.tokenType || 0,
+            data.averageTicketPrice.tokenType || 0
           ),
           growthRate: data.growthRate.percentage,
         });
@@ -128,7 +128,7 @@ export default function AdminAnalytics() {
           data.volumeOverTime.map((v: any) => ({
             date: v.date,
             volume: v.totalVolume,
-          })),
+          }))
         );
 
         const colors = [
@@ -144,11 +144,11 @@ export default function AdminAnalytics() {
             .map((t: any, index: number) => ({
               name: getTokenSymbol(
                 mapNumericTokenType(t.tokenTypeRaw || 0),
-                t.tokenAddress,
+                t.tokenAddress
               ),
               value: t.percentage,
               color: colors[index % colors.length],
-            })),
+            }))
         );
       }
 
@@ -157,9 +157,12 @@ export default function AdminAnalytics() {
         setTopWallets(
           leaderboardRes.data.topBuyers.map((b: any) => ({
             wallet: b.walletAddress,
-            spending: `${b.totalSpent} ${getTokenSymbol(mapNumericTokenType(b.tokenType || 0), b.tokenAddress)}`,
+            spending: `${b.totalSolSpent} ${getTokenSymbol(
+              mapNumericTokenType(b.tokenType || 0),
+              b.tokenAddress
+            )}`,
             raffles: b.ticketsBought,
-          })),
+          }))
         );
       }
     } catch (error) {
@@ -226,7 +229,9 @@ export default function AdminAnalytics() {
         />
         <StatCard
           title="Avg. Ticket Price"
-          value={`${kpiData.avgTicketPrice} ${getTokenSymbol(kpiData.avgTicketTokenType)}`}
+          value={`${kpiData.avgTicketPrice} ${getTokenSymbol(
+            kpiData.avgTicketTokenType
+          )}`}
           // change={0}
           // trend="up"
           icon={<Activity className="h-6 w-6 text-muted-foreground" />}
@@ -335,10 +340,10 @@ export default function AdminAnalytics() {
                           index === 0
                             ? "bg-gradient-primary text-white"
                             : index === 1
-                              ? "bg-secondary/20 text-secondary"
-                              : index === 2
-                                ? "bg-accent/20 text-accent"
-                                : "bg-muted text-muted-foreground"
+                            ? "bg-secondary/20 text-secondary"
+                            : index === 2
+                            ? "bg-accent/20 text-accent"
+                            : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {index + 1}

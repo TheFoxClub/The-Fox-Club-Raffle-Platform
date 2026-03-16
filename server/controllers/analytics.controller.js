@@ -7,6 +7,7 @@ const {
   TOKEN_TYPE,
   mapEnumValue,
 } = require("../config/data");
+const PriceService = require("../services/price.service");
 
 // Total Users
 const getTotalUsers = async () => {
@@ -48,35 +49,56 @@ const getActiveUsers = async (startDate, endDate) => {
 // Average Ticket Price
 const getAverageTicketPrice = async (startDate, endDate) => {
   try {
-    const result = await sequelize.query(
+    const rows = await sequelize.query(
       `
-      SELECT 
-        AVG(COALESCE(st.commissionAmount, 0) + COALESCE(st.creatorAmount, 0)) as avgTicketPrice,
-        COUNT(rt.id) as totalTickets,
-        st.type as tokenType
+      SELECT
+        st.id,
+        st.tokenAddress,
+        (COALESCE(st.commissionAmount,0) + COALESCE(st.creatorAmount,0)) AS transactionAmount,
+        COUNT(rt.id) AS ticketsCount
       FROM spl_token_send_transactions st
-      INNER JOIN raffle_tickets rt ON rt.splTokenSendTxId = st.id
+      INNER JOIN raffle_tickets rt
+        ON rt.splTokenSendTxId = st.id
       WHERE st.status = ?
         AND st.createdAt BETWEEN ? AND ?
-        AND st.type = 0
-      GROUP BY st.type
+      GROUP BY st.id
       `,
       {
         replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, startDate, endDate],
         type: sequelize.QueryTypes.SELECT,
       }
     );
-    
-    const solResult = result.find(r => r.tokenType === 0) || { avgTicketPrice: 0, totalTickets: 0, tokenType: 0 };
-    
+
+    if (!rows.length) {
+      return { average: 0, totalTickets: 0 };
+    }
+
+    let totalUsd = 0;
+    let totalTickets = 0;
+
+    for (const row of rows) {
+      const tokenPrice = await PriceService.getTokenUsdPrice(row.tokenAddress);
+
+      const txAmount = parseFloat(row.transactionAmount || 0);
+      const tickets = parseInt(row.ticketsCount || 0, 10);
+
+      if (tickets === 0) continue;
+
+      const ticketPrice = txAmount / tickets;
+      const ticketPriceUsd = ticketPrice * tokenPrice;
+
+      totalUsd += ticketPriceUsd * tickets;
+      totalTickets += tickets;
+    }
+
     return {
-      average: parseFloat(solResult.avgTicketPrice || 0),
-      totalTickets: parseInt(solResult.totalTickets || 0, 10),
-      tokenType: solResult.tokenType,
+      average: totalTickets ? totalUsd / totalTickets : 0,
+      totalTickets,
+      tokenType: 3, //USD
     };
   } catch (error) {
     logger.error("Error getting average ticket price:", error);
-    return { average: 0, totalTickets: 0, tokenType: 0 };
+    return { average: 0, totalTickets: 0, tokenType: 3 };
   }
 };
 

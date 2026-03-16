@@ -67,7 +67,7 @@ const Leaderboard = () => {
             rank: buyer.rank,
             walletAddress: buyer.walletAddress,
             walletShort: shortenWallet(buyer.walletAddress),
-            spent: buyer.totalSpent,
+            spent: buyer.totalXpEarned, //changing to xp, as per client request
             tickets: buyer.ticketsBought,
             wins: buyer.totalWins,
             tokenType: formatToken(buyer.tokenType),

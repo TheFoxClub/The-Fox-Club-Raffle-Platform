@@ -12,23 +12,27 @@ const { getXpRates } = require("./xp.service");
 
 const getTopHosts = async (limit = 10, xpConfig) => {
   try {
-    // Get top hosts by SOL revenue only (tokenType = 0) from raffles table
-    const results = await sequelize.query(
+    // Get top hosts by revenue  from raffles table
+
+    const results2 = await sequelize.query(
       `
-      SELECT
-        u.pubkey as walletAddress,
-        COALESCE(SUM(
-          CASE WHEN r.tokenType = 0 THEN r.claimableAmount + r.totalCommission ELSE 0 END
-        ), 0) AS totalRevenue,
-        COUNT(CASE WHEN r.tokenType = 0 THEN r.id END) as rafflesCount,
-        0 as tokenType
-      FROM users u
-      LEFT JOIN raffles r ON u.id = r.userId AND r.status != 0
-      GROUP BY u.id, u.pubkey
-      HAVING totalRevenue > 0
-      ORDER BY totalRevenue DESC
-      LIMIT ?
-      `,
+  SELECT
+    u.pubkey AS walletAddress,
+    JSON_ARRAYAGG(
+      JSON_OBJECT(
+        'raffleId', r.id,
+        'revenue', (COALESCE(r.claimableAmount,0) + COALESCE(r.totalCommission,0)),
+        'tokenAddress', r.tokenAddress,
+        'tokenType', r.tokenType
+      )
+    ) AS raffles
+  FROM users u
+  INNER JOIN raffles r
+    ON u.id = r.userId
+  GROUP BY u.id, u.pubkey
+  ORDER BY u.id DESC
+  LIMIT ?
+  `,
       {
         replacements: [parseInt(limit, 10)],
         type: sequelize.QueryTypes.SELECT,
@@ -40,16 +44,52 @@ const getTopHosts = async (limit = 10, xpConfig) => {
       SPL_TOKEN_ADDRESS.SOLANA
     );
 
+    // normalize
+    const normalized = [];
+
+    for (const row of results2) {
+      const raffles =
+        typeof row.raffles === "string" ? JSON.parse(row.raffles) : row.raffles;
+
+      let totalRevenueUsd = 0;
+
+      const normalizedRaffles = [];
+
+      for (const raffle of raffles) {
+        const price = await PriceService.getTokenUsdPrice(raffle.tokenAddress);
+
+        const revenueUsd = parseFloat(raffle.revenue || 0) * price;
+
+        totalRevenueUsd += revenueUsd;
+
+        normalizedRaffles.push({
+          raffleId: raffle.raffleId,
+          tokenAddress: raffle.tokenAddress,
+          revenue: parseFloat(raffle.revenue || 0),
+          revenueUsd,
+        });
+      }
+
+      normalized.push({
+        walletAddress: row.walletAddress,
+        totalRevenueUsd,
+        raffles: normalizedRaffles,
+        raffleCount: raffles.length || 0,
+      });
+    }
+
     //converting each revenue to XP
-    const xpResults = results.map((host, index) => ({
+    const xpResults = normalized.map((host, index) => ({
       rank: index + 1,
       walletAddress: host.walletAddress,
-      totalRevenue:
-        (parseFloat(host.totalRevenue || 0) * solToUsdPrice) /
-        xpConfig.raffle_revenue_rate,
-      rafflesCount: parseInt(host.rafflesCount || 0, 10),
-      tokenType: mapEnumValue(TOKEN_TYPE, host.tokenType),
-      isXPValue: true,
+      totalRevenue: parseFloat(host.totalRevenueUsd) || 0, //usd
+      totalRevenueSol: host.totalRevenueUsd / solToUsdPrice,
+      totalRevenueXp:
+        parseFloat(host.totalRevenueUsd) / xpConfig.raffle_revenue_rate,
+      rafflesCount: parseInt(host.raffleCount || 0, 10),
+      raffles: host.raffles,
+      // tokenType: mapEnumValue(TOKEN_TYPE, host.tokenType),
+      isXPValue: false,
       tokenAddress: null,
     }));
 
@@ -66,17 +106,18 @@ const getTopBuyers = async (limit = 10, xpConfig) => {
     const results = await sequelize.query(
       `
       SELECT
-        senderPubkey AS walletAddress,
-        COUNT(*) AS transactionsCount,
-        SUM(COALESCE(commissionAmount, 0) + COALESCE(creatorAmount, 0)) AS totalSpent,
-        SUM(COALESCE(commissionAmount, 0)) AS totalCommission,
-        SUM(COALESCE(creatorAmount, 0)) AS totalCreatorAmount,
-        0 AS tokenType
-      FROM spl_token_send_transactions
-      WHERE status = ? AND type = 0
-      GROUP BY senderPubkey
+        st.senderPubkey AS walletAddress,
+        COUNT(DISTINCT st.id) AS transactionsCount,
+        SUM(COALESCE(xp.xpEarned, 0)) AS totalXpEarned,
+        SUM(COALESCE(xp.usdValue, 0)) AS totalSpent
+      FROM spl_token_send_transactions st
+      LEFT JOIN xp_tables xp
+        ON xp.splTokenSendTransactionId = st.id
+      WHERE st.status = ?
+        AND st.rewardTransferType = 'ticket_purchase'
+      GROUP BY st.senderPubkey
       HAVING totalSpent > 0
-      ORDER BY totalSpent DESC
+      ORDER BY totalXpEarned DESC
       LIMIT ?
       `,
       {
@@ -130,16 +171,17 @@ const getTopBuyers = async (limit = 10, xpConfig) => {
     }, {});
 
     //converting sol to usd, and converting usd to XP as per XP Configs
-    const solToUsdPrice = await PriceService.getTokenUsdPrice(
-      SPL_TOKEN_ADDRESS.SOLANA
-    );
+    // const solToUsdPrice = await PriceService.getTokenUsdPrice(
+    //   SPL_TOKEN_ADDRESS.SOLANA
+    // );
+    const solPriceInUsd = await PriceService.getSolPrice();
 
     const xpBuyers = buyers.map((buyer, index) => ({
       rank: index + 1,
       walletAddress: buyer.walletAddress,
-      totalSpent:
-        (parseFloat(buyer.totalSpent || 0) * solToUsdPrice) /
-        xpConfig.ticket_purchase_rate,
+      totalXpEarned: buyer.totalXpEarned,
+      totalSpent: parseFloat(buyer.totalSpent) || 0, //in USD
+      totalSolSpent: parseFloat(buyer.totalSpent || 0) / solPriceInUsd, //in SOL
       ticketsBought: parseInt(ticketCounts[buyer.walletAddress] || 0, 10),
       transactionsCount: parseInt(buyer.transactionsCount || 0, 10),
       totalWins: winsLookup[buyer.walletAddress] || 0,

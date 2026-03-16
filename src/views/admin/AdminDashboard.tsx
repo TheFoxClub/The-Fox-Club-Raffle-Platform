@@ -58,10 +58,9 @@ export default function AdminDashboard() {
         // totalPlatformRevenue: statsRes.data.data.totalPlatformRevenue,
         // liveRaffleCount: statsRes.data.data.liveRaffleCount,
         // tokenType: "MIXED", //for mixed of sol and other tokens
-        totalRevenue: statsRes.data.data.primaryTokenStats.totalRevenue,
-        totalTicketsSold: statsRes.data.data.primaryTokenStats.totalTicketsSold,
-        totalPlatformRevenue:
-          statsRes.data.data.primaryTokenStats.totalPlatformRevenue,
+        totalRevenue: statsRes.data.data.totalRevenue,
+        totalTicketsSold: statsRes.data.data.totalTicketsSold,
+        totalPlatformRevenue: statsRes.data.data.totalPlatformRevenue,
         liveRaffleCount: statsRes.data.data.liveRaffleCount,
         tokenType: "SOL", //sol only
       });

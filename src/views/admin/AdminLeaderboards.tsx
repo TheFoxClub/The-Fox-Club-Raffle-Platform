@@ -40,7 +40,7 @@ export default function AdminLeaderboards() {
   const formatAmount = (
     amount: number,
     tokenType: string,
-    tokenAddress?: string,
+    tokenAddress?: string
   ) => {
     if (amount === null || amount === undefined)
       return `0 ${getTokenSymbol(tokenType, tokenAddress)}`;
@@ -56,25 +56,25 @@ export default function AdminLeaderboards() {
       setTopHosts(
         topHosts.map((host: any) => ({
           walletAddress: host.walletAddress,
-          totalRevenue: host.totalRevenue,
+          totalRevenue: host.totalRevenueSol,
           tokenType: mapNumericTokenType(host.tokenType || 0),
           tokenAddress: host.tokenAddress,
           rafflesCount: host.rafflesCount,
           xp: 0,
           //  streak: 0,
-        })),
+        }))
       );
 
       setTopBuyers(
         topBuyers.map((buyer: any) => ({
           walletAddress: buyer.walletAddress,
-          spending: buyer.totalSpent,
+          spending: buyer.totalSolSpent,
           tokenType: mapNumericTokenType(buyer.tokenType || 0),
           tokenAddress: buyer.tokenAddress,
           tickets: buyer.ticketsBought,
           xp: 0,
           //  streak: 0,
-        })),
+        }))
       );
     } catch (error) {
       console.error("Error fetching leaderboards:", error);
@@ -160,10 +160,10 @@ export default function AdminLeaderboards() {
                                 index === 0
                                   ? "bg-gradient-primary text-white"
                                   : index === 1
-                                    ? "bg-secondary/20 text-secondary"
-                                    : index === 2
-                                      ? "bg-accent/20 text-accent"
-                                      : "bg-muted text-muted-foreground"
+                                  ? "bg-secondary/20 text-secondary"
+                                  : index === 2
+                                  ? "bg-accent/20 text-accent"
+                                  : "bg-muted text-muted-foreground"
                               }`}
                             >
                               {index + 1}
@@ -186,7 +186,7 @@ export default function AdminLeaderboards() {
                           {formatAmount(
                             host.totalRevenue,
                             host.tokenType,
-                            host.tokenAddress,
+                            host.tokenAddress
                           )}
                         </td>
                         <td className="p-4 text-muted-foreground">
@@ -238,10 +238,10 @@ export default function AdminLeaderboards() {
                                 index === 0
                                   ? "bg-gradient-primary text-white"
                                   : index === 1
-                                    ? "bg-secondary/20 text-secondary"
-                                    : index === 2
-                                      ? "bg-accent/20 text-accent"
-                                      : "bg-muted text-muted-foreground"
+                                  ? "bg-secondary/20 text-secondary"
+                                  : index === 2
+                                  ? "bg-accent/20 text-accent"
+                                  : "bg-muted text-muted-foreground"
                               }`}
                             >
                               {index + 1}
@@ -264,7 +264,7 @@ export default function AdminLeaderboards() {
                           {formatAmount(
                             buyer.spending,
                             buyer.tokenType,
-                            buyer.tokenAddress,
+                            buyer.tokenAddress
                           )}
                         </td>
                         <td className="p-4 text-muted-foreground">
