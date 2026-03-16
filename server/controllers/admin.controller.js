@@ -31,6 +31,7 @@ const { getFeeData } = require("../helpers/cache/system-fee");
 const XpService = require("../services/xp.service");
 const { publicKey } = require("@metaplex-foundation/umi");
 const { getUmi } = require("../config/solana");
+const PriceService = require("../services/price.service");
 
 class AdminController {
   static async getAllRaffles(req, res) {
@@ -548,15 +549,24 @@ class AdminController {
     try {
       const { address } = req.query;
       if (!address || address.trim().length < 32) {
-        return respond(res, httpStatus.BAD_REQUEST, "Valid collection address is required");
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Valid collection address is required"
+        );
       }
       const umi = getUmi();
       const asset = await umi.rpc.getAsset(publicKey(address.trim()));
-      const name = asset?.content?.metadata?.name?.replace(/\0/g, "").trim() || null;
-      return respond(res, httpStatus.OK, "Collection metadata fetched", { name });
+      const name =
+        asset?.content?.metadata?.name?.replace(/\0/g, "").trim() || null;
+      return respond(res, httpStatus.OK, "Collection metadata fetched", {
+        name,
+      });
     } catch (error) {
       // Address not found on-chain or invalid — return null name instead of error to allow manual entry
-      return respond(res, httpStatus.OK, "No on-chain metadata found", { name: null });
+      return respond(res, httpStatus.OK, "No on-chain metadata found", {
+        name: null,
+      });
     }
   }
 
@@ -636,33 +646,19 @@ class AdminController {
 
   static async getDashboardStats(req, res) {
     try {
-      // const stats = await Raffle.findOne({
-      //   attributes: [
-      //     [Sequelize.fn("SUM", Sequelize.col("totalRevenue")), "totalRevenue"],
-      //     [
-      //       Sequelize.fn("SUM", Sequelize.col("ticketsSold")),
-      //       "totalTicketsSold",
-      //     ],
-      //     [
-      //       Sequelize.fn("SUM", Sequelize.col("platformRevenue")),
-      //       "totalPlatformRevenue",
-      //     ],
-      //   ],
-      //   raw: true,
-      // });
-      // Get stats grouped by token type from raffles table
-      const tokenStats = await sequelize.query(
+      // Fetch all raffles that are not DRAFT
+      const raffles = await sequelize.query(
         `
-        SELECT 
-          r.tokenType,
-          SUM(COALESCE(r.totalRevenue, 0)) as totalRevenue,
-          SUM(COALESCE(r.ticketsSold, 0)) as totalTicketsSold,
-          SUM(COALESCE(r.platformRevenue, 0)) as totalPlatformRevenue
-        FROM raffles r
-        WHERE r.status != ?
-        GROUP BY r.tokenType
-        ORDER BY totalRevenue DESC
-        `,
+      SELECT
+        r.id,
+        r.tokenType,
+        r.tokenAddress,
+        COALESCE(r.totalRevenue, 0) AS totalRevenue,
+        COALESCE(r.ticketsSold, 0) AS totalTicketsSold,
+        COALESCE(r.platformRevenue, 0) AS totalPlatformRevenue
+      FROM raffles r
+      WHERE r.status != ?
+      `,
         {
           replacements: [0], // Exclude DRAFT raffles
           type: sequelize.QueryTypes.SELECT,
@@ -670,55 +666,88 @@ class AdminController {
       );
 
       const liveRaffleCount = await Raffle.count({
-        where: {
-          status: RAFFLE_STATUS.LIVE,
-        },
+        where: { status: RAFFLE_STATUS.LIVE },
       });
 
-      const statsByToken = tokenStats.map((stat) => ({
-        tokenType: mapEnumValue(TOKEN_TYPE, stat.tokenType),
-        tokenTypeRaw: stat.tokenType,
-        totalRevenue: Number(stat.totalRevenue || 0),
-        totalTicketsSold: Number(stat.totalTicketsSold || 0),
-        totalPlatformRevenue: Number(stat.totalPlatformRevenue || 0),
-      }));
+      // Get unique token addresses
+      const uniqueTokens = [
+        ...new Set(raffles.map((r) => r.tokenAddress).filter(Boolean)),
+      ];
 
-      // Calculate totals across all token types
-      const totals = tokenStats.reduce(
-        (acc, stat) => ({
-          totalRevenue: acc.totalRevenue + Number(stat.totalRevenue || 0),
-          totalTicketsSold:
-            acc.totalTicketsSold + Number(stat.totalTicketsSold || 0),
-          totalPlatformRevenue:
-            acc.totalPlatformRevenue + Number(stat.totalPlatformRevenue || 0),
-        }),
-        { totalRevenue: 0, totalTicketsSold: 0, totalPlatformRevenue: 0 }
+      // Fetch USD price for each token
+      const tokenUsdPrices = {};
+      for (const token of uniqueTokens) {
+        tokenUsdPrices[token] = await PriceService.getTokenUsdPrice(token);
+      }
+
+      // Get current SOL price in USD
+      const solPrice = await PriceService.getTokenUsdPrice(
+        SPL_TOKEN_ADDRESS.SOLANA
       );
 
-      // Get SOL-only stats (tokenType = 0)
-      const solStats = tokenStats.find((s) => s.tokenType === 0) || {
-        tokenType: 0,
+      // Compute totals in SOL
+      let totalRevenueSol = 0;
+      let totalPlatformRevenueSol = 0;
+      let totalTicketsSold = 0;
+
+      // Also prepare statsByToken
+      const statsByToken = {};
+
+      raffles.forEach((r) => {
+        const usdPrice = tokenUsdPrices[r.tokenAddress] || 0;
+
+        const revenueUsd = Number(r.totalRevenue || 0) * usdPrice;
+        const platformRevenueUsd =
+          Number(r.totalPlatformRevenue || 0) * usdPrice;
+
+        const revenueSol = solPrice ? revenueUsd / solPrice : 0;
+        const platformRevenueSol = solPrice ? platformRevenueUsd / solPrice : 0;
+
+        // Add to global totals
+        totalRevenueSol += revenueSol;
+        totalPlatformRevenueSol += platformRevenueSol;
+        totalTicketsSold += Number(r.totalTicketsSold || 0);
+
+        // Add per-token stats
+        if (!statsByToken[r.tokenType]) {
+          statsByToken[r.tokenType] = {
+            tokenType: mapEnumValue(TOKEN_TYPE, r.tokenType),
+            tokenTypeRaw: r.tokenType,
+            totalRevenue: 0,
+            totalTicketsSold: 0,
+            totalPlatformRevenue: 0,
+          };
+        }
+
+        statsByToken[r.tokenType].totalRevenue += revenueSol;
+        statsByToken[r.tokenType].totalPlatformRevenue += platformRevenueSol;
+        statsByToken[r.tokenType].totalTicketsSold += Number(
+          r.totalTicketsSold || 0
+        );
+      });
+
+      // Convert statsByToken object to array
+      const statsByTokenArray = Object.values(statsByToken);
+
+      // SOL-only stats (tokenType = 0)
+      const solStats = statsByTokenArray.find((s) => s.tokenTypeRaw === 0) || {
+        tokenType: mapEnumValue(TOKEN_TYPE, 0),
+        tokenTypeRaw: 0,
         totalRevenue: 0,
         totalTicketsSold: 0,
         totalPlatformRevenue: 0,
       };
 
       const response = {
-        // Legacy totals (mixed tokens)
-        totalRevenue: totals.totalRevenue,
-        totalTicketsSold: totals.totalTicketsSold,
-        totalPlatformRevenue: totals.totalPlatformRevenue,
+        // Totals in SOL
+        totalRevenue: totalRevenueSol,
+        totalTicketsSold,
+        totalPlatformRevenue: totalPlatformRevenueSol,
         liveRaffleCount,
-        // breakdown by token type
-        statsByToken,
-        // SOL-only stats for clean display
-        primaryTokenStats: {
-          tokenType: mapEnumValue(TOKEN_TYPE, solStats.tokenType),
-          tokenTypeRaw: solStats.tokenType,
-          totalRevenue: Number(solStats.totalRevenue || 0),
-          totalTicketsSold: Number(solStats.totalTicketsSold || 0),
-          totalPlatformRevenue: Number(solStats.totalPlatformRevenue || 0),
-        },
+        // breakdown by token
+        statsByToken: statsByTokenArray,
+        // SOL-only stats for primary display
+        primaryTokenStats: solStats,
       };
 
       return respond(res, httpStatus.OK, "Dashboard stats fetched!", response);

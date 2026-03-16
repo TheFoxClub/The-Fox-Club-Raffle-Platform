@@ -24,3 +24,5 @@ module.exports.CHECKSUM_SECRET_KEY =
 module.exports.COLLECTION_ADDRESS = process.env.COLLECTION_ADDRESS
   ? process.env.COLLECTION_ADDRESS.split(",")
   : "";
+
+module.exports.JUPITER_API_KEY = process.env.JUPITER_API_KEY;

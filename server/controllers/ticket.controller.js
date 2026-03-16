@@ -594,7 +594,7 @@ class TicketController {
             {
               totalCommission: commissionAmount,
               claimableAmount: creatorAmount,
-              totalRevenue: lamports / LAMPORTS_PER_SOL,
+              totalRevenue: lamports / decimals,
               platformRevenue: commissionAmount,
             },
             {

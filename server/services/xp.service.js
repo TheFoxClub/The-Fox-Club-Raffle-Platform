@@ -12,7 +12,7 @@ class XpService {
   static async getXpRates() {
     try {
       const cacheKey = "xp:rates";
-      
+
       // Try to get from cache first (only if Redis is available)
       try {
         const cachedRates = await redisClient.get(cacheKey);
@@ -20,15 +20,19 @@ class XpService {
           return cachedRates;
         }
       } catch (redisError) {
-        logger.warn(`Redis cache unavailable for XP rates: ${redisError.message}`);
+        logger.warn(
+          `Redis cache unavailable for XP rates: ${redisError.message}`
+        );
       }
 
       // Get from database
       let rates = await XpConfig.getAllActiveConfig();
-      
+
       // If no rates found, initialize with defaults
       if (!rates || Object.keys(rates).length === 0) {
-        logger.info("No XP rates found in database, initializing with defaults");
+        logger.info(
+          "No XP rates found in database, initializing with defaults"
+        );
         await this.initializeDefaultXpRates();
         rates = await XpConfig.getAllActiveConfig();
       }
@@ -37,18 +41,18 @@ class XpService {
       const defaultRates = {
         ticket_purchase_rate: 1,
         raffle_revenue_rate: 1,
-        raffle_creation_reward: 10
+        raffle_creation_reward: 10,
       };
 
       const finalRates = { ...defaultRates, ...rates };
-      
+
       // Cache for 5 minutes (only if Redis is available)
       try {
         await redisClient.set(cacheKey, finalRates, 300);
       } catch (redisError) {
         logger.warn(`Could not cache XP rates: ${redisError.message}`);
       }
-      
+
       return finalRates;
     } catch (error) {
       logger.error(`Error getting XP rates: ${error.message}`);
@@ -56,7 +60,7 @@ class XpService {
       return {
         ticket_purchase_rate: 1,
         raffle_revenue_rate: 1,
-        raffle_creation_reward: 10
+        raffle_creation_reward: 10,
       };
     }
   }
@@ -69,27 +73,28 @@ class XpService {
     try {
       const defaultConfigs = [
         {
-          configKey: 'ticket_purchase_rate',
+          configKey: "ticket_purchase_rate",
           configValue: 1,
-          description: 'XP earned per $1 spent on ticket purchases'
+          description: "XP earned per $1 spent on ticket purchases",
         },
         {
-          configKey: 'raffle_revenue_rate',
+          configKey: "raffle_revenue_rate",
           configValue: 1,
-          description: 'XP earned per $1 revenue generated from raffles'
+          description: "XP earned per $1 revenue generated from raffles",
         },
         {
-          configKey: 'raffle_creation_reward',
+          configKey: "raffle_creation_reward",
           configValue: 10,
-          description: 'Fixed XP reward for creating a raffle'
-        }
+          description: "Fixed XP reward for creating a raffle",
+        },
       ];
 
       for (const config of defaultConfigs) {
         await XpConfig.updateConfigValue(config.configKey, config.configValue);
-        logger.info(`Initialized XP config: ${config.configKey} = ${config.configValue}`);
+        logger.info(
+          `Initialized XP config: ${config.configKey} = ${config.configValue}`
+        );
       }
-
     } catch (error) {
       logger.error(`Error initializing default XP rates: ${error.message}`);
     }
@@ -106,53 +111,74 @@ class XpService {
     try {
       // Convert raw amount to actual token amount using decimals
       const actualTokenAmount = parseFloat(amount) / Math.pow(10, decimals);
-      
-      logger.info(`Converting token amount: raw=${amount}, decimals=${decimals}, actual=${actualTokenAmount}`);
+
+      logger.info(
+        `Converting token amount: raw=${amount}, decimals=${decimals}, actual=${actualTokenAmount}`
+      );
 
       // Get token symbol for better logging
-      let tokenSymbol = 'Unknown';
+      let tokenSymbol = "Unknown";
       try {
         const token = await VerifiedToken.findOne({
           where: { address: tokenAddress },
-          attributes: ['symbol', 'name']
+          attributes: ["symbol", "name"],
         });
-        tokenSymbol = token ? (token.symbol || token.name || 'Unknown') : 'Unknown';
+        tokenSymbol = token
+          ? token.symbol || token.name || "Unknown"
+          : "Unknown";
       } catch (error) {
         // Continue with 'Unknown' symbol
       }
 
       // Get real-time USD price using PriceService
-      const realTimePrice = await PriceService.getTokenUsdPrice(tokenAddress, tokenSymbol);
-      
+      const realTimePrice = await PriceService.getTokenUsdPrice(
+        tokenAddress,
+        tokenSymbol
+      );
+
       if (realTimePrice <= 0) {
-        logger.warn(`No valid price found for ${tokenSymbol} (${tokenAddress}), USD value = 0`);
+        logger.warn(
+          `No valid price found for ${tokenSymbol} (${tokenAddress}), USD value = 0`
+        );
         return 0;
       }
 
       const usdValue = actualTokenAmount * realTimePrice;
-      logger.info(`Converted ${actualTokenAmount} ${tokenSymbol} to $${usdValue} USD using real-time rate $${realTimePrice}`);
-      
+      logger.info(
+        `Converted ${actualTokenAmount} ${tokenSymbol} to $${usdValue} USD using real-time rate $${realTimePrice}`
+      );
+
       return usdValue;
 
       if (token && token.conversionRate) {
         const usdValue = actualTokenAmount * parseFloat(token.conversionRate);
-        logger.info(`Converted ${amount} ${token.symbol || tokenAddress} to $${usdValue} USD using rate ${token.conversionRate}`);
+        logger.info(
+          `Converted ${amount} ${
+            token.symbol || tokenAddress
+          } to $${usdValue} USD using rate ${token.conversionRate}`
+        );
         return usdValue;
       }
 
       // For SOL, we could integrate with external price API
-      if (tokenType === TOKEN_TYPE.SOLANA || tokenAddress === SPL_TOKEN_ADDRESS.SOLANA) {
+      if (
+        tokenType === TOKEN_TYPE.SOLANA ||
+        tokenAddress === SPL_TOKEN_ADDRESS.SOLANA
+      ) {
         // For now, use a placeholder rate - in production, integrate with price API
         const solRate = await this.fetchSolPrice();
         const usdValue = actualTokenAmount * solRate;
-        logger.info(`Converted ${amount} SOL to $${usdValue} USD using rate ${solRate}`);
+        logger.info(
+          `Converted ${amount} SOL to $${usdValue} USD using rate ${solRate}`
+        );
         return usdValue;
       }
 
       // Fallback: if no conversion rate available, return 0
-      logger.warn(`No conversion rate found for token ${tokenAddress}, type ${tokenType}`);
+      logger.warn(
+        `No conversion rate found for token ${tokenAddress}, type ${tokenType}`
+      );
       return 0;
-
     } catch (error) {
       logger.error(`Error converting token to USD: ${error.message}`);
       return 0;
@@ -167,30 +193,41 @@ class XpService {
    * @param {Object} metadata - Additional metadata
    * @returns {Promise<Object|null>} XP record or null if duplicate
    */
-  static async awardTicketPurchaseXp(userId, splTokenSendTransactionId, usdValue, metadata = {}) {
+  static async awardTicketPurchaseXp(
+    userId,
+    splTokenSendTransactionId,
+    usdValue,
+    metadata = {}
+  ) {
     try {
-      logger.info(`Attempting to award ticket purchase XP: userId=${userId}, transactionId=${splTokenSendTransactionId}, usdValue=${usdValue}`);
-      
+      logger.info(
+        `Attempting to award ticket purchase XP: userId=${userId}, transactionId=${splTokenSendTransactionId}, usdValue=${usdValue}`
+      );
+
       const rates = await this.getXpRates();
       const xpEarned = usdValue * (rates.ticket_purchase_rate || 1);
 
       const config = await XpConfig.findOne({
-        where: { configKey: 'ticket_purchase_rate', isActive: true }
+        where: { configKey: "ticket_purchase_rate", isActive: true },
       });
 
       // Check for duplicate transaction
       const existing = await XpTable.findOne({
-        where: { 
-          splTokenSendTransactionId
-        }
+        where: {
+          splTokenSendTransactionId,
+        },
       });
 
       if (existing) {
-        logger.info(`XP already awarded for transaction ${splTokenSendTransactionId}`);
+        logger.info(
+          `XP already awarded for transaction ${splTokenSendTransactionId}`
+        );
         return null;
       }
 
-      logger.info(`Creating ticket purchase XP record: userId=${userId}, transactionId=${splTokenSendTransactionId}, xpEarned=${xpEarned}`);
+      logger.info(
+        `Creating ticket purchase XP record: userId=${userId}, transactionId=${splTokenSendTransactionId}, xpEarned=${xpEarned}`
+      );
 
       const xpRecord = await XpTable.create({
         userId,
@@ -203,16 +240,19 @@ class XpService {
         tokenAddress: metadata.tokenAddress,
         rawTokenAmount: metadata.rawTokenAmount,
         conversionRate: metadata.conversionRate,
-        metadata
+        metadata,
       });
 
-      logger.info(`Ticket purchase XP record created successfully with ID: ${xpRecord.id}`);
+      logger.info(
+        `Ticket purchase XP record created successfully with ID: ${xpRecord.id}`
+      );
 
       await this.updateUserTotalXp(userId);
-      
-      logger.info(`Awarded ${xpEarned} XP to user ${userId} for ticket purchase (transaction ${splTokenSendTransactionId})`);
-      return xpRecord;
 
+      logger.info(
+        `Awarded ${xpEarned} XP to user ${userId} for ticket purchase (transaction ${splTokenSendTransactionId})`
+      );
+      return xpRecord;
     } catch (error) {
       logger.error(`Error awarding ticket purchase XP: ${error.message}`);
       logger.error(`Stack trace: ${error.stack}`);
@@ -228,22 +268,27 @@ class XpService {
    * @param {Object} metadata - Additional metadata
    * @returns {Promise<Object>} XP record
    */
-  static async awardRaffleRevenueXp(userId, raffleId, usdRevenue, metadata = {}) {
+  static async awardRaffleRevenueXp(
+    userId,
+    raffleId,
+    usdRevenue,
+    metadata = {}
+  ) {
     try {
       const rates = await this.getXpRates();
       const xpEarned = usdRevenue * (rates.raffle_revenue_rate || 1);
 
       const config = await XpConfig.findOne({
-        where: { configKey: 'raffle_revenue_rate', isActive: true }
+        where: { configKey: "raffle_revenue_rate", isActive: true },
       });
 
       // Check for duplicate
       const existing = await XpTable.findOne({
-        where: { 
+        where: {
           userId,
           raffleId,
-          configId: config?.id
-        }
+          configId: config?.id,
+        },
       });
 
       if (existing) {
@@ -257,14 +302,15 @@ class XpService {
         configId: config?.id,
         usdValue: usdRevenue,
         xpEarned,
-        metadata
+        metadata,
       });
 
       await this.updateUserTotalXp(userId);
-      
-      logger.info(`Awarded ${xpEarned} XP to user ${userId} for raffle revenue (raffle ${raffleId})`);
-      return xpRecord;
 
+      logger.info(
+        `Awarded ${xpEarned} XP to user ${userId} for raffle revenue (raffle ${raffleId})`
+      );
+      return xpRecord;
     } catch (error) {
       logger.error(`Error awarding raffle revenue XP: ${error.message}`);
       throw error;
@@ -280,22 +326,24 @@ class XpService {
    */
   static async awardRaffleCreationXp(userId, raffleId, metadata = {}) {
     try {
-      logger.info(`Attempting to award raffle creation XP: userId=${userId}, raffleId=${raffleId}`);
-      
+      logger.info(
+        `Attempting to award raffle creation XP: userId=${userId}, raffleId=${raffleId}`
+      );
+
       const rates = await this.getXpRates();
       const xpEarned = rates.raffle_creation_reward || 10;
 
       const config = await XpConfig.findOne({
-        where: { configKey: 'raffle_creation_reward', isActive: true }
+        where: { configKey: "raffle_creation_reward", isActive: true },
       });
 
       // Check for duplicate
       const existing = await XpTable.findOne({
-        where: { 
+        where: {
           userId,
           raffleId,
-          configId: config?.id
-        }
+          configId: config?.id,
+        },
       });
 
       if (existing) {
@@ -303,7 +351,9 @@ class XpService {
         return existing;
       }
 
-      logger.info(`Creating XP record: userId=${userId}, raffleId=${raffleId}, xpEarned=${xpEarned}`);
+      logger.info(
+        `Creating XP record: userId=${userId}, raffleId=${raffleId}, xpEarned=${xpEarned}`
+      );
 
       const xpRecord = await XpTable.create({
         userId,
@@ -311,16 +361,18 @@ class XpService {
         configId: config?.id,
         usdValue: 0, // Fixed reward, not based on USD value
         xpEarned,
-        metadata
+        splTokenSendTransactionId: metadata.transactionId,
+        metadata,
       });
 
       logger.info(`XP record created successfully with ID: ${xpRecord.id}`);
 
       await this.updateUserTotalXp(userId);
-      
-      logger.info(`Awarded ${xpEarned} XP to user ${userId} for raffle creation (raffle ${raffleId})`);
-      return xpRecord;
 
+      logger.info(
+        `Awarded ${xpEarned} XP to user ${userId} for raffle creation (raffle ${raffleId})`
+      );
+      return xpRecord;
     } catch (error) {
       logger.error(`Error awarding raffle creation XP: ${error.message}`);
       logger.error(`Stack trace: ${error.stack}`);
@@ -335,12 +387,12 @@ class XpService {
    */
   static async updateUserTotalXp(userId) {
     try {
-      const totalXp = await XpTable.sum('xpEarned', { where: { userId } });
-      
+      const totalXp = await XpTable.sum("xpEarned", { where: { userId } });
+
       await User.update(
-        { 
-          totalXp: totalXp || 0, 
-          xpLastUpdated: new Date() 
+        {
+          totalXp: totalXp || 0,
+          xpLastUpdated: new Date(),
         },
         { where: { id: userId } }
       );
@@ -349,11 +401,12 @@ class XpService {
       try {
         await redisClient.del(`user:${userId}:xp`);
       } catch (redisError) {
-        logger.warn(`Could not clear XP cache for user ${userId}: ${redisError.message}`);
+        logger.warn(
+          `Could not clear XP cache for user ${userId}: ${redisError.message}`
+        );
       }
-      
-      logger.debug(`Updated total XP for user ${userId}: ${totalXp || 0}`);
 
+      logger.debug(`Updated total XP for user ${userId}: ${totalXp || 0}`);
     } catch (error) {
       logger.error(`Error updating user total XP: ${error.message}`);
       throw error;
@@ -368,7 +421,7 @@ class XpService {
   static async getUserXpSummary(userId) {
     try {
       const cacheKey = `user:${userId}:xp`;
-      
+
       // Try cache first (only if Redis is available)
       try {
         const cached = await redisClient.get(cacheKey);
@@ -376,37 +429,47 @@ class XpService {
           return cached;
         }
       } catch (redisError) {
-        logger.warn(`Redis cache unavailable for user XP summary: ${redisError.message}`);
+        logger.warn(
+          `Redis cache unavailable for user XP summary: ${redisError.message}`
+        );
       }
 
       const user = await User.findByPk(userId, {
-        attributes: ['id', 'pubkey', 'totalXp', 'xpLastUpdated']
+        attributes: ["id", "pubkey", "totalXp", "xpLastUpdated"],
       });
 
       if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
       }
 
       const breakdown = await XpTable.findAll({
         where: { userId },
-        include: [{
-          model: XpConfig,
-          as: 'config',
-          attributes: ['configKey', 'description'],
-          required: false
-        }],
-        attributes: [
-          [XpTable.sequelize.fn('COUNT', XpTable.sequelize.col('XpTable.id')), 'count'],
-          [XpTable.sequelize.fn('SUM', XpTable.sequelize.col('xpEarned')), 'totalXp']
+        include: [
+          {
+            model: XpConfig,
+            as: "config",
+            attributes: ["configKey", "description"],
+            required: false,
+          },
         ],
-        group: ['config.id'],
-        raw: false
+        attributes: [
+          [
+            XpTable.sequelize.fn("COUNT", XpTable.sequelize.col("XpTable.id")),
+            "count",
+          ],
+          [
+            XpTable.sequelize.fn("SUM", XpTable.sequelize.col("xpEarned")),
+            "totalXp",
+          ],
+        ],
+        group: ["config.id"],
+        raw: false,
       });
 
       const summary = {
         user,
         breakdown,
-        totalXp: parseFloat(user.totalXp || 0)
+        totalXp: parseFloat(user.totalXp || 0),
       };
 
       // Cache for 2 minutes (only if Redis is available)
@@ -417,7 +480,6 @@ class XpService {
       }
 
       return summary;
-
     } catch (error) {
       logger.error(`Error getting user XP summary: ${error.message}`);
       throw error;
@@ -432,7 +494,8 @@ class XpService {
   static async processTransactionXp(transaction) {
     try {
       // Only process successful transactions
-      if (transaction.status !== 2) { // SUCCESS status
+      if (transaction.status !== 2) {
+        // SUCCESS status
         return;
       }
 
@@ -442,13 +505,16 @@ class XpService {
       }
 
       // Determine transaction type and award appropriate XP
-      if (transaction.rewardTransferType === 'ticket_purchase' || 
-          (!transaction.rewardTransferType && transaction.raffleId)) {
-        
+      if (
+        transaction.rewardTransferType === "ticket_purchase" ||
+        (!transaction.rewardTransferType && transaction.raffleId)
+      ) {
         // Find user ID from raffle ticket or other means
         const userId = await this.getUserIdFromTransaction(transaction);
         if (!userId) {
-          logger.warn(`Could not determine user ID for transaction ${transaction.id}`);
+          logger.warn(
+            `Could not determine user ID for transaction ${transaction.id}`
+          );
           return;
         }
 
@@ -466,13 +532,14 @@ class XpService {
             tokenAddress: transaction.tokenAddress,
             rawTokenAmount: parseFloat(transaction.uiAmount),
             conversionRate: usdValue / parseFloat(transaction.uiAmount),
-            transactionHash: transaction.txId
+            transactionHash: transaction.txId,
           });
         }
       }
-
     } catch (error) {
-      logger.error(`Error processing transaction XP for transaction ${transaction.id}: ${error.message}`);
+      logger.error(
+        `Error processing transaction XP for transaction ${transaction.id}: ${error.message}`
+      );
     }
   }
 
@@ -486,14 +553,13 @@ class XpService {
       // If we have raffleId, we can get the user from raffle tickets
       if (transaction.raffleId) {
         const raffle = await Raffle.findByPk(transaction.raffleId, {
-          attributes: ['userId']
+          attributes: ["userId"],
         });
         return raffle ? raffle.userId : null;
       }
 
       // Could implement other logic to determine user from transaction
       return null;
-
     } catch (error) {
       logger.error(`Error getting user ID from transaction: ${error.message}`);
       return null;
