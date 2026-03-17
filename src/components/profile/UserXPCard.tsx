@@ -112,7 +112,9 @@ export function UserXPCard({ className = "" }: UserXPCardProps) {
       {xpData.breakdown.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-muted-foreground">XP Sources</h4>
-          {xpData.breakdown.map((source, index) => {
+          {xpData.breakdown
+            .filter((source) => source?.config?.configKey)
+            .map((source, index) => {
             const config = getSourceConfig(source.config.configKey);
             const Icon = config.icon;
             const activityLabel = getActivityLabel(source.config.configKey, source.count);

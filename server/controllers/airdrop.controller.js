@@ -1,65 +1,118 @@
 const { status: httpStatus } = require("http-status");
 const { Op } = require("sequelize");
-const { User, UserInfo, XpTable, AirdropReward, UserAirdropReward, SplTokenSendTransaction, sequelize } = require("../models");
+const {
+  User,
+  UserInfo,
+  XpTable,
+  AirdropReward,
+  UserAirdropReward,
+  SplTokenSendTransaction,
+  sequelize,
+} = require("../models");
 const XpService = require("../services/xp.service");
 const { getConnection } = require("../config/solana");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
+const { Transaction, VersionedTransaction } = require("@solana/web3.js");
+const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
+const { publicKey } = require("@metaplex-foundation/umi");
+const { default: bs58 } = require("bs58");
 
-const { sendMultipleSplTokenTx, TRANSFER_DIRECTION, createAirdropClaimTransaction } = require("../helpers/solana/spl-token-send-tx");
+const {
+  sendMultipleSplTokenTx,
+  TRANSFER_DIRECTION,
+  createAirdropClaimTransaction,
+  submitTransactionToBlockchain,
+} = require("../helpers/solana/spl-token-send-tx");
+const { validateChecksum } = require("../helpers/solana/checksum-validation");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { AirdropWallet } = require("../helpers/solana/airdrop-wallet");
-const { RAFFLE_REWARD_TYPES, SPL_TOKEN_ADDRESS, SPL_TOKEN_SEND_TX_STATUS, SPL_TOKEN_SEND_TRANSACTION_TYPE } = require("../config/data");
+const {
+  RAFFLE_REWARD_TYPES,
+  SPL_TOKEN_ADDRESS,
+  SPL_TOKEN_SEND_TX_STATUS,
+  SPL_TOKEN_SEND_TRANSACTION_TYPE,
+} = require("../config/data");
 
+const connection = getConnection();
 const AIRDROP_STATUS = AirdropReward.STATUS;
 const REWARD_TYPE = AirdropReward.REWARD_TYPE;
 const USER_REWARD_STATUS = UserAirdropReward.STATUS;
 
-const waitForConfirmedSignature = async (
-  signature,
-  timeoutMs = 30000,
-  intervalMs = 1500,
-  minObservationMs = 20000
-) => {
-  const connection = getConnection();
-  const startedAt = Date.now();
-  let seenConfirmed = false;
+const decodeSignedTransaction = (signedTransaction) => {
+  const txBytes = Buffer.from(signedTransaction, "base64");
 
-  while (Date.now() - startedAt <= timeoutMs) {
-    const elapsedMs = Date.now() - startedAt;
-    const statuses = await connection.getSignatureStatuses([signature], {
-      searchTransactionHistory: true,
-    });
+  try {
+    return {
+      tx: Transaction.from(txBytes),
+      isVersioned: false,
+    };
+  } catch (legacyError) {
+    return {
+      tx: VersionedTransaction.deserialize(txBytes),
+      isVersioned: true,
+    };
+  }
+};
 
-    const status = statuses?.value?.[0];
-
-    if (status?.err) {
-      return {
-        confirmed: false,
-        reason: `On-chain transaction failed: ${JSON.stringify(status.err)}`,
-      };
+const getTransactionSignature = (tx, isVersioned) => {
+  if (isVersioned) {
+    if (!tx.signatures || !tx.signatures[0]) {
+      throw new Error("Signed transaction is missing wallet signature");
     }
-
-    if (status && (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized")) {
-      seenConfirmed = true;
-
-      // Signature presence alone is not success. We require a minimum observation
-      // window to reduce false positives from early/temporary statuses.
-      if (elapsedMs >= minObservationMs) {
-        return { confirmed: true };
-      }
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    return bs58.encode(tx.signatures[0]);
   }
 
-  return {
-    confirmed: false,
-    reason: seenConfirmed
-      ? "Transaction confirmation did not remain verifiable long enough"
-      : "Transaction is not yet confirmed on-chain",
-  };
+  if (!tx.signature) {
+    throw new Error("Signed transaction is missing wallet signature");
+  }
+
+  return bs58.encode(tx.signature);
+};
+
+const validateTransactionChecksum = (tx, isVersioned, checksum) => {
+  try {
+    const umi = createUmi(connection);
+    let umiTx;
+
+    if (isVersioned) {
+      const versionedMessage = tx.message;
+      const instructions = [];
+
+      for (let i = 0; i < versionedMessage.compiledInstructions.length; i++) {
+        const compiledIx = versionedMessage.compiledInstructions[i];
+        instructions.push({
+          programIndex: compiledIx.programIdIndex,
+          accountIndexes: compiledIx.accountKeyIndexes,
+          data: compiledIx.data,
+        });
+      }
+
+      umiTx = {
+        message: {
+          accounts: versionedMessage.staticAccountKeys.map((key) =>
+            publicKey(key.toBase58())
+          ),
+          instructions,
+          recentBlockhash: versionedMessage.recentBlockhash,
+        },
+      };
+    } else {
+      const compiledMessage = tx.compileMessage();
+      umiTx = umi.transactions.create({
+        version: "legacy",
+        blockhash: compiledMessage.recentBlockhash,
+        instructions: tx.instructions,
+        payer: publicKey(tx.feePayer.toBase58()),
+      });
+    }
+
+    return validateChecksum(umiTx.message, checksum);
+  } catch (err) {
+    logger.warn(`Checksum validation error: ${err.message}`);
+    return false;
+  }
 };
 
 class AirdropController {
@@ -353,7 +406,9 @@ class AirdropController {
 
       return respond(res, httpStatus.OK, "Airdrop funding transaction prepared", {
         transaction: transferResponse.data.serializedTx,
+        checksum: transferResponse.data.checksum,
         blockhash: transferResponse.data.blockhash,
+        lastValidBlockHeight: transferResponse.data.lastValidBlockHeight,
         fundingData: {
           totalAmount: parseFloat(totalAmount),
           rewardType: numericType,
@@ -389,25 +444,20 @@ class AirdropController {
         totalAmount,
         recipients,    // Array of { pubKey: string, xp: number }
         totalXp,       // Sum of all selected users' XP (denominator for proportion)
-        fundingSignature,
+        signedTransaction,
+        checksum,
         fromAddress,
       } = req.body;
 
-      logger.info(`Confirming airdrop funding: sig=${fundingSignature}, amount=${totalAmount}, recipients=${recipients?.length}`);
+      logger.info(`Confirming airdrop funding: amount=${totalAmount}, recipients=${recipients?.length}`);
 
-      if (!fundingSignature) {
+      if (!signedTransaction || !checksum) {
         await transaction.rollback();
-        return respond(res, httpStatus.BAD_REQUEST, "Funding signature is required");
-      }
-
-      const existingFundingTx = await SplTokenSendTransaction.findOne({
-        where: { txId: fundingSignature },
-        transaction,
-      });
-
-      if (existingFundingTx) {
-        await transaction.rollback();
-        return respond(res, httpStatus.BAD_REQUEST, "Funding transaction already recorded");
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "signedTransaction and checksum are required"
+        );
       }
 
       if (!recipients || recipients.length === 0) {
@@ -434,18 +484,77 @@ class AirdropController {
         return respond(res, httpStatus.BAD_REQUEST, "totalAmount must be greater than 0");
       }
 
-      const fundingConfirmation = await waitForConfirmedSignature(fundingSignature);
-      if (!fundingConfirmation.confirmed) {
+      const numericType = typeof rewardType === "number" ? rewardType : parseInt(rewardType || 0);
+      const adminUserId = req.payload?.id;
+
+      if (!adminUserId) {
+        await transaction.rollback();
+        return respond(res, httpStatus.UNAUTHORIZED, "Admin not authenticated");
+      }
+
+      const adminUser = await User.findByPk(adminUserId, {
+        attributes: ["id", "pubkey"],
+        transaction,
+      });
+
+      if (!adminUser?.pubkey) {
+        await transaction.rollback();
+        return respond(res, httpStatus.NOT_FOUND, "Admin wallet not found");
+      }
+
+      if (fromAddress && fromAddress !== adminUser.pubkey) {
         await transaction.rollback();
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          fundingConfirmation.reason || "Funding transaction is not confirmed"
+          "fromAddress must match the authenticated admin wallet"
         );
       }
 
-      const numericType = typeof rewardType === "number" ? rewardType : parseInt(rewardType || 0);
-      const adminUserId = req.payload?.id || 1;
+      let decoded;
+      try {
+        decoded = decodeSignedTransaction(signedTransaction);
+      } catch (decodeErr) {
+        await transaction.rollback();
+        return respond(res, httpStatus.BAD_REQUEST, "Invalid signed transaction format");
+      }
+
+      const { tx, isVersioned } = decoded;
+
+      if (!validateTransactionChecksum(tx, isVersioned, checksum)) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Transaction checksum validation failed. Transaction may have been tampered with."
+        );
+      }
+
+      const txFeePayer = isVersioned
+        ? tx.message.staticAccountKeys[0]?.toBase58()
+        : tx.feePayer?.toBase58();
+
+      if (!txFeePayer || txFeePayer !== adminUser.pubkey) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Signed transaction fee payer does not match authenticated admin wallet"
+        );
+      }
+
+      const derivedFundingSignature = getTransactionSignature(tx, isVersioned);
+
+      const existingFundingTx = await SplTokenSendTransaction.findOne({
+        where: { txId: derivedFundingSignature },
+        transaction,
+      });
+
+      if (existingFundingTx) {
+        await transaction.rollback();
+        return respond(res, httpStatus.BAD_REQUEST, "Funding transaction already recorded");
+      }
+
       const airdropWalletAddress = AirdropWallet.getWalletAddress();
       const parsedTotalAmount = parseFloat(totalAmount);
       const parsedTotalXp = parseFloat(totalXp);
@@ -460,13 +569,36 @@ class AirdropController {
       if (numericType === REWARD_TYPE.SPL_TOKEN) splType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
       else if (numericType === REWARD_TYPE.SPL_TOKEN_2022) splType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
 
+      // Submit and wait for on-chain confirmation before mutating DB.
+      const submissionResult = await submitTransactionToBlockchain(signedTransaction);
+
+      if (!submissionResult.success) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          `Failed to submit funding transaction: ${submissionResult.error || submissionResult.message}`
+        );
+      }
+
+      const finalFundingSignature = submissionResult.signature;
+
+      if (derivedFundingSignature !== finalFundingSignature) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Submitted signature does not match signed transaction payload"
+        );
+      }
+
       // Record the funding transaction
       const splTxRecord = await SplTokenSendTransaction.create(
         {
-          senderPubkey: fromAddress,
+          senderPubkey: adminUser.pubkey,
           receiverPubkey: airdropWalletAddress,
           type: splType,
-          txId: fundingSignature,
+          txId: finalFundingSignature,
           tokenAddress: tokenAddress || null,
           decimals: tokenDecimals || 9,
           uiAmount: String(parsedTotalAmount),
@@ -519,6 +651,7 @@ class AirdropController {
           ...airdrop.toJSON(),
           totalReceivers: userRewards.length,
         },
+        fundingSignature: finalFundingSignature,
         fundingTxRecordId: splTxRecord.id,
       });
     } catch (err) {
@@ -641,6 +774,7 @@ class AirdropController {
 
       return respond(res, httpStatus.OK, "Claim transaction prepared", {
         transaction: claimResult.data.serializedTx,
+        checksum: claimResult.data.checksum,
         blockhash: claimResult.data.blockhash,
         lastValidBlockHeight: claimResult.data.lastValidBlockHeight,
         rewardId: reward.id,
@@ -654,19 +788,25 @@ class AirdropController {
   }
 
   /**
-   * Confirm reward claim after user submits the signed on-chain transaction
+    * Confirm reward claim from user signed transaction.
+    * Validates checksum and wallet ownership before on-chain submission.
+    * Writes DB records only after confirmed on-chain transaction.
    */
   static async claimReward(req, res) {
     const transaction = await sequelize.transaction();
 
     try {
       const { rewardId } = req.params;
-      const { signature } = req.body;
+      const { signedTransaction, checksum } = req.body;
       const userId = req.payload?.id;
 
-      if (!signature) {
+      if (!signedTransaction || !checksum) {
         await transaction.rollback();
-        return respond(res, httpStatus.BAD_REQUEST, "Transaction signature is required");
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "signedTransaction and checksum are required"
+        );
       }
 
       if (!userId) {
@@ -686,8 +826,42 @@ class AirdropController {
 
       const userWallet = user.pubkey;
 
+      let decoded;
+      try {
+        decoded = decodeSignedTransaction(signedTransaction);
+      } catch (decodeErr) {
+        await transaction.rollback();
+        return respond(res, httpStatus.BAD_REQUEST, "Invalid signed transaction format");
+      }
+
+      const { tx, isVersioned } = decoded;
+
+      if (!validateTransactionChecksum(tx, isVersioned, checksum)) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Transaction checksum validation failed. Transaction may have been tampered with."
+        );
+      }
+
+      const txFeePayer = isVersioned
+        ? tx.message.staticAccountKeys[0]?.toBase58()
+        : tx.feePayer?.toBase58();
+
+      if (!txFeePayer || txFeePayer !== userWallet) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Signed transaction fee payer does not match authenticated wallet"
+        );
+      }
+
+      const derivedSignature = getTransactionSignature(tx, isVersioned);
+
       const existingClaimTx = await SplTokenSendTransaction.findOne({
-        where: { txId: signature },
+        where: { txId: derivedSignature },
         transaction,
       });
 
@@ -720,13 +894,26 @@ class AirdropController {
 
       const now = new Date();
 
-      const claimConfirmation = await waitForConfirmedSignature(signature);
-      if (!claimConfirmation.confirmed) {
+      // Submit and wait for on-chain confirmation before mutating DB.
+      const submissionResult = await submitTransactionToBlockchain(signedTransaction);
+
+      if (!submissionResult.success) {
         await transaction.rollback();
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          claimConfirmation.reason || "Claim transaction is not confirmed"
+          `Failed to submit claim transaction: ${submissionResult.error || submissionResult.message}`
+        );
+      }
+
+      const finalSignature = submissionResult.signature;
+
+      if (derivedSignature !== finalSignature) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Submitted signature does not match signed transaction payload"
         );
       }
 
@@ -741,7 +928,7 @@ class AirdropController {
           senderPubkey: campaign.airdropWallet,
           receiverPubkey: userWallet,
           type: splType,
-          txId: signature,
+          txId: finalSignature,
           tokenAddress: campaign.tokenAddress || null,
           decimals: campaign.tokenDecimals,
           uiAmount: String(parseFloat(reward.amount)),
@@ -804,7 +991,7 @@ class AirdropController {
 
       return respond(res, httpStatus.OK, "Reward claimed successfully", {
         rewardId: reward.id,
-        transactionSignature: signature,
+        transactionSignature: finalSignature,
       });
     } catch (err) {
       await transaction.rollback();

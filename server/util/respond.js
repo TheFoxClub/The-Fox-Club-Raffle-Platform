@@ -13,7 +13,7 @@ const respond = (res, code, message, data) => {
 
   const response = {
     message,
-    success: code === httpStatus.OK,
+    success: code >= 200 && code < 300,
     data: data || null,
   };
 

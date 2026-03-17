@@ -292,7 +292,7 @@ body {
 }
 
 .bg-accent {
-  background-color: hsl(var(--accent));
+  background-color: var(--accent);
 }
 
 /* Change datetime-local calendar icon color */

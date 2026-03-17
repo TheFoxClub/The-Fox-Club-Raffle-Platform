@@ -75,7 +75,6 @@ module.exports = (sequelize, DataTypes) => {
   UserAirdropReward.STATUS = {
     PENDING: 0,
     CLAIMED: 1,
-    EXPIRED: 2,
   };
 
   return UserAirdropReward;
