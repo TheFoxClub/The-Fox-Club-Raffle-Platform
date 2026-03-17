@@ -20,6 +20,7 @@ const { getConnectionDas, getUmi } = require("../../config/solana");
 const { getTokenDetail } = require("./token-program");
 const connection = getConnectionDas();
 const { Wallet } = require("./wallet.js");
+const { AirdropWallet } = require("./airdrop-wallet.js");
 const { addCommissionToTransaction } = require("../../services/commissions.js");
 const {
   SOLANA_TOKEN_ADDRESS,
@@ -41,6 +42,15 @@ const { getFeeData } = require("../cache/system-fee.js");
 
 const umi = getUmi();
 
+// Transfer direction constants
+const TRANSFER_DIRECTION = {
+  USER_TO_PLATFORM: "user_to_platform",
+  PLATFORM_TO_USER: "platform_to_user",
+  USER_TO_AIRDROP: "user_to_airdrop",
+  ADMIN_TO_AIRDROP: "admin_to_airdrop",
+  AIRDROP_TO_USER: "airdrop_to_user",
+};
+
 /**
  * Send multiple SPL tokens, NFTs, or SOL with bidirectional support
  * @param {Object} params
@@ -51,6 +61,7 @@ const umi = getUmi();
  * @param {number} params.feeData - Fee data
  * @param {string} params.fromAccount - Source wallet address (can be user or platform)
  * @param {boolean} params.isUserToPlatform - Direction flag: true = user→platform, false = platform→user
+ * @param {string} params.transferDirection - Explicit direction: user_to_platform, platform_to_user, user_to_airdrop, admin_to_airdrop, airdrop_to_user
  */
 const sendMultipleSplTokenTx = async ({
   splTokenSendSummary,
@@ -60,8 +71,18 @@ const sendMultipleSplTokenTx = async ({
   isFeatured,
   fromAccount,
   isUserToPlatform = true,
+  transferDirection = null, // Optional: explicit direction like user_to_airdrop/admin_to_airdrop
 }) => {
   try {
+    // Determine the effective direction
+    const effectiveDirection = transferDirection || 
+      (isUserToPlatform ? TRANSFER_DIRECTION.USER_TO_PLATFORM : TRANSFER_DIRECTION.PLATFORM_TO_USER);
+    
+    // Determine if this is a user-initiated transfer that requires platform fees
+    const shouldChargeTransactionFee = 
+      effectiveDirection === TRANSFER_DIRECTION.USER_TO_PLATFORM ||
+      effectiveDirection === TRANSFER_DIRECTION.USER_TO_AIRDROP;
+    
     let transaction = new Transaction();
 
     // Set compute budget for optimal performance
@@ -77,8 +98,8 @@ const sendMultipleSplTokenTx = async ({
       })
     );
 
-    //transaction fee
-    if (isUserToPlatform) {
+    //transaction fee - only for user-initiated transfers
+    if (shouldChargeTransactionFee) {
       const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
       transaction.add(
         SystemProgram.transfer({
@@ -122,7 +143,7 @@ const sendMultipleSplTokenTx = async ({
             SystemProgram.transfer({
               fromPubkey: new PublicKey(fromAccount),
               toPubkey: new PublicKey(toAccount),
-              lamports: amount * LAMPORTS_PER_SOL,
+              lamports: Math.floor(amount * LAMPORTS_PER_SOL),
             })
           );
 
@@ -131,9 +152,7 @@ const sendMultipleSplTokenTx = async ({
             from: fromAccount,
             to: toAccount,
             amount,
-            direction: isUserToPlatform
-              ? "user_to_platform"
-              : "platform_to_user",
+            direction: effectiveDirection,
           });
           break;
 
@@ -143,7 +162,7 @@ const sendMultipleSplTokenTx = async ({
             const tokenDetail = await getTokenDetail(tokenAddress);
             const { transferFeeConfig, decimals, tokenProgramId } = tokenDetail;
 
-            const uiAmount = amount * Math.pow(10, decimals);
+            const uiAmount = Math.floor(amount * Math.pow(10, decimals));
 
             // Get token accounts
             const fromAta = getAssociatedTokenAddressSync(
@@ -232,9 +251,7 @@ const sendMultipleSplTokenTx = async ({
               amount: uiAmount,
               decimals,
               fee: actualFee,
-              direction: isUserToPlatform
-                ? "user_to_platform"
-                : "platform_to_user",
+              direction: effectiveDirection,
             });
           } catch (tokenError) {
             throw new Error(
@@ -259,7 +276,7 @@ const sendMultipleSplTokenTx = async ({
           mintAddresses,
           toAccountAddress: toAccount,
           fromAccountAddress: fromAccount,
-          direction: isUserToPlatform ? "user_to_platform" : "platform_to_user",
+          direction: effectiveDirection,
         });
 
         if (nftResult && nftResult.serializedTx) {
@@ -270,9 +287,7 @@ const sendMultipleSplTokenTx = async ({
             metadata: {
               type: "NFT",
               mints: mintAddresses.map((m) => m.address),
-              direction: isUserToPlatform
-                ? "user_to_platform"
-                : "platform_to_user",
+              direction: effectiveDirection,
             },
           };
         }
@@ -282,7 +297,7 @@ const sendMultipleSplTokenTx = async ({
     }
 
     // Add commission if applicable (only for user→platform transfers)
-    if (solCommission > 0 && isUserToPlatform) {
+    if (solCommission > 0 && shouldChargeTransactionFee) {
       try {
         transaction = await addCommissionToTransaction({
           transaction,
@@ -330,7 +345,7 @@ const sendMultipleSplTokenTx = async ({
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         transactionDetails,
-        direction: isUserToPlatform ? "user_to_platform" : "platform_to_user",
+        direction: effectiveDirection,
       },
       message: "Created Serialized Transaction.",
     };
@@ -830,10 +845,234 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
   }
 };
 
+/**
+ * Create a claim transaction for airdrop rewards.
+ * Uses AirdropWallet to sign transfers from airdrop escrow to user
+ */
+const createAirdropClaimTransaction = async ({
+  reward,
+  toAccount,
+  feePayer,
+}) => {
+  try {
+    const fromAccount = AirdropWallet.getWalletAddress();
+
+    let transaction = new Transaction();
+
+    // Set compute budget for optimal performance
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 300_000,
+      })
+    );
+
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: 300_000,
+      })
+    );
+
+    // Transaction fee - user pays
+    const feeData = await getFeeData();
+    const transactionFee = Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(feePayer),
+        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+      })
+    );
+
+    const { tokenAddress, amount, type } = reward;
+
+    logger.info(
+      `createAirdropClaimTransaction - type: ${type}, amount: ${amount}, from: ${fromAccount}, to: ${toAccount}`
+    );
+
+    // Normalize reward type for airdrops first (0=SOL,1=SPL,2=SPL_2022).
+    // This avoids collision with raffle enums where NFT is 0.
+    let normalizedRewardType;
+    if (type === TOKEN_TYPE.SOLANA || type === "SOL" || type === "SOLANA") {
+      normalizedRewardType = TOKEN_TYPE.SOLANA;
+    } else if (type === TOKEN_TYPE.SPL_TOKEN || type === "SPL_TOKEN") {
+      normalizedRewardType = TOKEN_TYPE.SPL_TOKEN;
+    } else if (type === TOKEN_TYPE.SPL_TOKEN_2022 || type === "SPL_TOKEN_2022") {
+      normalizedRewardType = TOKEN_TYPE.SPL_TOKEN_2022;
+    } else if (type === "NFT") {
+      normalizedRewardType = "NFT";
+    } else {
+      normalizedRewardType = "UNKNOWN";
+    }
+
+    switch (normalizedRewardType) {
+      case TOKEN_TYPE.SOLANA:
+        // SOL transfer from airdrop wallet to user
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: new PublicKey(fromAccount),
+            toPubkey: new PublicKey(toAccount),
+            lamports: amount * LAMPORTS_PER_SOL,
+          })
+        );
+        break;
+
+      case "NFT":
+        return {
+          success: false,
+          data: null,
+          message: "NFT claiming is not implemented yet",
+        };
+
+      case TOKEN_TYPE.SPL_TOKEN:
+      case TOKEN_TYPE.SPL_TOKEN_2022:
+        // SPL Token transfer
+        {
+          const tokenDetail = await getTokenDetail(tokenAddress);
+          if (!tokenDetail) {
+            throw new Error(`Failed to get token details for ${tokenAddress}`);
+          }
+
+          const { transferFeeConfig, decimals, tokenProgramId } = tokenDetail;
+          const uiAmount = amount * Math.pow(10, decimals);
+
+          // Get token accounts
+          const fromAta = getAssociatedTokenAddressSync(
+            new PublicKey(tokenAddress),
+            new PublicKey(fromAccount),
+            false,
+            tokenProgramId
+          );
+
+          const toAta = getAssociatedTokenAddressSync(
+            new PublicKey(tokenAddress),
+            new PublicKey(toAccount),
+            false,
+            tokenProgramId
+          );
+
+          // Check if destination account exists, create if needed
+          try {
+            await getAccount(connection, toAta, "confirmed", tokenProgramId);
+          } catch (e) {
+            if (e instanceof TokenAccountNotFoundError) {
+              transaction.add(
+                createAssociatedTokenAccountInstruction(
+                  new PublicKey(feePayer), // User pays for account creation
+                  toAta,
+                  new PublicKey(toAccount),
+                  new PublicKey(tokenAddress),
+                  tokenProgramId,
+                  ASSOCIATED_TOKEN_PROGRAM_ID
+                )
+              );
+            } else {
+              throw e;
+            }
+          }
+
+          // Handle Token-2022 transfer fees
+          if (tokenProgramId === TOKEN_2022_PROGRAM_ID && transferFeeConfig) {
+            const feeBasisPoints =
+              transferFeeConfig?.newerTransferFee?.transferFeeBasisPoints || 0;
+            const maxFee = BigInt(
+              transferFeeConfig?.newerTransferFee?.maximumFee || 0
+            );
+            const fee = (BigInt(uiAmount) * BigInt(feeBasisPoints)) / BigInt(10_000);
+            const actualFee = fee > maxFee ? maxFee : fee;
+
+            transaction.add(
+              createTransferCheckedWithFeeInstruction(
+                fromAta,
+                new PublicKey(tokenAddress),
+                toAta,
+                new PublicKey(fromAccount),
+                BigInt(uiAmount),
+                decimals,
+                actualFee,
+                [],
+                tokenProgramId
+              )
+            );
+          } else {
+            transaction.add(
+              createTransferInstruction(
+                fromAta,
+                toAta,
+                new PublicKey(fromAccount),
+                uiAmount,
+                [],
+                tokenProgramId
+              )
+            );
+          }
+        }
+        break;
+
+      default:
+        return {
+          success: false,
+          data: null,
+          message: `Unsupported reward type for claiming: ${type}`,
+        };
+        break;
+    }
+
+    // Get latest blockhash
+    const latestBlockhash = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.feePayer = new PublicKey(feePayer);
+
+    // AirdropWallet partially signs the transaction (for the transfer)
+    const signedTransaction = AirdropWallet.partialSign(transaction);
+
+    // Generate checksum
+    const umi = createUmi(connection);
+    const umiTx = umi.transactions.create({
+      version: "legacy",
+      blockhash: latestBlockhash.blockhash,
+      instructions: transaction.instructions,
+      payer: publicKey(feePayer),
+    });
+    const checksum = generateChecksum(umiTx.message);
+
+    // Serialize the partially signed transaction
+    const serializedTx = signedTransaction
+      .serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      })
+      .toString("base64");
+
+    logger.info(`Created airdrop claim transaction - partially signed by airdrop wallet`);
+
+    return {
+      success: true,
+      data: {
+        serializedTx,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        checksum,
+      },
+      message: "Created airdrop claim transaction",
+    };
+  } catch (error) {
+    logger.error("Error in createAirdropClaimTransaction:", error);
+    return {
+      success: false,
+      data: null,
+      message: error?.message || "Failed to create airdrop claim transaction",
+      error: error.stack,
+    };
+  }
+};
+
 module.exports = {
   sendMultipleSplTokenTx,
   sendSingleRewardTx,
   createClaimTransaction,
   createPayoutTransaction,
   submitTransactionToBlockchain,
+  createAirdropClaimTransaction,
+  TRANSFER_DIRECTION,
+  AirdropWallet,
 };

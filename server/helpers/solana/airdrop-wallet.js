@@ -9,7 +9,11 @@ const {
   fromWeb3JsKeypair,
 } = require("@metaplex-foundation/umi-web3js-adapters");
 const logger = require("../../util/logger");
-const e = require("express");
+
+const getConfiguredWalletPubkey = () => {
+  const keypair = Keypair.fromSecretKey(new Uint8Array(airdropWalletKeypair));
+  return keypair.publicKey.toString();
+};
 
 class AirdropWallet {
   static #instance;
@@ -36,7 +40,7 @@ class AirdropWallet {
   static getInstance() {
     if (!AirdropWallet.#instance) {
       AirdropWallet.#instance = new AirdropWallet();
-    } else if (airdropWalletKeypair !== AirdropWallet.#instance.#wallet.publicKey.toString()) {
+    } else if (getConfiguredWalletPubkey() !== AirdropWallet.#instance.#wallet.publicKey.toString()) {
       // Check for keypair change
       logger.warn("Airdrop wallet keypair has changed. Reinitializing AirdropWallet instance.");
       AirdropWallet.#instance = new AirdropWallet();
@@ -111,6 +115,14 @@ class AirdropWallet {
    */
   getWalletPubkey = () => {
     return this.#wallet.publicKey;
+  };
+
+  /**
+   * Get the airdrop wallet address as base58 string
+   * @returns {string} Wallet address
+   */
+  getWalletAddress = () => {
+    return this.#wallet.publicKey.toString();
   };
 }
 
