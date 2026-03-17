@@ -2,6 +2,8 @@ const { VerifiedToken } = require("../models");
 const { SPL_TOKEN_ADDRESS, TOKEN_TYPE } = require("../config/data");
 const logger = require("../util/logger");
 const redisClient = require("../util/redisClient");
+const { default: axios } = require("axios");
+const { JUPITER_API_KEY } = require("../config/credentials");
 
 class PriceService {
   /**
@@ -201,31 +203,20 @@ class PriceService {
    */
   static async fetchFromJupiter(tokenAddress) {
     try {
-      const https = require("https");
-      const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}`;
+      const url = `https://api.jup.ag/price/v3?ids=${tokenAddress}`;
 
-      return new Promise((resolve, reject) => {
-        const req = https.get(url, (res) => {
-          let data = "";
-          res.on("data", (chunk) => (data += chunk));
-          res.on("end", () => {
-            try {
-              const parsed = JSON.parse(data);
-              const price = parsed?.data?.[tokenAddress]?.price;
-              resolve(price && price > 0 ? price : 0);
-            } catch (error) {
-              resolve(0);
-            }
-          });
-        });
-
-        req.on("error", () => resolve(0));
-        req.setTimeout(5000, () => {
-          req.destroy();
-          resolve(0);
-        });
+      const response = await axios.get(url, {
+        timeout: 5000,
+        headers: {
+          "X-API-KEY": `${JUPITER_API_KEY}`,
+        },
       });
+
+      const price = response?.data?.[tokenAddress]?.usdPrice;
+
+      return price && price > 0 ? price : 0;
     } catch (error) {
+      logger.error("error fetching from jupiter:", error.message);
       return 0;
     }
   }

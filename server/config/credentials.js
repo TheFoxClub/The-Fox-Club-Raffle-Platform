@@ -18,6 +18,11 @@ module.exports.FUND_RECEIVER_WALLET = process.env.FUND_RECEIVER_WALLET;
 
 module.exports.JWT_SECRET = process.env.JWT_SECRET || "secret-key";
 
-module.exports.CHECKSUM_SECRET_KEY = process.env.CHECKSUM_SECRET_KEY || "default-checksum-secret-key";
+module.exports.CHECKSUM_SECRET_KEY =
+  process.env.CHECKSUM_SECRET_KEY || "default-checksum-secret-key";
 
-module.exports.COLLECTION_ADDRESS = process.env.COLLECTION_ADDRESS || "";
+module.exports.COLLECTION_ADDRESS = process.env.COLLECTION_ADDRESS
+  ? process.env.COLLECTION_ADDRESS.split(",")
+  : "";
+
+module.exports.JUPITER_API_KEY = process.env.JUPITER_API_KEY;

@@ -436,6 +436,13 @@ class RaffleController {
           "At least one reward is required"
         );
       }
+      if (!Array.isArray(rewards) || rewards.length > 5) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Please select only 5 different rewards at max."
+        );
+      }
 
       if (!fromAddress) {
         return respond(res, httpStatus.BAD_REQUEST, "fromAddress is required");
@@ -2159,7 +2166,8 @@ class RaffleController {
         );
 
         const splTokenSendTxData = {
-          senderPubkey: raffle.platformWallet || Wallet.getWalletPubkey().toString(),
+          senderPubkey:
+            raffle.platformWallet || Wallet.getWalletPubkey().toString(),
           receiverPubkey: user.pubkey,
           type:
             reward.rewardType === RAFFLE_REWARD_TYPES.SOLANA

@@ -167,12 +167,23 @@ const handleLegacyNFT = async ({
 
     let blockhashResult = await umi.rpc.getLatestBlockhash();
 
-    let tx = umi.transactions.create({
+    
+    let tx;
+    if(direction === 'platform_to_user') {
+      tx= umi.transactions.create({
       version: "legacy",
       blockhash: blockhashResult.blockhash,
       instructions: transaction.instructions,
-      payer: publicKey(fromAccountAddress), // User is the payer, not platform
+      payer: publicKey(toAccountAddress), // User is the payer, not platform
     });
+    } else {
+      tx = umi.transactions.create({
+       version: "legacy",
+       blockhash: blockhashResult.blockhash,
+       instructions: transaction.instructions,
+       payer: publicKey(fromAccountAddress), // User is the payer, not platform
+     });
+    }
 
     const serializedTx = umi.transactions.serialize(tx);
     const txBase64 = base64.deserialize(serializedTx)[0];
