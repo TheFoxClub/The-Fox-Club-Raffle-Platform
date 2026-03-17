@@ -78,6 +78,8 @@ const getTopHosts = async (limit = 10, xpConfig) => {
       });
     }
 
+    normalized.sort((a, b) => b.totalRevenueUsd - a.totalRevenueUsd);
+
     //converting each revenue to XP
     const xpResults = normalized.map((host, index) => ({
       rank: index + 1,
