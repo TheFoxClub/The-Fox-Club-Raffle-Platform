@@ -594,7 +594,7 @@ class TicketController {
             {
               totalCommission: commissionAmount,
               claimableAmount: creatorAmount,
-              totalRevenue: lamports / decimals,
+              totalRevenue: lamports / Math.pow(10, decimals),
               platformRevenue: commissionAmount,
             },
             {
