@@ -257,6 +257,11 @@ const RaffleDetail = () => {
       return;
     }
 
+    if (!user.isAuthenticated) {
+      toast.error("Please sign in to purchase tickets");
+      return;
+    }
+
     if (!connected || !publicKey || !signTransaction) {
       toast.error("Please connect your wallet first");
       return;
@@ -402,7 +407,7 @@ const RaffleDetail = () => {
     } finally {
       setIsBuying(false);
     }
-  }, [raffle, ticketCount, publicKey, signTransaction, connected, isBuying]);
+  }, [raffle, ticketCount, publicKey, signTransaction, connected, isBuying, user.isAuthenticated]);
 
   const fetchRaffle = useCallback(async () => {
     if (!raffleId) return;
@@ -1109,7 +1114,19 @@ const RaffleDetail = () => {
             </div>
 
             {/* Countdown */}
-            {isLive && !isSoldOut && (
+            {(!connected || !user.isAuthenticated) && (
+              <div className="bg-red-50 border border-red-300 rounded-lg p-3 sm:p-4 mb-4">
+                <div className="flex gap-2 sm:gap-3">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0 mt-0.5" />
+                  <div className="text-xs sm:text-sm text-red-800">
+                    <p className="font-semibold mb-1">Sign In Required</p>
+                    <p>You must sign in and connect your wallet to purchase tickets.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isLive && !isSoldOut && connected && user.isAuthenticated && (
               <div className="space-y-2 sm:space-y-3">
                 <label className="text-xs sm:text-sm font-medium text-muted-foreground">
                   Number of Tickets
@@ -1200,7 +1217,15 @@ const RaffleDetail = () => {
               </div>
             )}
 
-            {isUpcoming ? (
+            {!connected || !user.isAuthenticated ? (
+              <Button
+                className="w-full h-10 sm:h-12 text-base sm:text-lg mt-4"
+                disabled
+              >
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                Sign In to Buy
+              </Button>
+            ) : isUpcoming ? (
               <div className="w-full h-10 sm:h-12 flex items-center justify-center gap-2 rounded-lg bg-yellow-50 border border-border/50 text-yellow-800 font-semibold text-sm sm:text-base mt-4">
                 <Clock className="h-4 w-4" />
                 Raffle starts soon
@@ -1217,7 +1242,7 @@ const RaffleDetail = () => {
               <Button
                 className="w-full gradient-primary glow-primary h-10 sm:h-12 text-base sm:text-lg mt-4"
                 onClick={handleBuyTickets}
-                disabled={!connected || isBuying}
+                disabled={!connected || !user.isAuthenticated || isBuying}
               >
                 {isBuying ? (
                   "Processing..."

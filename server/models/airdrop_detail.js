@@ -2,7 +2,7 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class AirdropReward extends Model {
+  class AirdropDetail extends Model {
     static associate(models) {
       this.belongsTo(models.User, {
         foreignKey: "creatorUserId",
@@ -12,19 +12,31 @@ module.exports = (sequelize, DataTypes) => {
 
       this.hasMany(models.UserAirdropReward, {
         foreignKey: "airdropRewardId",
-        as: "userRewards",
+        as: "userAirdropRewards",
       });
 
       this.belongsTo(models.SplTokenSendTransaction, {
-        foreignKey: "fundingTxId",
+        foreignKey: "splTokenSendTxId",
         targetKey: "id",
-        as: "fundingTransaction",
+        as: "splTokenSendTransaction",
       });
     }
   }
 
-  AirdropReward.init(
+  AirdropDetail.init(
     {
+      airdropName: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+      },
+      startDate: {
+        type: DataTypes.DATE,
+        allowNull: false,
+      },
+      endDate: {
+        type: DataTypes.DATE,
+        allowNull: false,
+      },
       type: {
         type: DataTypes.TINYINT,
         allowNull: false,
@@ -67,7 +79,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: true,
       },
-      fundingTxId: {
+      splTokenSendTxId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
       },
@@ -78,13 +90,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "AirdropReward",
-      tableName: "airdrop_rewards",
+      modelName: "AirdropDetail",
+      tableName: "airdrop_details",
       timestamps: true,
     }
   );
 
-  AirdropReward.STATUS = {
+  AirdropDetail.STATUS = {
     DRAFT: 0,
     PENDING: 1,
     FUNDED: 2,
@@ -93,13 +105,13 @@ module.exports = (sequelize, DataTypes) => {
     CANCELLED: 5,
   };
 
-  AirdropReward.REWARD_TYPE = {
+  AirdropDetail.REWARD_TYPE = {
     SOL: 0,
     SPL_TOKEN: 1,
     SPL_TOKEN_2022: 2,
   };
 
-  return AirdropReward;
+  return AirdropDetail;
 };
 
 

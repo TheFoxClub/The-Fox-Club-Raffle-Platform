@@ -19,7 +19,7 @@ module.exports = {
         type: Sequelize.INTEGER.UNSIGNED,
         allowNull: false,
         references: {
-          model: "airdrop_rewards",
+          model: "airdrop_details",
           key: "id",
         },
         onUpdate: "CASCADE",
@@ -41,7 +41,7 @@ module.exports = {
         defaultValue: 0,
         comment: "User XP used to calculate proportional airdrop amount",
       },
-      splTokenTxId: {
+      splTokenSendTxId: {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
@@ -51,10 +51,6 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
         comment: "Foreign key to the claim transaction record",
-      },
-      claimedAt: {
-        type: Sequelize.DATE,
-        allowNull: true,
       },
       createdAt: {
         allowNull: false,

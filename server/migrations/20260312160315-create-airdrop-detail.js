@@ -2,12 +2,24 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("airdrop_rewards", {
+    await queryInterface.createTable("airdrop_details", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER.UNSIGNED,
+      },
+      airdropName: {
+        type: Sequelize.STRING(255),
+        allowNull: false,
+      },
+      startDate: {
+        type: Sequelize.DATE,
+        allowNull: false,
+      },
+      endDate: {
+        type: Sequelize.DATE,
+        allowNull: false,
       },
       type: {
         type: Sequelize.TINYINT,
@@ -44,7 +56,7 @@ module.exports = {
         allowNull: true,
         comment: "Platform wallet that holds the airdrop funds",
       },
-      fundingTxId: {
+      splTokenSendTxId: {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
@@ -77,11 +89,13 @@ module.exports = {
       },
     });
 
-    await queryInterface.addIndex("airdrop_rewards", ["status"]);
-    await queryInterface.addIndex("airdrop_rewards", ["fundingTxId"]);
+    await queryInterface.addIndex("airdrop_details", ["status"]);
+    await queryInterface.addIndex("airdrop_details", ["splTokenSendTxId"]);
+    await queryInterface.addIndex("airdrop_details", ["startDate"]);
+    await queryInterface.addIndex("airdrop_details", ["endDate"]);
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("airdrop_rewards");
+    await queryInterface.dropTable("airdrop_details");
   },
 };

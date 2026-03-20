@@ -5,6 +5,9 @@ const isAdmin = require("../middlewares/isAdmin");
 
 const router = express.Router();
 
+// Public periodic leaderboard based on latest airdrop period
+router.get("/periodic-leaderboard", AirdropController.getLatestPeriodicLeaderboard);
+
 // ==============================
 // Admin Routes (Protected)
 // ==============================

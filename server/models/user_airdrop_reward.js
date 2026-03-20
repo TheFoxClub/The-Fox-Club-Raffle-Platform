@@ -4,14 +4,14 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class UserAirdropReward extends Model {
     static associate(models) {
-      this.belongsTo(models.AirdropReward, {
+      this.belongsTo(models.AirdropDetail, {
         foreignKey: "airdropRewardId",
-        as: "airdropReward",
+        as: "airdropDetail",
       });
 
       this.belongsTo(models.SplTokenSendTransaction, {
-        foreignKey: "splTokenTxId",
-        as: "splTokenTx",
+        foreignKey: "splTokenSendTxId",
+        as: "splTokenSendTx",
       });
     }
   }
@@ -55,12 +55,8 @@ module.exports = (sequelize, DataTypes) => {
           return val !== null && val !== undefined ? parseFloat(val) : 0;
         },
       },
-      splTokenTxId: {
+      splTokenSendTxId: {
         type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      claimedAt: {
-        type: DataTypes.DATE,
         allowNull: true,
       },
     },

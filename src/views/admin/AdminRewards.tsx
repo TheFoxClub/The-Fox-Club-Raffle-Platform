@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Check,
   Wallet,
+  AlertTriangle,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Progress } from "../../components/ui/Progress";
@@ -50,6 +51,9 @@ type LeaderboardUser = {
 
 type Airdrop = {
   id: number;
+  airdropName?: string;
+  startDate?: string;
+  endDate?: string;
   totalReceivers: number;
   totalAmount: number;
   type: number;
@@ -106,8 +110,8 @@ export default function AdminRewards() {
   const [selectedEndDate, setSelectedEndDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
-  const [topN, setTopN] = useState(10);
-  const [fetchAllUsers, setFetchAllUsers] = useState(false);
+  const [airdropName, setAirdropName] = useState("");
+  const todayDate = new Date().toISOString().split("T")[0];
   const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [airdrops, setAirdrops] = useState<Airdrop[]>([]);
@@ -253,15 +257,16 @@ export default function AdminRewards() {
         return;
       }
 
+      if (selectedEndDate > todayDate) {
+        toast.error("End date cannot be in the future");
+        return;
+      }
+
       setLeaderboardLoading(true);
       const params = new URLSearchParams({
         startDate: selectedStartDate,
         endDate: selectedEndDate,
       });
-
-      if (!fetchAllUsers) {
-        params.set("limit", String(topN));
-      }
 
       const res = await server.get(`/airdrop/xp-leaderboard?${params.toString()}`);
       
@@ -342,6 +347,11 @@ export default function AdminRewards() {
     if (!selectedToken) {
       console.log("Validation failed: No token selected");
       toast.error("Please select a reward token");
+      return;
+    }
+
+    if (!airdropName.trim()) {
+      toast.error("Please enter an airdrop name");
       return;
     }
 
@@ -428,6 +438,9 @@ export default function AdminRewards() {
       const totalXp = selectedUsers.reduce((sum, u) => sum + u.periodXp, 0);
 
       const confirmRes = await server.post("/airdrop/confirm-funding", {
+        airdropName: airdropName.trim(),
+        startDate: selectedStartDate,
+        endDate: selectedEndDate,
         totalAmount: totalDistributed,
         rewardType: selectedToken.tokenType,
         tokenAddress: selectedToken.value,
@@ -467,6 +480,7 @@ export default function AdminRewards() {
       console.log("Airdrop created:", confirmRes.data.data);
       
       // Reset form
+      setAirdropName("");
       setTotalAirdropAmount(0);
       setLeaderboardUsers([]);
       
@@ -741,6 +755,16 @@ export default function AdminRewards() {
           {/* Airdrop Form */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label className="text-sm font-medium mb-1 block">Airdrop Name *</label>
+              <input
+                type="text"
+                value={airdropName}
+                onChange={(e) => setAirdropName(e.target.value)}
+                placeholder="e.g., March 2026 Rewards"
+                className="w-full border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium mb-1 block">Reward Token *</label>
               {tokenOptionsLoading ? (
                 <div className="w-full border border-input rounded-lg p-2 text-sm bg-background text-muted-foreground">
@@ -787,49 +811,19 @@ export default function AdminRewards() {
                   <input
                     type="date"
                     value={selectedEndDate}
-                    onChange={(e) => setSelectedEndDate(e.target.value)}
+                    onChange={(e) => {
+                      const nextEndDate = e.target.value;
+                      if (nextEndDate > todayDate) {
+                        setSelectedEndDate(todayDate);
+                        toast.warning("End date cannot be in the future. Using today's date.");
+                        return;
+                      }
+                      setSelectedEndDate(nextEndDate);
+                    }}
+                    max={todayDate}
                     className="border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
                   />
                 </div>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-card/40 p-3">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Recipient Scope</p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={!fetchAllUsers ? "default" : "outline"}
-                    onClick={() => setFetchAllUsers(false)}
-                  >
-                    Top N
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={fetchAllUsers ? "default" : "outline"}
-                    onClick={() => setFetchAllUsers(true)}
-                  >
-                    All Users
-                  </Button>
-                </div>
-                {!fetchAllUsers && (
-                  <div className="mt-2">
-                    <label className="text-xs text-muted-foreground mb-1 block">Top N Users</label>
-                    <input
-                      type="number"
-                      value={topN}
-                      onChange={(e) => {
-                        setTopN(Math.max(1, parseInt(e.target.value, 10) || 1));
-                      }}
-                      min={1}
-                      max={100}
-                      className="w-24 border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-                    />
-                  </div>
-                )}
-                <p className="text-[11px] text-muted-foreground mt-2">
-                  {fetchAllUsers ? "Fetching all qualified users in the selected date range." : `Fetching top ${topN} users by XP in the selected date range.`}
-                </p>
               </div>
               <Button
                 onClick={fetchPeriodLeaderboard}

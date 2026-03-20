@@ -1,15 +1,14 @@
 const { status: httpStatus } = require("http-status");
-const { Op } = require("sequelize");
+const { Op, QueryTypes } = require("sequelize");
 const {
   User,
   UserInfo,
   XpTable,
-  AirdropReward,
+  AirdropDetail,
   UserAirdropReward,
   SplTokenSendTransaction,
   sequelize,
 } = require("../models");
-const XpService = require("../services/xp.service");
 const { getConnection } = require("../config/solana");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
@@ -36,8 +35,8 @@ const {
 } = require("../config/data");
 
 const connection = getConnection();
-const AIRDROP_STATUS = AirdropReward.STATUS;
-const REWARD_TYPE = AirdropReward.REWARD_TYPE;
+const AIRDROP_STATUS = AirdropDetail.STATUS;
+const REWARD_TYPE = AirdropDetail.REWARD_TYPE;
 const USER_REWARD_STATUS = UserAirdropReward.STATUS;
 
 const decodeSignedTransaction = (signedTransaction) => {
@@ -117,19 +116,132 @@ const validateTransactionChecksum = (tx, isVersioned, checksum) => {
 
 class AirdropController {
   /**
+   * Public periodic leaderboard based on the latest airdrop period.
+    * Uses latest airdrop and ranks users by XP stored in user_airdrop_rewards.
+   */
+  static async getLatestPeriodicLeaderboard(req, res) {
+    try {
+      const parsedPage = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const parsedLimit = Math.max(parseInt(req.query.limit, 10) || 50, 1);
+      const offset = (parsedPage - 1) * parsedLimit;
+
+      const latestAirdropRows = await sequelize.query(
+        `
+          SELECT id, airdropName, startDate, endDate, tokenSymbol, tokenAddress, createdAt
+          FROM airdrop_details
+          ORDER BY createdAt DESC
+          LIMIT 1
+        `,
+        { type: QueryTypes.SELECT }
+      );
+
+      if (!latestAirdropRows.length) {
+        return respond(res, httpStatus.OK, "No periodic airdrop data found", {
+          airdrop: null,
+          users: [],
+          pagination: {
+            total: 0,
+            page: parsedPage,
+            limit: parsedLimit,
+            totalPages: 0,
+          },
+        });
+      }
+
+      const latestAirdrop = latestAirdropRows[0];
+      const rangeStart = new Date(latestAirdrop.startDate);
+      const rangeEnd = new Date(latestAirdrop.endDate);
+
+      if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Latest airdrop has invalid startDate/endDate"
+        );
+      }
+
+      rangeStart.setHours(0, 0, 0, 0);
+      rangeEnd.setHours(23, 59, 59, 999);
+      const normalizedStartDate = rangeStart.toISOString();
+      const normalizedEndDate = rangeEnd.toISOString();
+
+      const rewardRows = await UserAirdropReward.findAll({
+        attributes: [
+          "pubKey",
+          [sequelize.fn("SUM", sequelize.col("xp")), "periodXp"],
+          [
+            sequelize.fn("COUNT", sequelize.col("UserAirdropReward.id")),
+            "transactionCount",
+          ],
+        ],
+        where: {
+          airdropRewardId: latestAirdrop.id,
+        },
+        group: ["pubKey"],
+        order: [[sequelize.fn("SUM", sequelize.col("xp")), "DESC"]],
+        raw: true,
+      });
+
+      const total = rewardRows.length;
+      const totalPages = total > 0 ? Math.ceil(total / parsedLimit) : 0;
+      const pageRows = rewardRows.slice(offset, offset + parsedLimit);
+
+      const users = await Promise.all(
+        pageRows.map(async (row, index) => {
+          const dbUser = await User.findOne({
+            where: { pubkey: row.pubKey },
+            attributes: ["id", "pubkey", "totalXp"],
+            include: [
+              {
+                model: UserInfo,
+                attributes: ["username"],
+                required: false,
+              },
+            ],
+          });
+
+          return {
+            rank: offset + index + 1,
+            userId: dbUser?.id || 0,
+            walletAddress: dbUser?.pubkey || row.pubKey || "Unknown",
+            username: dbUser?.user_info?.username || null,
+            periodXp: parseFloat(row.periodXp || 0),
+            transactionCount: parseInt(row.transactionCount || 0, 10),
+            allTimeXp: parseFloat(dbUser?.totalXp || 0),
+          };
+        })
+      );
+
+      return respond(res, httpStatus.OK, "Periodic leaderboard retrieved successfully", {
+        airdrop: {
+          id: latestAirdrop.id,
+          airdropName: latestAirdrop.airdropName,
+          startDate: normalizedStartDate,
+          endDate: normalizedEndDate,
+          tokenSymbol: latestAirdrop.tokenSymbol || null,
+          tokenAddress: latestAirdrop.tokenAddress || null,
+          createdAt: latestAirdrop.createdAt,
+        },
+        users,
+        pagination: {
+          total,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages,
+        },
+      });
+    } catch (err) {
+      logger.error("Error fetching periodic leaderboard:", err);
+      return respond(res, httpStatus.INTERNAL_SERVER_ERROR, parseSequelizeErrors(err));
+    }
+  }
+
+  /**
    * Get periodic XP leaderboard for airdrop recipient selection
    */
   static async getXpLeaderboard(req, res) {
     try {
-      const { startDate, endDate, limit } = req.query;
-
-      const now = new Date();
-      const hasExplicitLimit = limit !== undefined && limit !== null && String(limit).trim() !== "";
-      const parsedLimit = hasExplicitLimit ? parseInt(limit, 10) : null;
-
-      if (hasExplicitLimit && (!Number.isInteger(parsedLimit) || parsedLimit <= 0)) {
-        return respond(res, httpStatus.BAD_REQUEST, "limit must be a positive integer when provided");
-      }
+      const { startDate, endDate } = req.query;
 
       const hasCustomRange = Boolean(startDate && endDate);
       let rangeStart;
@@ -172,7 +284,6 @@ class AirdropController {
         },
         group: ["userId"],
         order: [[sequelize.fn("SUM", sequelize.col("xpEarned")), "DESC"]],
-        ...(hasExplicitLimit ? { limit: parsedLimit } : {}),
         raw: true,
       });
 
@@ -231,7 +342,7 @@ class AirdropController {
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
-      const { count, rows: airdrops } = await AirdropReward.findAndCountAll({
+      const { count, rows: airdrops } = await AirdropDetail.findAndCountAll({
         where: whereClause,
         order: [["createdAt", "DESC"]],
         limit: parseInt(limit),
@@ -239,7 +350,7 @@ class AirdropController {
         include: [
           {
             model: UserAirdropReward,
-            as: "userRewards",
+            as: "userAirdropRewards",
             attributes: ["id", "status"],
           },
         ],
@@ -247,11 +358,14 @@ class AirdropController {
 
       const enrichedAirdrops = airdrops.map((airdrop) => {
         const data = airdrop.toJSON();
-        const rewards = data.userRewards || [];
+        const rewards = data.userAirdropRewards || [];
         const claimedCount = rewards.filter((r) => r.status === USER_REWARD_STATUS.CLAIMED).length;
 
         return {
           id: data.id,
+          airdropName: data.airdropName,
+          startDate: data.startDate,
+          endDate: data.endDate,
           totalAmount: data.totalAmount,
           type: data.type,
           tokenSymbol: data.tokenSymbol,
@@ -285,7 +399,7 @@ class AirdropController {
       const { id } = req.params;
       const { status } = req.body;
 
-      const airdrop = await AirdropReward.findByPk(id);
+      const airdrop = await AirdropDetail.findByPk(id);
 
       if (!airdrop) {
         return respond(res, httpStatus.NOT_FOUND, "Airdrop not found");
@@ -437,6 +551,9 @@ class AirdropController {
 
     try {
       const {
+        airdropName,
+        startDate,
+        endDate,
         rewardType,
         tokenAddress,
         tokenSymbol,
@@ -482,6 +599,32 @@ class AirdropController {
       if (!totalAmount || parseFloat(totalAmount) <= 0) {
         await transaction.rollback();
         return respond(res, httpStatus.BAD_REQUEST, "totalAmount must be greater than 0");
+      }
+
+      if (!airdropName || !String(airdropName).trim()) {
+        await transaction.rollback();
+        return respond(res, httpStatus.BAD_REQUEST, "airdropName is required");
+      }
+
+      if (!startDate || !endDate) {
+        await transaction.rollback();
+        return respond(res, httpStatus.BAD_REQUEST, "startDate and endDate are required");
+      }
+
+      const parsedStartDate = new Date(startDate);
+      const parsedEndDate = new Date(endDate);
+
+      if (
+        Number.isNaN(parsedStartDate.getTime()) ||
+        Number.isNaN(parsedEndDate.getTime())
+      ) {
+        await transaction.rollback();
+        return respond(res, httpStatus.BAD_REQUEST, "Invalid startDate or endDate format");
+      }
+
+      if (parsedStartDate > parsedEndDate) {
+        await transaction.rollback();
+        return respond(res, httpStatus.BAD_REQUEST, "startDate cannot be after endDate");
       }
 
       const numericType = typeof rewardType === "number" ? rewardType : parseInt(rewardType || 0);
@@ -609,8 +752,11 @@ class AirdropController {
       );
 
       // Create the airdrop reward campaign (starts as FUNDED, admin can make it claimable)
-      const airdrop = await AirdropReward.create(
+      const airdrop = await AirdropDetail.create(
         {
+          airdropName: String(airdropName).trim(),
+          startDate: parsedStartDate,
+          endDate: parsedEndDate,
           type: numericType,
           tokenAddress: tokenAddress || null,
           tokenDecimals: tokenDecimals || 9,
@@ -618,7 +764,7 @@ class AirdropController {
           totalAmount: parsedTotalAmount,
           status: AIRDROP_STATUS.FUNDED,
           airdropWallet: airdropWalletAddress,
-          fundingTxId: splTxRecord.id,
+          splTokenSendTxId: splTxRecord.id,
           creatorUserId: adminUserId,
         },
         { transaction }
@@ -635,8 +781,7 @@ class AirdropController {
           pubKey: recipient.pubKey,
           amount: calculatedAmount,
           xp: userXp,
-          splTokenTxId: null,
-          claimedAt: null,
+          splTokenSendTxId: null,
         };
       });
 
@@ -686,8 +831,8 @@ class AirdropController {
         },
         include: [
           {
-            model: AirdropReward,
-            as: "airdropReward",
+            model: AirdropDetail,
+            as: "airdropDetail",
             where: {
               status: AIRDROP_STATUS.ACTIVE,
             },
@@ -698,9 +843,9 @@ class AirdropController {
 
       const enrichedRewards = unclaimedRewards.map((reward) => ({
         ...reward.toJSON(),
-        tokenSymbol: reward.airdropReward?.tokenSymbol,
-        tokenAddress: reward.airdropReward?.tokenAddress,
-        rewardType: reward.airdropReward?.type,
+        tokenSymbol: reward.airdropDetail?.tokenSymbol,
+        tokenAddress: reward.airdropDetail?.tokenAddress,
+        rewardType: reward.airdropDetail?.type,
       }));
 
       const totalAmount = enrichedRewards.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
@@ -742,14 +887,14 @@ class AirdropController {
           pubKey: userWallet,
           status: USER_REWARD_STATUS.PENDING,
         },
-        include: [{ model: AirdropReward, as: "airdropReward" }],
+        include: [{ model: AirdropDetail, as: "airdropDetail" }],
       });
 
       if (!reward) {
         return respond(res, httpStatus.NOT_FOUND, "Reward not found for authenticated user");
       }
 
-      const campaign = reward.airdropReward;
+      const campaign = reward.airdropDetail;
 
       if (!campaign || campaign.status !== AIRDROP_STATUS.ACTIVE) {
         return respond(res, httpStatus.BAD_REQUEST, "Airdrop is not active");
@@ -876,7 +1021,7 @@ class AirdropController {
           pubKey: userWallet,
           status: USER_REWARD_STATUS.PENDING,
         },
-        include: [{ model: AirdropReward, as: "airdropReward" }],
+        include: [{ model: AirdropDetail, as: "airdropDetail" }],
         transaction,
       });
 
@@ -885,7 +1030,7 @@ class AirdropController {
         return respond(res, httpStatus.NOT_FOUND, "Reward not found for authenticated user or already claimed. Try Refreshing the page.");
       }
 
-      const campaign = reward.airdropReward;
+      const campaign = reward.airdropDetail;
 
       if (!campaign || campaign.status !== AIRDROP_STATUS.ACTIVE) {
         await transaction.rollback();
@@ -942,29 +1087,10 @@ class AirdropController {
       await reward.update(
         {
           status: USER_REWARD_STATUS.CLAIMED,
-          claimedAt: now,
-          splTokenTxId: splTxRecord.id,
+          splTokenSendTxId: splTxRecord.id,
         },
         { transaction }
       );
-
-      const claimingUser = await User.findOne({
-        where: { pubkey: userWallet },
-        attributes: ["id"],
-        transaction,
-      });
-
-      // Xp claiming feature currently in works. If you uncomment this also uncomment below userTotalXp update code
-      // await XpTable.create(
-      //   {
-      //     userId: claimingUser.id,
-      //     xpEarned: -(parseFloat(reward.xp || 0)),
-      //     usdValue: 0,
-      //     splTokenSendTransactionId: splTxRecord.id,
-      //     metadata: { purpose: "airdrop_claim", airdropRewardId: campaign.id },
-      //   },
-      //   { transaction }
-      // );
 
       // If all user rewards are claimed, mark the campaign as completed
       const pendingCount = await UserAirdropReward.count({
@@ -980,14 +1106,6 @@ class AirdropController {
       }
 
       await transaction.commit();
-
-      // try {
-      //   await XpService.updateUserTotalXp(claimingUser.id);
-      // } catch (xpErr) {
-      //   logger.warn(`Could not update totalXp for user ${claimingUser.id} after airdrop claim: ${xpErr.message}`);
-      // }
-
-      // logger.info(`UserAirdropReward ${rewardId} claimed by wallet ${userWallet}, tx: ${signature}`);
 
       return respond(res, httpStatus.OK, "Reward claimed successfully", {
         rewardId: reward.id,
