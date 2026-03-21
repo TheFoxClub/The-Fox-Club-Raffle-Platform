@@ -257,13 +257,16 @@ const updateDbAndConfirmTransactions = async (op) => {
 
             if (parseFloat(currentRaffle.claimedAmount) === 0) {
               // Update the raffle's claimedAmount
-              const [affectedRows] = await Raffle.increment(
-                { claimedAmount: payoutAmount },
+              // Update the raffle's claimedAmount - handle string field properly
+              const newClaimedAmount = (parseFloat(currentRaffle.claimedAmount || 0) + payoutAmount).toString();
+              
+              await Raffle.update(
+                { claimedAmount: newClaimedAmount },
                 { where: { id: existingTransaction.raffleId } }
               );
 
               logger.info(
-                `Updated claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (Transaction: ${existingTransaction.txId}), affected rows: ${affectedRows}`
+                `Updated claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (Transaction: ${existingTransaction.txId})`
               );
 
               // Verify the update

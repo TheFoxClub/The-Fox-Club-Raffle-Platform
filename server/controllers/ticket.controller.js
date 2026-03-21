@@ -585,17 +585,22 @@ class TicketController {
 
       if (raffleId && ticketCount) {
         try {
-          await Raffle.increment("ticketsSold", {
-            by: ticketCount,
-            where: { id: raffleId },
-          });
+          // Fetch current raffle data to properly handle string fields
+          const currentRaffle = await Raffle.findOne({ where: { id: raffleId } });
+          
+          const revenueToAdd = lamports / decimals;
+          const updatedTotalCommission = (parseFloat(currentRaffle.totalCommission || 0) + parseFloat(commissionAmount)).toString();
+          const updatedClaimableAmount = (parseFloat(currentRaffle.claimableAmount || 0) + parseFloat(creatorAmount)).toString();
+          const updatedTotalRevenue = (parseFloat(currentRaffle.totalRevenue || 0) + revenueToAdd).toString();
+          const updatedPlatformRevenue = (parseFloat(currentRaffle.platformRevenue || 0) + parseFloat(commissionAmount)).toString();
 
-          await Raffle.increment(
+          await Raffle.update(
             {
-              totalCommission: commissionAmount,
-              claimableAmount: creatorAmount,
-              totalRevenue: lamports / decimals,
-              platformRevenue: commissionAmount,
+              ticketsSold: currentRaffle.ticketsSold + ticketCount,
+              totalCommission: updatedTotalCommission,
+              claimableAmount: updatedClaimableAmount,
+              totalRevenue: updatedTotalRevenue,
+              platformRevenue: updatedPlatformRevenue,
             },
             {
               where: { id: raffleId },
