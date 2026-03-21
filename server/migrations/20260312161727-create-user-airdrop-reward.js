@@ -13,7 +13,7 @@ module.exports = {
         type: Sequelize.TINYINT,
         allowNull: false,
         defaultValue: 0,
-        comment: "0=PENDING, 1=CLAIMED",
+        comment: "0=UNCLAIMED, 1=CLAIMED, 2=PENDING",
       },
       airdropRewardId: {
         type: Sequelize.INTEGER.UNSIGNED,

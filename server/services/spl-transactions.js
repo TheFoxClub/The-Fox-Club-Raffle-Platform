@@ -1,5 +1,11 @@
 const { Op } = require("sequelize");
-const { SplTokenSendTransaction, GameReward, Raffle } = require("../models");
+const {
+  SplTokenSendTransaction,
+  GameReward,
+  Raffle,
+  UserAirdropReward,
+  AirdropDetail,
+} = require("../models");
 const {
   SPL_TOKEN_SEND_TX_STATUS,
   SPL_TOKEN_SEND_TRANSACTION_TYPE,
@@ -10,6 +16,9 @@ const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const logger = require("../util/logger");
 const SocketService = require("./socket.service");
 const { getFeeData } = require("../helpers/cache/system-fee");
+
+const USER_AIRDROP_STATUS = UserAirdropReward.STATUS;
+const AIRDROP_STATUS = AirdropDetail.STATUS;
 
 const getSplTokenSendTransactions = async () => {
   const now = Date.now();
@@ -156,6 +165,40 @@ const updateDbAndConfirmTransactions = async (op) => {
         : SPL_TOKEN_SEND_TX_STATUS.MISMATCHED;
 
       await existingTransaction.save();
+
+      // Keep user airdrop rewards in sync with tx finality.
+      if (existingTransaction.rewardTransferType === "airdrop_claim") {
+        const userReward = await UserAirdropReward.findOne({
+          where: { splTokenSendTxId: existingTransaction.id },
+        });
+
+        if (userReward) {
+          // Only mark as CLAIMED if validation passed
+          if (isValid) {
+            await userReward.update({ status: USER_AIRDROP_STATUS.CLAIMED });
+
+            const pendingCount = await UserAirdropReward.count({
+              where: {
+                airdropRewardId: userReward.airdropRewardId,
+                status: { [Op.ne]: USER_AIRDROP_STATUS.CLAIMED },
+              },
+            });
+
+            if (pendingCount === 0) {
+              await AirdropDetail.update(
+                { status: AIRDROP_STATUS.COMPLETED },
+                { where: { id: userReward.airdropRewardId } }
+              );
+            }
+          } else {
+            // Handle mismatched airdrop claim - reset to UNCLAIMED for retry
+            await userReward.update({
+              status: USER_AIRDROP_STATUS.UNCLAIMED,
+              splTokenSendTxId: null,
+            });
+          }
+        }
+      }
 
       // Handle payout transactions - update claimedAmount in raffle table
       if (
@@ -334,6 +377,36 @@ const updateDbAndConfirmTransactions = async (op) => {
             );
           }
         }
+      }
+
+      // Failed airdrop claim tx should become claimable again.
+      const failedAirdropTxRecords = await SplTokenSendTransaction.findAll({
+        where: {
+          txId: { [Op.in]: failedTxIds },
+          rewardTransferType: "airdrop_claim",
+        },
+        attributes: ["id", "txId"],
+      });
+
+      if (failedAirdropTxRecords.length > 0) {
+        const failedAirdropTxIds = failedAirdropTxRecords.map((txRecord) => txRecord.id);
+
+        await UserAirdropReward.update(
+          {
+            status: USER_AIRDROP_STATUS.UNCLAIMED,
+            splTokenSendTxId: null,
+          },
+          {
+            where: {
+              splTokenSendTxId: { [Op.in]: failedAirdropTxIds },
+              status: { [Op.ne]: USER_AIRDROP_STATUS.CLAIMED },
+            },
+          }
+        );
+
+        logger.info(
+          `Reset ${failedAirdropTxIds.length} failed airdrop claim rewards back to UNCLAIMED`
+        );
       }
 
       // Set rewardClaimTxId to null in game_rewards table for failed tx

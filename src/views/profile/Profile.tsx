@@ -112,9 +112,13 @@ type Win = {
 type AirdropReward = {
   id: number;              // UserAirdropReward.id
   airdropRewardId: number; // AirdropReward campaign id
+  airdropName?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
   pubKey: string;
   amount: number;
-  status: number;          // 0=PENDING, 1=CLAIMED
+  xp: number;
+  status: number;          // 0=UNCLAIMED, 1=CLAIMED, 2=PENDING
   claimedAt: string | null;
   tokenSymbol: string | null;
   tokenAddress: string | null;
@@ -130,8 +134,9 @@ const RAFFLE_STATUS = {
 };
 
 const USER_AIRDROP_STATUS = {
-  PENDING: 0,
+  UNCLAIMED: 0,
   CLAIMED: 1,
+  PENDING: 2,
 };
 
 const Profile = () => {
@@ -173,7 +178,7 @@ const Profile = () => {
   const [loadingRewards, setLoadingRewards] = useState(false);
   const unclaimedWinsCount = wins.filter((win) => !win.isClaimed).length;
   const unclaimedAirdropCount = airdropRewards.filter(
-    (reward) => reward.status === USER_AIRDROP_STATUS.PENDING
+    (reward) => reward.status === USER_AIRDROP_STATUS.UNCLAIMED
   ).length;
   const hostedRafflesWithUnclaimedPayouts = hostedRafflesData.filter(
     (raffle) =>
@@ -1445,7 +1450,9 @@ const Profile = () => {
 
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-bold">Airdrop #{reward.airdropRewardId}</h3>
+                            <h3 className="text-lg font-bold">
+                              {reward.airdropName || `Airdrop #${reward.airdropRewardId}`}
+                            </h3>
                           </div>
 
                           <div className="flex flex-wrap items-center text-sm text-muted-foreground gap-4">
@@ -1455,16 +1462,31 @@ const Profile = () => {
                                 {reward.amount} {reward.tokenSymbol || "Token"}
                               </span>
                             </div>
+                            <div className="flex items-center gap-1">
+                              <Trophy className="h-4 w-4" />
+                              <span>XP: {reward.xp ?? 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                {formatDate(reward.startDate || "")} - {formatDate(reward.endDate || "")}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex-shrink-0">
+                        {(() => {
+                          const isPending = reward.status === USER_AIRDROP_STATUS.PENDING;
+                          const canClaim = reward.status === USER_AIRDROP_STATUS.UNCLAIMED;
+
+                          return (
                         <Button
                           onClick={() => handleAirdropClaim(reward)}
                           disabled={
                             claimingAirdropId === reward.id ||
-                            reward.status !== USER_AIRDROP_STATUS.PENDING
+                            !canClaim
                           }
                           className="gradient-primary"
                           >
@@ -1473,6 +1495,11 @@ const Profile = () => {
                                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                                 Claiming...
                               </>
+                            ) : isPending ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Pending Confirmation
+                              </>
                             ) : (
                               <>
                                 <Gift className="h-4 w-4 mr-2" />
@@ -1480,6 +1507,8 @@ const Profile = () => {
                               </>
                             )}
                           </Button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </Card>

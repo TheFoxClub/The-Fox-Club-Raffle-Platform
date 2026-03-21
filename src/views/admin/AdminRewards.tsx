@@ -152,6 +152,17 @@ export default function AdminRewards() {
   const shortWallet = (wallet: string) =>
     wallet.slice(0, 4) + "..." + wallet.slice(-4);
 
+  const formatAirdropDate = (value?: string) => {
+    if (!value) return "N/A";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "N/A";
+    return parsed.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   const mapNumericTokenType = (numericTokenType: number): string => {
     switch (numericTokenType) {
       case 0:
@@ -995,20 +1006,36 @@ export default function AdminRewards() {
               <h3 className="text-base font-semibold mb-3">Recent Airdrops</h3>
               <div className="space-y-2">
                 {airdrops.map((airdrop) => (
+                  (() => {
+                    const remainingCount = Math.max(
+                      0,
+                      (airdrop.totalReceivers || 0) - (airdrop.claimedCount || 0)
+                    );
+
+                    return (
                   <div
                     key={airdrop.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-card/50 rounded-lg border border-border/30 gap-3"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">Airdrop #{airdrop.id}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${AIRDROP_STATUS_COLORS[airdrop.status]}`}>
-                          {AIRDROP_STATUS_LABELS[airdrop.status]}
+                        <span className="font-semibold">
+                          {airdrop.airdropName || `Airdrop #${airdrop.id}`}
+                        </span>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            AIRDROP_STATUS_COLORS[airdrop.status] || "bg-gray-500/20 text-gray-400"
+                          }`}
+                        >
+                          {AIRDROP_STATUS_LABELS[airdrop.status] || "Unknown"}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
+                        {formatAirdropDate(airdrop.startDate)} - {formatAirdropDate(airdrop.endDate)} •
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
                         {airdrop.totalReceivers} recipients • {airdrop.totalAmount} {airdrop.tokenSymbol || selectedTokenSymbol} •
-                        Claimed: {airdrop.claimedCount}/{airdrop.totalReceivers}
+                        Claimed: {airdrop.claimedCount}/{airdrop.totalReceivers} • Remaining: {remainingCount}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -1044,6 +1071,8 @@ export default function AdminRewards() {
                       )}
                     </div>
                   </div>
+                    );
+                  })()
                 ))}
               </div>
             </div>

@@ -736,6 +736,9 @@ class AirdropController {
       }
 
       // Record the funding transaction
+      // Calculate actual uiAmount in smallest units (with decimals applied) for on-chain verification
+      const fundingUiAmount = Math.floor(parsedTotalAmount * Math.pow(10, tokenDecimals || 9));
+      
       const splTxRecord = await SplTokenSendTransaction.create(
         {
           senderPubkey: adminUser.pubkey,
@@ -744,7 +747,7 @@ class AirdropController {
           txId: finalFundingSignature,
           tokenAddress: tokenAddress || null,
           decimals: tokenDecimals || 9,
-          uiAmount: String(parsedTotalAmount),
+          uiAmount: String(fundingUiAmount),
           status: SPL_TOKEN_SEND_TX_STATUS?.CONFIRMED || 2,
           additionalJson: { purpose: "airdrop_funding" },
         },
@@ -776,7 +779,7 @@ class AirdropController {
         const calculatedAmount = parseFloat(((userXp / parsedTotalXp) * parsedTotalAmount).toFixed(9));
 
         return {
-          status: USER_REWARD_STATUS.PENDING,
+          status: USER_REWARD_STATUS.UNCLAIMED,
           airdropRewardId: airdrop.id,
           pubKey: recipient.pubKey,
           amount: calculatedAmount,
@@ -827,7 +830,12 @@ class AirdropController {
       const unclaimedRewards = await UserAirdropReward.findAll({
         where: {
           pubKey: user.pubkey,
-          status: USER_REWARD_STATUS.PENDING,
+          status: {
+            [Op.in]: [
+              USER_REWARD_STATUS.UNCLAIMED,
+              USER_REWARD_STATUS.PENDING,
+            ],
+          },
         },
         include: [
           {
@@ -836,13 +844,24 @@ class AirdropController {
             where: {
               status: AIRDROP_STATUS.ACTIVE,
             },
-            attributes: ["id", "tokenSymbol", "tokenAddress", "type"],
+            attributes: [
+              "id",
+              "airdropName",
+              "startDate",
+              "endDate",
+              "tokenSymbol",
+              "tokenAddress",
+              "type",
+            ],
           },
         ],
       });
 
       const enrichedRewards = unclaimedRewards.map((reward) => ({
         ...reward.toJSON(),
+        airdropName: reward.airdropDetail?.airdropName || null,
+        startDate: reward.airdropDetail?.startDate || null,
+        endDate: reward.airdropDetail?.endDate || null,
         tokenSymbol: reward.airdropDetail?.tokenSymbol,
         tokenAddress: reward.airdropDetail?.tokenAddress,
         rewardType: reward.airdropDetail?.type,
@@ -885,7 +904,7 @@ class AirdropController {
         where: {
           id: parseInt(rewardId),
           pubKey: userWallet,
-          status: USER_REWARD_STATUS.PENDING,
+          status: USER_REWARD_STATUS.UNCLAIMED,
         },
         include: [{ model: AirdropDetail, as: "airdropDetail" }],
       });
@@ -1019,7 +1038,7 @@ class AirdropController {
         where: {
           id: parseInt(rewardId),
           pubKey: userWallet,
-          status: USER_REWARD_STATUS.PENDING,
+          status: USER_REWARD_STATUS.UNCLAIMED,
         },
         include: [{ model: AirdropDetail, as: "airdropDetail" }],
         transaction,
@@ -1037,18 +1056,40 @@ class AirdropController {
         return respond(res, httpStatus.BAD_REQUEST, "Airdrop is not active");
       }
 
-      const now = new Date();
-
       // Submit and wait for on-chain confirmation before mutating DB.
       const submissionResult = await submitTransactionToBlockchain(signedTransaction);
+      let shouldStoreAsPending = false;
 
       if (!submissionResult.success) {
-        await transaction.rollback();
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          `Failed to submit claim transaction: ${submissionResult.error || submissionResult.message}`
-        );
+        if (!submissionResult.signature) {
+          await transaction.rollback();
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            `Failed to submit claim transaction: ${submissionResult.error || submissionResult.message}`
+          );
+        }
+
+        // Signature exists but submit helper returned unsuccessful. Recheck once after a short delay.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        shouldStoreAsPending = true;
+
+        try {
+          const recheckConfirmation = await connection.confirmTransaction(
+            submissionResult.signature,
+            "confirmed"
+          );
+
+          // Only treat as immediate success when explicit confirmation is successful.
+          if (recheckConfirmation?.value?.err === null) {
+            shouldStoreAsPending = false;
+          }
+        } catch (confirmErr) {
+          logger.warn(
+            `Error rechecking airdrop claim confirmation for ${submissionResult.signature}. Keeping tx as PENDING for cron handling.`
+          );
+        }
       }
 
       const finalSignature = submissionResult.signature;
@@ -1068,6 +1109,9 @@ class AirdropController {
       else if (campaign.type === REWARD_TYPE.SPL_TOKEN_2022) splType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
 
       // Create the SPL TX record for the claim
+      // Calculate actual uiAmount in smallest units (with decimals applied) for on-chain verification
+      const claimUiAmount = Math.floor(parseFloat(reward.amount) * Math.pow(10, campaign.tokenDecimals || 9));
+      
       const splTxRecord = await SplTokenSendTransaction.create(
         {
           senderPubkey: campaign.airdropWallet,
@@ -1076,39 +1120,53 @@ class AirdropController {
           txId: finalSignature,
           tokenAddress: campaign.tokenAddress || null,
           decimals: campaign.tokenDecimals,
-          uiAmount: String(parseFloat(reward.amount)),
-          status: SPL_TOKEN_SEND_TX_STATUS?.CONFIRMED || 2,
+          uiAmount: String(claimUiAmount),
+          status: shouldStoreAsPending
+            ? SPL_TOKEN_SEND_TX_STATUS.PENDING
+            : SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+          rewardTransferType: "airdrop_claim",
           additionalJson: { purpose: "airdrop_claim", airdropRewardId: campaign.id },
         },
         { transaction }
       );
 
-      // Mark the user reward as claimed
+      const nextRewardStatus = shouldStoreAsPending
+        ? USER_REWARD_STATUS.PENDING
+        : USER_REWARD_STATUS.CLAIMED;
+
+      // Mark the user reward as claimed when confirmed, otherwise pending for cron verification.
       await reward.update(
         {
-          status: USER_REWARD_STATUS.CLAIMED,
+          status: nextRewardStatus,
           splTokenSendTxId: splTxRecord.id,
         },
         { transaction }
       );
 
-      // If all user rewards are claimed, mark the campaign as completed
-      const pendingCount = await UserAirdropReward.count({
-        where: {
-          airdropRewardId: campaign.id,
-          status: { [Op.ne]: USER_REWARD_STATUS.CLAIMED },
-        },
-        transaction,
-      });
+      if (!shouldStoreAsPending) {
+        // If all user rewards are claimed, mark the campaign as completed
+        const pendingCount = await UserAirdropReward.count({
+          where: {
+            airdropRewardId: campaign.id,
+            status: { [Op.ne]: USER_REWARD_STATUS.CLAIMED },
+          },
+          transaction,
+        });
 
-      if (pendingCount === 0) {
-        await campaign.update({ status: AIRDROP_STATUS.COMPLETED }, { transaction });
+        if (pendingCount === 0) {
+          await campaign.update({ status: AIRDROP_STATUS.COMPLETED }, { transaction });
+        }
       }
 
       await transaction.commit();
 
-      return respond(res, httpStatus.OK, "Reward claimed successfully", {
+      const responseMessage = shouldStoreAsPending
+        ? "Transaction submitted and is pending confirmation"
+        : "Reward claimed successfully";
+
+      return respond(res, httpStatus.OK, responseMessage, {
         rewardId: reward.id,
+        rewardStatus: nextRewardStatus,
         transactionSignature: finalSignature,
       });
     } catch (err) {

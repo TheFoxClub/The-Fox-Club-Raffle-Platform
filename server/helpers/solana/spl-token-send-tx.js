@@ -794,6 +794,7 @@ const createPayoutTransaction = async ({
  * Submit a signed transaction to the Solana blockchain
  */
 const submitTransactionToBlockchain = async (signedTransactionBase64) => {
+  let signature;
   try {
     const transactionBuffer = Buffer.from(signedTransactionBase64, "base64");
 
@@ -801,7 +802,7 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
     logger.info(`Transaction size: ${transactionBuffer.length} bytes`);
 
     // Submit to Solana network with simulation first
-    const signature = await connection.sendRawTransaction(transactionBuffer, {
+    signature = await connection.sendRawTransaction(transactionBuffer, {
       skipPreflight: false,
       preflightCommitment: "confirmed",
       maxRetries: 3,
@@ -841,6 +842,7 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
       message: error.message,
       error: error.message,
       logs: error.logs || [],
+      signature,
     };
   }
 };

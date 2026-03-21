@@ -3698,16 +3698,44 @@ class RaffleController {
         signedTransaction
       );
 
+      let nextTxStatus = SPL_TOKEN_SEND_TX_STATUS.SUCCESS;
+
       if (!submissionResult.success) {
-        logger.error(
-          `Payout transaction submission failed:`,
-          submissionResult.error
-        );
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          `Transaction submission failed: ${submissionResult.error}`
-        );
+        if (!submissionResult.signature) {
+          logger.error(
+            "Payout transaction submission failed without signature:",
+            submissionResult.error
+          );
+          return respond(
+            res,
+            httpStatus.BAD_REQUEST,
+            `Transaction submission failed: ${submissionResult.error || submissionResult.message}`
+          );
+        }
+
+        nextTxStatus = SPL_TOKEN_SEND_TX_STATUS.PENDING;
+
+        // Signature exists but submit helper returned unsuccessful. Recheck once after a short delay.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        try {
+          const recheckConfirmation = await connection.confirmTransaction(
+            submissionResult.signature,
+            "confirmed"
+          );
+
+          if (recheckConfirmation?.value?.err === null) {
+            nextTxStatus = SPL_TOKEN_SEND_TX_STATUS.SUCCESS;
+          } else if (recheckConfirmation?.value?.err) {
+            logger.warn(
+              `Payout recheck returned err for ${submissionResult.signature}. Keeping tx as PENDING for cron handling.`
+            );
+          }
+        } catch (confirmErr) {
+          logger.warn(
+            `Error rechecking payout confirmation for ${submissionResult.signature}. Keeping tx as PENDING for cron handling.`
+          );
+        }
       }
 
       const signature = submissionResult.signature;
@@ -3715,7 +3743,7 @@ class RaffleController {
       await SplTokenSendTransaction.update(
         {
           txId: signature,
-          status: SPL_TOKEN_SEND_TX_STATUS.PENDING, // Mark as PENDING, cron job will verify and set to SUCCESS
+          status: nextTxStatus,
         },
         {
           where: { id: transactionId },
@@ -3735,9 +3763,12 @@ class RaffleController {
           signature: signature,
           transactionId: transactionId,
           raffleId: raffleId,
+          status: nextTxStatus,
           explorerUrl: `https://solscan.io/tx/${signature}`,
           message:
-            "Your payout is being processed and will be confirmed shortly.",
+            nextTxStatus === SPL_TOKEN_SEND_TX_STATUS.SUCCESS
+              ? "Your payout transaction is confirmed."
+              : "Your payout is being processed and will be confirmed shortly.",
         }
       );
     } catch (err) {
