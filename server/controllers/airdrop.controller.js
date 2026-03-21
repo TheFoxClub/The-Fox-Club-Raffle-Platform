@@ -241,7 +241,9 @@ class AirdropController {
    */
   static async getXpLeaderboard(req, res) {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, page = 1, limit = 10 } = req.query;
+      const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+      const parsedLimit = Math.max(parseInt(limit, 10) || 10, 1);
 
       const hasCustomRange = Boolean(startDate && endDate);
       let rangeStart;
@@ -287,8 +289,13 @@ class AirdropController {
         raw: true,
       });
 
+      const totalParticipants = topEarners.length;
+      const totalPages = totalParticipants > 0 ? Math.ceil(totalParticipants / parsedLimit) : 0;
+      const offset = (parsedPage - 1) * parsedLimit;
+      const paginatedEarners = topEarners.slice(offset, offset + parsedLimit);
+
       const enrichedEarners = await Promise.all(
-        topEarners.map(async (earner, index) => {
+        paginatedEarners.map(async (earner, index) => {
           const user = await User.findByPk(earner.userId, {
             attributes: ["id", "pubkey", "totalXp"],
             include: [
@@ -301,7 +308,7 @@ class AirdropController {
           });
 
           return {
-            rank: index + 1,
+            rank: offset + index + 1,
             userId: earner.userId,
             walletAddress: user?.pubkey || "Unknown",
             username: user?.user_info?.username || null,
@@ -319,8 +326,14 @@ class AirdropController {
           startDate: rangeStart.toISOString(),
           endDate: rangeEnd.toISOString(),
         },
-        totalParticipants: enrichedEarners.length,
+        totalParticipants,
         leaderboard: enrichedEarners,
+        pagination: {
+          total: totalParticipants,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages,
+        },
       });
     } catch (err) {
       logger.error("Error fetching periodic XP leaderboard:", err);

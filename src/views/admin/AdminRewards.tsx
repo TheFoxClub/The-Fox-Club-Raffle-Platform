@@ -46,7 +46,6 @@ type LeaderboardUser = {
   transactionCount: number;
   allTimeXp: number;
   rewardAmount?: number;
-  selected?: boolean;
 };
 
 type Airdrop = {
@@ -81,6 +80,8 @@ const AIRDROP_STATUS_COLORS: Record<number, string> = {
   5: "bg-red-500/20 text-red-400",
 };
 
+const LEADERBOARD_PAGE_SIZE = 10;
+
 export default function AdminRewards() {
   // const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -114,6 +115,12 @@ export default function AdminRewards() {
   const todayDate = new Date().toISOString().split("T")[0];
   const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardPagination, setLeaderboardPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: LEADERBOARD_PAGE_SIZE,
+    totalPages: 0,
+  });
   const [airdrops, setAirdrops] = useState<Airdrop[]>([]);
   const [totalAirdropAmount, setTotalAirdropAmount] = useState<number>(0);
   const [creatingAirdrop, setCreatingAirdrop] = useState(false);
@@ -256,7 +263,7 @@ export default function AdminRewards() {
   }, []);
 
   // Fetch leaderboard for the selected date range
-  const fetchPeriodLeaderboard = async () => {
+  const fetchPeriodLeaderboard = async (page = 1) => {
     try {
       if (!selectedStartDate || !selectedEndDate) {
         toast.error("Please select both start and end dates");
@@ -277,6 +284,8 @@ export default function AdminRewards() {
       const params = new URLSearchParams({
         startDate: selectedStartDate,
         endDate: selectedEndDate,
+        page: String(page),
+        limit: String(LEADERBOARD_PAGE_SIZE),
       });
 
       const res = await server.get(`/airdrop/xp-leaderboard?${params.toString()}`);
@@ -284,10 +293,17 @@ export default function AdminRewards() {
       if (res.data.success) {
         const usersWithSelection = res.data.data.leaderboard.map((user: LeaderboardUser) => ({
           ...user,
-          selected: true,
           rewardAmount: 0,
         }));
         setLeaderboardUsers(usersWithSelection);
+
+        const pagination = res.data.data.pagination || {
+          total: usersWithSelection.length,
+          page,
+          limit: LEADERBOARD_PAGE_SIZE,
+          totalPages: usersWithSelection.length > 0 ? 1 : 0,
+        };
+        setLeaderboardPagination(pagination);
         
         // Auto-distribute using proportional-to-XP method
         if (totalAirdropAmount > 0) {
@@ -307,14 +323,13 @@ export default function AdminRewards() {
     users: LeaderboardUser[],
     total: number
   ) => {
-    const selectedUsers = users.filter((u) => u.selected);
-    if (selectedUsers.length === 0) return;
+    if (users.length === 0) return;
 
-    const totalXp = selectedUsers.reduce((sum, u) => sum + u.periodXp, 0);
+    const totalXp = users.reduce((sum, u) => sum + u.periodXp, 0);
     const updatedUsers = users.map((u) => ({
       ...u,
       rewardAmount:
-        u.selected && totalXp > 0
+        totalXp > 0
           ? parseFloat(((u.periodXp / totalXp) * total).toFixed(6))
           : 0,
     }));
@@ -328,23 +343,11 @@ export default function AdminRewards() {
     distributeRewards(leaderboardUsers, amount);
   };
 
-  // Toggle user selection
-  const toggleUserSelection = (userId: number) => {
-    const updatedUsers = leaderboardUsers.map((u) =>
-      u.userId === userId ? { ...u, selected: !u.selected } : u
-    );
-    setLeaderboardUsers(updatedUsers);
-    
-    if (totalAirdropAmount > 0) {
-      distributeRewards(updatedUsers, totalAirdropAmount);
-    }
-  };
-
   // Create airdrop with token transfer
   const createAirdrop = async () => {
     console.log("=== CREATE AIRDROP START ===");
     
-    const selectedUsers = leaderboardUsers.filter((u) => u.selected && u.rewardAmount && u.rewardAmount > 0);
+    const selectedUsers = leaderboardUsers.filter((u) => u.rewardAmount && u.rewardAmount > 0);
     console.log("Selected users:", selectedUsers.length);
     console.log("Selected users data:", selectedUsers);
     
@@ -706,7 +709,7 @@ export default function AdminRewards() {
       </div>
 
       {/* Reward Pool Status */}
-      <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50">
+      {/* <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
           <div>
             <h2 className="text-xl font-bold">Reward Pool</h2>
@@ -747,7 +750,7 @@ export default function AdminRewards() {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Airdrop Creation Section */}
       <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50 space-y-6">
@@ -837,7 +840,7 @@ export default function AdminRewards() {
                 </div>
               </div>
               <Button
-                onClick={fetchPeriodLeaderboard}
+                onClick={() => fetchPeriodLeaderboard(1)}
                 disabled={leaderboardLoading}
                 className="gradient-primary"
               >
@@ -884,23 +887,6 @@ export default function AdminRewards() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 sticky top-0">
                       <tr>
-                        <th className="p-2 text-left w-12">
-                          <input
-                            type="checkbox"
-                            checked={leaderboardUsers.every((u) => u.selected)}
-                            onChange={(e) => {
-                              const allSelected = e.target.checked;
-                              setLeaderboardUsers((prev) =>
-                                prev.map((u) => ({ ...u, selected: allSelected }))
-                              );
-                              if (totalAirdropAmount > 0) {
-                                const updated = leaderboardUsers.map((u) => ({ ...u, selected: allSelected }));
-                                distributeRewards(updated, totalAirdropAmount);
-                              }
-                            }}
-                            className="rounded"
-                          />
-                        </th>
                         <th className="p-2 text-left">Rank</th>
                         <th className="p-2 text-left">Wallet</th>
                         <th className="p-2 text-left">Period XP</th>
@@ -911,16 +897,8 @@ export default function AdminRewards() {
                       {leaderboardUsers.map((user) => (
                         <tr
                           key={user.userId}
-                          className={`border-t border-border/30 ${user.selected ? "bg-primary/5" : "opacity-50"}`}
+                          className="border-t border-border/30 bg-primary/5"
                         >
-                          <td className="p-2">
-                            <input
-                              type="checkbox"
-                              checked={user.selected}
-                              onChange={() => toggleUserSelection(user.userId)}
-                              className="rounded"
-                            />
-                          </td>
                           <td className="p-2">
                             <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
                               user.rank === 1 ? "bg-yellow-500/20 text-yellow-400" :
@@ -958,18 +936,55 @@ export default function AdminRewards() {
                 </div>
               </div>
 
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <p className="text-muted-foreground">
+                  Page {leaderboardPagination.page} of {Math.max(leaderboardPagination.totalPages, 1)}
+                  {" "}
+                  ({leaderboardPagination.total} users)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      leaderboardLoading ||
+                      leaderboardPagination.page <= 1 ||
+                      leaderboardPagination.totalPages === 0
+                    }
+                    onClick={() =>
+                      fetchPeriodLeaderboard(Math.max(1, leaderboardPagination.page - 1))
+                    }
+                  >
+                    <ChevronUp className="h-4 w-4 mr-1" /> Prev
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      leaderboardLoading ||
+                      leaderboardPagination.page >= leaderboardPagination.totalPages ||
+                      leaderboardPagination.totalPages === 0
+                    }
+                    onClick={() =>
+                      fetchPeriodLeaderboard(leaderboardPagination.page + 1)
+                    }
+                  >
+                    Next <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+
               {/* Summary */}
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-muted/30 rounded-lg">
                 <div className="flex gap-6 text-sm">
                   <div>
                     <span className="text-muted-foreground">Selected:</span>{" "}
-                    <span className="font-semibold">{leaderboardUsers.filter((u) => u.selected).length} users</span>
+                    <span className="font-semibold">{leaderboardUsers.length} users</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total to distribute:</span>{" "}
                     <span className="font-semibold text-primary">
                       {leaderboardUsers
-                        .filter((u) => u.selected)
                         .reduce((sum, u) => sum + (u.rewardAmount || 0), 0)
                         .toFixed(6)} {selectedTokenSymbol}
                     </span>
@@ -985,7 +1000,7 @@ export default function AdminRewards() {
                 </div>
                 <Button
                   onClick={createAirdrop}
-                  disabled={creatingAirdrop || !connected || leaderboardUsers.filter((u) => u.selected && u.rewardAmount).length === 0}
+                  disabled={creatingAirdrop || !connected || leaderboardUsers.filter((u) => u.rewardAmount).length === 0}
                   className="gradient-primary"
                   title={!connected ? "Connect wallet to create airdrop" : ""}
                 >
