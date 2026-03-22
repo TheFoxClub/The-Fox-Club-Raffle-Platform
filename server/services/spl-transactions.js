@@ -150,10 +150,10 @@ const updateDbAndConfirmTransactions = async (op) => {
           return tx.details.amounts.some(
             (amount) =>
               amount ===
-                Number(existingTransaction.uiAmount) + commissionInLamports || // <-- transferring commission and amount to same wallet.
+                Number(existingTransaction.commissionAmount) * LAMPORTS_PER_SOL === amount || // <-- transferring commission and amount to same wallet.
               amount === Number(existingTransaction.uiAmount) ||
               amount ===
-                Number(existingTransaction.uiAmount) - commissionInLamports, // <-- transferring commission and amount to same wallet.
+                Number(existingTransaction.creatorAmount) * LAMPORTS_PER_SOL, // <-- transferring commission and amount to same wallet.
           );
         }
         return (
