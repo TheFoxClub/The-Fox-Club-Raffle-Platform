@@ -31,6 +31,7 @@ import { Connection, Transaction } from "@solana/web3.js";
 import { storeSignature, cancelReservation } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
+import { shortenPubkey } from "../../helpers/utils";
 
 const mapNumericTokenType = (numericTokenType: number): string => {
   switch (numericTokenType) {
@@ -104,6 +105,12 @@ export interface RaffleType {
   tokenTypeNumber?: number;
   tokenAddress?: string;
 }
+
+type TTicketPurchaser = {
+  userPubkey: string;
+  userId: number;
+  ticketCount: number;
+};
 
 // Reward types mapping
 const RAFFLE_REWARD_TYPES = {
@@ -197,6 +204,9 @@ const RaffleDetail = () => {
   // const [nftImages, setNftImages] = useState<Record<string, string>>({});
   const [isBuying, setIsBuying] = useState(false);
   const user = useSelector((state: RootState) => state.user);
+  const [ticketPurchasers, setTicketPurchasers] = useState<TTicketPurchaser[]>(
+    [],
+  );
 
   const extractErrorMessage = (error: any): string => {
     if (!error) return "";
@@ -228,7 +238,7 @@ const RaffleDetail = () => {
 
   const getTokenTypeForAPI = (
     tokenTypeNumber: number,
-    tokenAddress?: string
+    tokenAddress?: string,
   ): string => {
     switch (tokenTypeNumber) {
       case 0:
@@ -241,7 +251,7 @@ const RaffleDetail = () => {
           return tokenAddress;
         }
         console.warn(
-          `Token type ${tokenTypeNumber} requires token address but none provided`
+          `Token type ${tokenTypeNumber} requires token address but none provided`,
         );
         return "solana"; // Fallback to prevent errors
       default:
@@ -288,7 +298,7 @@ const RaffleDetail = () => {
 
     if (balance === 0) {
       toast.error(
-        "Insufficient balance. Please add SOL to your wallet to buy tickets."
+        "Insufficient balance. Please add SOL to your wallet to buy tickets.",
       );
       setIsBuying(false);
       return;
@@ -308,7 +318,7 @@ const RaffleDetail = () => {
 
       if (!transactionResponse.data.success) {
         throw new Error(
-          transactionResponse.data.message || "Failed to reserve tickets"
+          transactionResponse.data.message || "Failed to reserve tickets",
         );
       }
 
@@ -324,7 +334,7 @@ const RaffleDetail = () => {
       // Show reservation countdown
       toast.info(
         `Tickets reserved! You have ${reservationTimeoutSeconds} seconds to complete the transaction.`,
-        { autoClose: 3000 }
+        { autoClose: 3000 },
       );
 
       // Small delay so user sees the toast first
@@ -332,7 +342,7 @@ const RaffleDetail = () => {
 
       // Step 2: Sign transaction
       const solanaTransaction = Transaction.from(
-        Buffer.from(transaction, "base64")
+        Buffer.from(transaction, "base64"),
       );
 
       const signedTransaction = await signTransaction(solanaTransaction);
@@ -341,7 +351,7 @@ const RaffleDetail = () => {
       const connection = new Connection(SOLANA_RPC_HOST);
 
       const signature = await connection.sendRawTransaction(
-        signedTransaction.serialize()
+        signedTransaction.serialize(),
       );
 
       // Step 4: Confirm reservation with signature
@@ -358,7 +368,7 @@ const RaffleDetail = () => {
         ticketCount,
         raffle.id,
         reservationId, // Pass reservation ID
-        reservationId // Pass reservation ID
+        reservationId, // Pass reservation ID
       );
 
       if (confirmResponse.success) {
@@ -366,7 +376,7 @@ const RaffleDetail = () => {
         await fetchRaffle();
       } else {
         throw new Error(
-          confirmResponse.data.message || "Failed to confirm purchase"
+          confirmResponse.data.message || "Failed to confirm purchase",
         );
       }
     } catch (error: any) {
@@ -392,7 +402,7 @@ const RaffleDetail = () => {
 
         if (isInsufficientFundsError(error)) {
           toast.error(
-            "Insufficient balance. Please add funds to your wallet and try again."
+            "Insufficient balance. Please add funds to your wallet and try again.",
           );
           return;
         }
@@ -407,7 +417,15 @@ const RaffleDetail = () => {
     } finally {
       setIsBuying(false);
     }
-  }, [raffle, ticketCount, publicKey, signTransaction, connected, isBuying, user.isAuthenticated]);
+  }, [
+    raffle,
+    ticketCount,
+    publicKey,
+    signTransaction,
+    connected,
+    isBuying,
+    user.isAuthenticated,
+  ]);
 
   const fetchRaffle = useCallback(async () => {
     if (!raffleId) return;
@@ -415,6 +433,8 @@ const RaffleDetail = () => {
       setLoading(true);
       const res = await server.get(`/raffle/${raffleId}`);
       if (res.data.success) {
+        // setTicketPurchasers(res.data.data.ticketPurchasers);
+        setTicketPurchasers([]);
         const data = res.data.data.raffle;
 
         const mappedRaffle: RaffleType = {
@@ -456,7 +476,7 @@ const RaffleDetail = () => {
         if (mappedRaffle.hostId) {
           try {
             const hostRes = await server.get(
-              `/user/info/${mappedRaffle.hostId}`
+              `/user/info/${mappedRaffle.hostId}`,
             );
             if (
               hostRes.data.success &&
@@ -464,7 +484,7 @@ const RaffleDetail = () => {
             ) {
               setHostPhotoUrl(
                 // `${server.defaults.baseURL}${hostRes.data.data.user.user_info.photoUrl}`
-                hostRes.data.data.user.user_info.photoUrl
+                hostRes.data.data.user.user_info.photoUrl,
               );
             }
           } catch (err) {
@@ -511,13 +531,13 @@ const RaffleDetail = () => {
         if (raffle.status === RAFFLE_STATUS.UPCOMING) {
           // Automatically move to LIVE when start date is reached
           setRaffle((prev) =>
-            prev ? { ...prev, status: RAFFLE_STATUS.LIVE } : prev
+            prev ? { ...prev, status: RAFFLE_STATUS.LIVE } : prev,
           );
           setCountdown(formatCountdown(raffle.endDate!));
         } else if (raffle.status === RAFFLE_STATUS.LIVE) {
           // Automatically move to ENDED when end date is reached
           setRaffle((prev) =>
-            prev ? { ...prev, status: RAFFLE_STATUS.ENDED } : prev
+            prev ? { ...prev, status: RAFFLE_STATUS.ENDED } : prev,
           );
           setCountdown("Ended");
         }
@@ -587,7 +607,7 @@ const RaffleDetail = () => {
         // Show toast for other users (not the buyer)
         if (publicKey && data.buyerPubkey !== publicKey.toBase58()) {
           toast.info(
-            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`
+            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`,
           );
         }
       }
@@ -606,7 +626,7 @@ const RaffleDetail = () => {
                 data.reason === "sold_out"
                   ? "All tickets sold!"
                   : "Time expired!"
-              }`
+              }`,
             );
           }
 
@@ -622,7 +642,7 @@ const RaffleDetail = () => {
 
         if (participated) {
           toast.success(
-            `Winners have been selected! ${data.numberOfWinners} winner(s)`
+            `Winners have been selected! ${data.numberOfWinners} winner(s)`,
           );
         }
 
@@ -660,7 +680,7 @@ const RaffleDetail = () => {
     if (!participated) return;
 
     const userRewards = raffle.winnersData?.filter(
-      (w) => w.winnerPubkey === publicKey.toBase58()
+      (w) => w.winnerPubkey === publicKey.toBase58(),
     );
 
     const isWinner = (userRewards?.length ?? 0) > 0;
@@ -700,8 +720,8 @@ const RaffleDetail = () => {
   const countdownTarget = isUpcoming
     ? raffle.startDate
     : isLive
-    ? raffle.endDate
-    : null;
+      ? raffle.endDate
+      : null;
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -769,7 +789,7 @@ const RaffleDetail = () => {
                         onClick={() =>
                           setHeroIndex(
                             (i) =>
-                              (i - 1 + heroImages.length) % heroImages.length
+                              (i - 1 + heroImages.length) % heroImages.length,
                           )
                         }
                         className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition"
@@ -1120,7 +1140,10 @@ const RaffleDetail = () => {
                   <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0 mt-0.5" />
                   <div className="text-xs sm:text-sm text-red-800">
                     <p className="font-semibold mb-1">Sign In Required</p>
-                    <p>You must sign in and connect your wallet to purchase tickets.</p>
+                    <p>
+                      You must sign in and connect your wallet to purchase
+                      tickets.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1152,7 +1175,7 @@ const RaffleDetail = () => {
                       if (e.key === "ArrowUp") {
                         e.preventDefault();
                         setTicketCount((prev) =>
-                          Math.min((prev || 1) + 1, ticketsLeft)
+                          Math.min((prev || 1) + 1, ticketsLeft),
                         );
                       }
 
@@ -1171,12 +1194,12 @@ const RaffleDetail = () => {
                       }
 
                       setTicketCount(
-                        Math.min(Math.max(1, numeric), ticketsLeft)
+                        Math.min(Math.max(1, numeric), ticketsLeft),
                       );
                     }}
                     onBlur={() => {
                       setTicketCount((prev) =>
-                        Math.min(Math.max(1, prev), ticketsLeft)
+                        Math.min(Math.max(1, prev), ticketsLeft),
                       );
                     }}
                     className="flex h-9 sm:h-10 w-full rounded-md text-center border border-border bg-background-50 text-base sm:text-lg p-2 font-bold"
@@ -1267,6 +1290,70 @@ const RaffleDetail = () => {
               </div>
             </div>
           </Card>
+        </div>
+      </div>
+      <div className="mt-4">
+        <div className="flex flex-row gap-2 mt-4 ">
+          <Ticket className="text-secondary mt-1" />
+          <h2 className="text-2xl text-left font-bold text-secondary">
+            Tickets Sold
+          </h2>
+        </div>
+        <div className="relative overflow-x-auto w-full bg-neutral-primary-soft shadow-md rounded-lg border border-secondary mt-2">
+          {ticketPurchasers && ticketPurchasers.length > 0 ? (
+            ticketPurchasers.map((item, key) => (
+              <table className="min-w-full w-full text-sm text-left text-gray-700">
+                <thead className=" uppercase text-white tracking-wider">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-lg font-semibold text-primary"
+                    >
+                      User
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-lg font-semibold text-right text-primary"
+                    >
+                      Tickets Bought
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr key={key} className="border border-bottom">
+                    <th
+                      scope="row"
+                      className="px-6 py-4 text-white font-medium whitespace-nowrap flex items-center"
+                    >
+                      <span
+                        className="font-bold text-lg truncate cursor-pointer hover:text-primary transition mr-2"
+                        title={item.userPubkey} // full pubkey on hover
+                      >
+                        {shortenPubkey(item.userPubkey)}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(item.userPubkey)}
+                        title="Click to copy wallet address"
+                        className="p-1 rounded-full transition"
+                      >
+                        <Copy width={16} height={16} />
+                      </button>
+                    </th>
+                    <td className="px-6 py-4 text-right font-medium text-white">
+                      {item.ticketCount}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            ))
+          ) : (
+            <div className="p-4">
+              <span className="text-center py-4 text-gray-500 italic font-bold">
+                No Tickets Data
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>
