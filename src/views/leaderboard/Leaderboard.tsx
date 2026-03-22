@@ -3,11 +3,11 @@ import {
   Trophy,
   TrendingUp,
   User,
-  Coins,
   Award,
   Crown,
   Medal,
   Star,
+  Calendar,
 } from "lucide-react";
 
 import {
@@ -20,6 +20,7 @@ import {
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import XPLeaderboard from "./XPLeaderboard";
+import PeriodicLeaderboard from "./PeriodicLeaderboard";
 import { toast } from "react-toastify";
 
 interface TXpConfig {
@@ -143,6 +144,10 @@ const Leaderboard = () => {
             <TabsTrigger value="xp" className="gap-2 flex-1 sm:flex-none">
               <Star className="h-4 w-4" />
               XP Leaders
+            </TabsTrigger>
+            <TabsTrigger value="periodic" className="gap-2 flex-1 sm:flex-none">
+              <Calendar className="h-4 w-4" />
+              Periodic
             </TabsTrigger>
           </TabsList>
 
@@ -289,6 +294,10 @@ const Leaderboard = () => {
 
           <TabsContent value="xp" className="space-y-4">
             <XPLeaderboard />
+          </TabsContent>
+
+          <TabsContent value="periodic" className="space-y-4">
+            <PeriodicLeaderboard />
           </TabsContent>
         </Tabs>
         {/* XP Conversion Info */}

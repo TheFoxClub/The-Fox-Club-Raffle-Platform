@@ -6,7 +6,7 @@ import {
   Shield,
   Coins,
   Star,
-  //  Gift,
+   Gift,
   TrendingUp,
   Trophy,
   LogOut,
@@ -34,7 +34,7 @@ const menuItems = [
   { icon: Coins, label: "Tokens", path: "/admin/tokens" },
   { icon: Star, label: "XP Management", path: "/admin/xp" },
   { icon: Settings, label: "Fees & Config", path: "/admin/fees" },
-  //{ icon: Gift, label: "Rewards", path: "/admin/rewards" },
+  { icon: Gift, label: "Rewards", path: "/admin/rewards" },
   { icon: Trophy, label: "Leaderboards", path: "/admin/leaderboards" },
   { icon: TrendingUp, label: "Analytics", path: "/admin/analytics" },
 ];

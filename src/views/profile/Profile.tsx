@@ -4,7 +4,6 @@ import { Card } from "../../components/ui/Card";
 import {
   User,
   Trophy,
-  Award,
   Ticket,
   Calendar,
   Coins,
@@ -12,7 +11,7 @@ import {
   Gift,
   AlertCircle,
   Trash2,
-  Star,
+  RefreshCw,
 } from "lucide-react";
 import {
   Tabs,
@@ -110,12 +109,34 @@ type Win = {
   winDate: string;
 };
 
+type AirdropReward = {
+  id: number;              // UserAirdropReward.id
+  airdropRewardId: number; // AirdropReward campaign id
+  airdropName?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  pubKey: string;
+  amount: number;
+  xp: number;
+  status: number;          // 0=UNCLAIMED, 1=CLAIMED, 2=PENDING
+  claimedAt: string | null;
+  tokenSymbol: string | null;
+  tokenAddress: string | null;
+  rewardType: number;
+};
+
 const RAFFLE_STATUS = {
   UPCOMING: 1,
   LIVE: 2,
   ENDED: 3,
   DELETED: 6,
   REFUNDED: 7,
+};
+
+const USER_AIRDROP_STATUS = {
+  UNCLAIMED: 0,
+  CLAIMED: 1,
+  PENDING: 2,
 };
 
 const Profile = () => {
@@ -140,6 +161,11 @@ const Profile = () => {
   );
   const [wins, setWins] = useState<Win[]>([]);
 
+  // Airdrop rewards state
+  const [airdropRewards, setAirdropRewards] = useState<AirdropReward[]>([]);
+  const [loadingAirdropRewards, setLoadingAirdropRewards] = useState(false);
+  const [claimingAirdropId, setClaimingAirdropId] = useState<number | null>(null);
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [raffleToDelete, setRaffleToDelete] = useState<HostedRaffle | null>(
     null
@@ -151,6 +177,9 @@ const Profile = () => {
 
   const [loadingRewards, setLoadingRewards] = useState(false);
   const unclaimedWinsCount = wins.filter((win) => !win.isClaimed).length;
+  const unclaimedAirdropCount = airdropRewards.filter(
+    (reward) => reward.status === USER_AIRDROP_STATUS.UNCLAIMED
+  ).length;
   const hostedRafflesWithUnclaimedPayouts = hostedRafflesData.filter(
     (raffle) =>
       raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0
@@ -195,7 +224,7 @@ const Profile = () => {
 
         dispatch(
           setUser({
-            user_info: userData.user_info,
+            user_info: { ...userData.user_info, id: userData.id },
             isAuthenticated: true,
             isLoading: false,
           })
@@ -260,6 +289,7 @@ const Profile = () => {
   useEffect(() => {
     if (user_info?.id) {
       fetchClaimableRewards();
+      fetchAirdropRewards();
     }
   }, [user_info?.id]);
 
@@ -343,6 +373,116 @@ const Profile = () => {
       }
     } catch (error) {
       console.error("Failed to fetch wins:", error);
+    }
+  };
+
+  const fetchAirdropRewards = async () => {
+    try {
+      setLoadingAirdropRewards(true);
+      const res = await server.get("/airdrop/user/unclaimed");
+      
+      if (res.data.success) {
+        setAirdropRewards(res.data.data.rewards || []);
+      }
+    } catch (error: any) {
+      // Don't show error for auth errors
+      if (error.response?.status !== 401) {
+        console.error("Error fetching airdrop rewards:", error);
+      }
+    } finally {
+      setLoadingAirdropRewards(false);
+    }
+  };
+
+  const handleAirdropClaim = async (reward: AirdropReward) => {
+    if (!publicKey || !signTransaction) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    try {
+      setClaimingAirdropId(reward.id);
+      toast.info("Preparing claim transaction...");
+
+      // Step 1: Get the claim transaction (already partially signed by airdrop wallet)
+      const prepareRes = await server.post(`/airdrop/user/prepare-claim/${reward.id}`);
+
+      if (!prepareRes.data.success) {
+        throw new Error(prepareRes.data.message || "Failed to prepare claim transaction");
+      }
+
+      const { transaction: serializedTx, checksum } = prepareRes.data.data;
+
+      // Step 2: Deserialize the partially signed transaction from backend
+      toast.info("Please sign the transaction in your wallet...");
+
+      let tx: Transaction | VersionedTransaction;
+
+      try {
+        const txBytes = Uint8Array.from(atob(serializedTx), (c) => c.charCodeAt(0));
+        tx = Transaction.from(txBytes);
+      } catch {
+        try {
+          const txBytes = Uint8Array.from(atob(serializedTx), (c) => c.charCodeAt(0));
+          tx = VersionedTransaction.deserialize(txBytes);
+        } catch {
+          throw new Error("Failed to deserialize claim transaction");
+        }
+      }
+
+      // Step 3: Sign and submit to backend (backend broadcasts on-chain)
+      const signedTx = await signTransaction(tx);
+      toast.info("Submitting claim transaction...");
+
+      const signedTxBase64 =
+        signedTx instanceof VersionedTransaction
+          ? Buffer.from(signedTx.serialize()).toString("base64")
+          : Buffer.from(
+              signedTx.serialize({
+                requireAllSignatures: false,
+                verifySignatures: false,
+              })
+            ).toString("base64");
+
+      const claimRes = await server.post(`/airdrop/user/claim/${reward.id}`, {
+        signedTransaction: signedTxBase64,
+        checksum,
+      });
+
+      const signature = claimRes?.data?.data?.transactionSignature;
+
+      toast.success(
+        <div>
+          Reward claimed successfully!{" "}
+          {signature ? (
+            <a
+              href={`https://solscan.io/tx/${signature}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on Solscan
+            </a>
+          ) : null}
+        </div>
+      );
+
+      // Refresh rewards
+      fetchAirdropRewards();
+    } catch (error: any) {
+      console.error("Claim error:", error);
+      
+      if (error.message?.includes("User rejected") || error.name === "WalletSignTransactionError") {
+        toast.error("Transaction cancelled");
+      } else {
+        toast.error(
+          error.response?.data?.message ||
+            error.message ||
+            "Failed to claim reward"
+        );
+      }
+    } finally {
+      setClaimingAirdropId(null);
     }
   };
 
@@ -476,10 +616,15 @@ const Profile = () => {
 
   useEffect(() => {
     const notificationCount =
-      unclaimedWinsCount + hostedRafflesWithUnclaimedPayouts;
+      unclaimedWinsCount + hostedRafflesWithUnclaimedPayouts + unclaimedAirdropCount;
 
     dispatch(setNotificationsCount(notificationCount));
-  }, [unclaimedWinsCount, hostedRafflesWithUnclaimedPayouts, dispatch]);
+  }, [
+    unclaimedWinsCount,
+    hostedRafflesWithUnclaimedPayouts,
+    unclaimedAirdropCount,
+    dispatch,
+  ]);
 
   if (isLoading) {
     return (
@@ -622,6 +767,37 @@ const Profile = () => {
           </Card>
         )}
 
+        {/* Airdrop Rewards Notification */}
+        {unclaimedAirdropCount > 0 && (
+          <Card className="bg-gradient-to-r from-accent/20 to-accent/20 border border-accent/30 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Gift className="h-6 w-6 text-accent" />
+                <div>
+                  <h3 className="font-bold">
+                    You have {unclaimedAirdropCount} airdrop reward{unclaimedAirdropCount !== 1 ? "s" : ""} to claim!
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Go to the "Rewards" tab to claim your airdrop rewards
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="cursor-pointer border-accent/30 hover:bg-accent/10"
+                onClick={() => {
+                  const element = document.querySelector(
+                    '[data-tab="rewards"]'
+                  ) as HTMLElement;
+                  element?.click();
+                }}
+              >
+                View Rewards
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Tabs section */}
         <Tabs defaultValue="purchasedTickets" className="space-y-4 mt-10">
           <TabsList className="p-1 w-full sm:w-auto">
@@ -662,6 +838,18 @@ const Profile = () => {
               {unclaimedWinsCount > 0 && (
                 <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {unclaimedWinsCount}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="rewards"
+              className="flex-1 md:flex-none"
+              data-tab="rewards"
+            >
+              Rewards{" "}
+              {unclaimedAirdropCount > 0 && (
+                <span className="ml-2 bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unclaimedAirdropCount}
                 </span>
               )}
             </TabsTrigger>
@@ -1225,6 +1413,107 @@ const Profile = () => {
                   </div>
                 </Card>
               ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="rewards" className="space-y-4">
+            {loadingAirdropRewards ? (
+              <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
+                <div className="text-center">
+                  <RefreshCw className="h-8 w-8 mx-auto animate-spin text-primary mb-4" />
+                  <p className="text-muted-foreground">Loading airdrop rewards...</p>
+                </div>
+              </Card>
+            ) : airdropRewards.length === 0 ? (
+              <Card className="bg-card/50 backdrop-blur-xl p-12 border border-border/50">
+                <div className="text-center">
+                  <Gift className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">
+                    No airdrop rewards available. Check back later!
+                  </p>
+                </div>
+              </Card>
+            ) : (
+              airdropRewards.map((reward) => {
+                return (
+                  <Card
+                    key={reward.id}
+                    className="bg-card/50 backdrop-blur-xl border p-6 border-border/50"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0">
+                          <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center">
+                            <Gift className="h-8 w-8 text-accent" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-bold">
+                              {reward.airdropName || `Airdrop #${reward.airdropRewardId}`}
+                            </h3>
+                          </div>
+
+                          <div className="flex flex-wrap items-center text-sm text-muted-foreground gap-4">
+                            <div className="flex items-center gap-1">
+                              <Coins className="h-4 w-4" />
+                              <span className="font-semibold text-primary">
+                                {reward.amount} {reward.tokenSymbol || "Token"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Trophy className="h-4 w-4" />
+                              <span>XP: {reward.xp ?? 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                {formatDate(reward.startDate || "")} - {formatDate(reward.endDate || "")}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0">
+                        {(() => {
+                          const isPending = reward.status === USER_AIRDROP_STATUS.PENDING;
+                          const canClaim = reward.status === USER_AIRDROP_STATUS.UNCLAIMED;
+
+                          return (
+                        <Button
+                          onClick={() => handleAirdropClaim(reward)}
+                          disabled={
+                            claimingAirdropId === reward.id ||
+                            !canClaim
+                          }
+                          className="gradient-primary"
+                          >
+                            {claimingAirdropId === reward.id ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Claiming...
+                              </>
+                            ) : isPending ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Pending Confirmation
+                              </>
+                            ) : (
+                              <>
+                                <Gift className="h-4 w-4 mr-2" />
+                                Claim Reward
+                              </>
+                            )}
+                          </Button>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })
             )}
           </TabsContent>
         </Tabs>

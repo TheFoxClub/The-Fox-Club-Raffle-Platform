@@ -49,23 +49,45 @@ export const Header = () => {
       return;
     }
 
+    const USER_AIRDROP_STATUS = {
+      UNCLAIMED: 0,
+      CLAIMED: 1,
+      PENDING: 2,
+    };
+
     const getUserWinsAndPayouts = async () => {
       try {
-        const winsRes = await server.get("/raffle/user/wins");
-        const hostedRes = await server.get("/raffle/user/hosted");
+        const [winsRes, hostedRes, airdropRes] = await Promise.all([
+          server.get("/raffle/user/wins"),
+          server.get("/raffle/user/hosted"),
+          server.get("/airdrop/user/unclaimed"),
+        ]);
+
         if (winsRes.data.success && hostedRes.data.success) {
           const winsData = winsRes.data.data.wins || [];
           const hostedData = hostedRes.data.data.raffles || [];
+          const airdropRewards = airdropRes?.data?.success
+            ? airdropRes.data.data.rewards || []
+            : [];
+
           const unclaimedWinsCount = winsData.filter(
-            (win) => !win.isClaimed
+            (win: any) => !win.isClaimed
           ).length;
+
           const hostedRafflesWithUnclaimedPayouts = hostedData.filter(
-            (raffle) =>
+            (raffle: any) =>
               raffle.payoutInfo?.canClaim &&
               raffle.payoutInfo?.unclaimedAmount > 0
           ).length;
+
+          const unclaimedAirdropCount = airdropRewards.filter(
+            (reward: any) => reward.status === USER_AIRDROP_STATUS.UNCLAIMED
+          ).length;
+
           setNotificationsCount(
-            unclaimedWinsCount + hostedRafflesWithUnclaimedPayouts
+            unclaimedWinsCount +
+              hostedRafflesWithUnclaimedPayouts +
+              unclaimedAirdropCount
           );
         } else {
           setNotificationsCount(0);
@@ -270,6 +292,7 @@ export const Header = () => {
           </div>
         )}
       </div>
+      <div><button onClick={()=> console.log(notificationsCount)}>hh</button></div>
     </nav>
   );
 };
