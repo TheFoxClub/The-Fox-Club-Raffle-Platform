@@ -433,8 +433,7 @@ const RaffleDetail = () => {
       setLoading(true);
       const res = await server.get(`/raffle/${raffleId}`);
       if (res.data.success) {
-        // setTicketPurchasers(res.data.data.ticketPurchasers);
-        setTicketPurchasers([]);
+        setTicketPurchasers(res.data.data.ticketPurchasers);
         const data = res.data.data.raffle;
 
         const mappedRaffle: RaffleType = {
