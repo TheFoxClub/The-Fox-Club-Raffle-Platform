@@ -24,6 +24,12 @@ class PriceService {
         return await this.getSolPrice();
       }
 
+      if (this.isDevnetEnvironment()) {
+        const mockPrice = this.getMockSolPrice();
+        logger.info(`Using mock SOL price for devnet/testing: $${mockPrice}`);
+        return mockPrice;
+      }
+
       // Try cache first
       const cachedPrice = await this.getCachedPrice(tokenAddress);
       if (cachedPrice !== null) {

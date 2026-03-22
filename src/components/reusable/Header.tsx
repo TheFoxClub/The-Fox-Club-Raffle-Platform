@@ -292,7 +292,6 @@ export const Header = () => {
           </div>
         )}
       </div>
-      <div><button onClick={()=> console.log(notificationsCount)}>hh</button></div>
     </nav>
   );
 };
