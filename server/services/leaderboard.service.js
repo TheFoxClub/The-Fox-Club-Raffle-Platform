@@ -157,7 +157,6 @@ const getTopBuyers = async (limit = 10, xpConfig) => {
       WHERE st.senderPubkey IN (?)
         AND rt.isWinner = 1
         AND st.status = ?
-        AND st.type = 0
       GROUP BY st.senderPubkey
       `,
       {

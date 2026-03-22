@@ -36,15 +36,7 @@ const readTransactions = async (txs) => {
 
     data = await connection.getParsedTransactions(txIds, {
       maxSupportedTransactionVersion: 0,
-    });
-
-    const filteredTxIds = data.map(
-      (dataEntry) =>
-        dataEntry?.transaction.signatures[0] &&
-        dataEntry.transaction.signatures[0]
-    );
-
-    failedTransactions = txIds.filter((txId) => !filteredTxIds.includes(txId));
+    }).then((result) => result?.filter(Boolean));
 
     for (let transaction of data) {
       if (!transaction) continue;

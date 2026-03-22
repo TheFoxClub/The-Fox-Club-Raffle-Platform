@@ -104,13 +104,13 @@ const getSplTokenSendTransactions = async () => {
   });
 
   logger.info(
-    `Found ${regularRows.length} regular pending transactions, ${payoutRows.length} pending payout transactions, and ${successfulPayoutRows.length} successful payout transactions needing claimedAmount updates`
+    `Found ${regularRows.length} regular pending transactions, ${payoutRows.length} pending payout transactions, and ${successfulPayoutRows.length} successful payout transactions needing claimedAmount updates`,
   );
 
   if (allRows.length > 0) {
     allRows.forEach((row) => {
       logger.info(
-        `Transaction to process: ${row.txId}, type: ${row.type}, rewardTransferType: ${row.rewardTransferType}, raffleId: ${row.raffleId}, status: ${row.status}, created: ${row.createdAt}`
+        `Transaction to process: ${row.txId}, type: ${row.type}, rewardTransferType: ${row.rewardTransferType}, raffleId: ${row.raffleId}, status: ${row.status}, created: ${row.createdAt}`,
       );
     });
   }
@@ -133,7 +133,7 @@ const updateDbAndConfirmTransactions = async (op) => {
       }
 
       logger.info(
-        `Processing transaction ${tx.txId}: type=${existingTransaction.type}, rewardTransferType=${existingTransaction.rewardTransferType}, raffleId=${existingTransaction.raffleId}`
+        `Processing transaction ${tx.txId}: type=${existingTransaction.type}, rewardTransferType=${existingTransaction.rewardTransferType}, raffleId=${existingTransaction.raffleId}`,
       );
 
       if (tx.details.txType === SPL_TOKEN_SEND_TRANSACTION_TYPE.MULTIPLE) {
@@ -153,10 +153,18 @@ const updateDbAndConfirmTransactions = async (op) => {
                 Number(existingTransaction.uiAmount) + commissionInLamports || // <-- transferring commission and amount to same wallet.
               amount === Number(existingTransaction.uiAmount) ||
               amount ===
-                Number(existingTransaction.uiAmount) - commissionInLamports // <-- transferring commission and amount to same wallet.
+                Number(existingTransaction.uiAmount) - commissionInLamports, // <-- transferring commission and amount to same wallet.
           );
         }
-        return Number(existingTransaction.uiAmount) === tx.details.amount;
+        return (
+          Number(existingTransaction.uiAmount) === tx.details.amount ||
+          Number(existingTransaction.commissionAmount) *
+            Math.pow(10, Number(existingTransaction.decimals)) ===
+            tx.details.amount ||
+          Number(existingTransaction.creatorAmount) *
+            Math.pow(10, Number(existingTransaction.decimals)) ===
+            tx.details.amount
+        );
       };
 
       const isValid = checks();
@@ -187,7 +195,7 @@ const updateDbAndConfirmTransactions = async (op) => {
             if (pendingCount === 0) {
               await AirdropDetail.update(
                 { status: AIRDROP_STATUS.COMPLETED },
-                { where: { id: userReward.airdropRewardId } }
+                { where: { id: userReward.airdropRewardId } },
               );
             }
           } else {
@@ -206,7 +214,7 @@ const updateDbAndConfirmTransactions = async (op) => {
         existingTransaction.raffleId
       ) {
         logger.info(
-          `Processing payout transaction: ${existingTransaction.txId}, isValid: ${isValid}, status: ${existingTransaction.status}, raffleId: ${existingTransaction.raffleId}, uiAmount: ${existingTransaction.uiAmount}`
+          `Processing payout transaction: ${existingTransaction.txId}, isValid: ${isValid}, status: ${existingTransaction.status}, raffleId: ${existingTransaction.raffleId}, uiAmount: ${existingTransaction.uiAmount}`,
         );
 
         // Handle successful transactions (either newly validated or already successful)
@@ -230,7 +238,7 @@ const updateDbAndConfirmTransactions = async (op) => {
 
             if (!currentRaffle) {
               logger.error(
-                `Raffle not found for transaction ${existingTransaction.txId}`
+                `Raffle not found for transaction ${existingTransaction.txId}`,
               );
             }
 
@@ -252,21 +260,23 @@ const updateDbAndConfirmTransactions = async (op) => {
             }
 
             logger.info(
-              `Attempting to update claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (uiAmount: ${existingTransaction.uiAmount}, decimals: ${existingTransaction.decimals})`
+              `Attempting to update claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (uiAmount: ${existingTransaction.uiAmount}, decimals: ${existingTransaction.decimals})`,
             );
 
             if (parseFloat(currentRaffle.claimedAmount) === 0) {
               // Update the raffle's claimedAmount
               // Update the raffle's claimedAmount - handle string field properly
-              const newClaimedAmount = (parseFloat(currentRaffle.claimedAmount || 0) + payoutAmount).toString();
-              
+              const newClaimedAmount = (
+                parseFloat(currentRaffle.claimedAmount || 0) + payoutAmount
+              ).toString();
+
               await Raffle.update(
                 { claimedAmount: newClaimedAmount },
-                { where: { id: existingTransaction.raffleId } }
+                { where: { id: existingTransaction.raffleId } },
               );
 
               logger.info(
-                `Updated claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (Transaction: ${existingTransaction.txId})`
+                `Updated claimedAmount for raffle ${existingTransaction.raffleId}: +${payoutAmount} ${tokenSymbol} (Transaction: ${existingTransaction.txId})`,
               );
 
               // Verify the update
@@ -277,7 +287,7 @@ const updateDbAndConfirmTransactions = async (op) => {
 
               if (updatedRaffle) {
                 logger.info(
-                  `Raffle ${existingTransaction.raffleId} after update - claimedAmount: ${updatedRaffle.claimedAmount}, claimableAmount: ${updatedRaffle.claimableAmount}`
+                  `Raffle ${existingTransaction.raffleId} after update - claimedAmount: ${updatedRaffle.claimedAmount}, claimableAmount: ${updatedRaffle.claimableAmount}`,
                 );
 
                 // Get raffle owner for Socket.IO event
@@ -301,13 +311,13 @@ const updateDbAndConfirmTransactions = async (op) => {
               }
             } else {
               logger.info(
-                `Skipping claimedAmount update for raffle ${existingTransaction.raffleId} - already updated (current: ${currentRaffle?.claimedAmount})`
+                `Skipping claimedAmount update for raffle ${existingTransaction.raffleId} - already updated (current: ${currentRaffle?.claimedAmount})`,
               );
             }
           } catch (payoutError) {
             logger.error(
               `Failed to update claimedAmount for raffle ${existingTransaction.raffleId}:`,
-              payoutError
+              payoutError,
             );
           }
         } else {
@@ -320,16 +330,16 @@ const updateDbAndConfirmTransactions = async (op) => {
                   id: existingTransaction.raffleId,
                   creatorClaimTxId: existingTransaction.id,
                 },
-              }
+              },
             );
 
             logger.info(
-              `Reset creatorClaimTxId for raffle ${existingTransaction.raffleId} due to mismatched payout transaction ${existingTransaction.txId}`
+              `Reset creatorClaimTxId for raffle ${existingTransaction.raffleId} due to mismatched payout transaction ${existingTransaction.txId}`,
             );
           } catch (resetError) {
             logger.error(
               `Failed to reset creatorClaimTxId for raffle ${existingTransaction.raffleId}:`,
-              resetError
+              resetError,
             );
           }
         }
@@ -347,7 +357,7 @@ const updateDbAndConfirmTransactions = async (op) => {
           where: {
             txId: { [Op.in]: failedTxIds },
           },
-        }
+        },
       );
 
       // Handle failed payout transactions - reset creatorClaimTxId in raffle table
@@ -367,16 +377,16 @@ const updateDbAndConfirmTransactions = async (op) => {
               { creatorClaimTxId: null },
               {
                 where: { id: failedTx.raffleId, creatorClaimTxId: failedTx.id },
-              }
+              },
             );
 
             logger.info(
-              `Reset creatorClaimTxId for raffle ${failedTx.raffleId} due to failed payout transaction ${failedTx.txId}`
+              `Reset creatorClaimTxId for raffle ${failedTx.raffleId} due to failed payout transaction ${failedTx.txId}`,
             );
           } catch (resetError) {
             logger.error(
               `Failed to reset creatorClaimTxId for raffle ${failedTx.raffleId}:`,
-              resetError
+              resetError,
             );
           }
         }
@@ -392,7 +402,9 @@ const updateDbAndConfirmTransactions = async (op) => {
       });
 
       if (failedAirdropTxRecords.length > 0) {
-        const failedAirdropTxIds = failedAirdropTxRecords.map((txRecord) => txRecord.id);
+        const failedAirdropTxIds = failedAirdropTxRecords.map(
+          (txRecord) => txRecord.id,
+        );
 
         await UserAirdropReward.update(
           {
@@ -404,11 +416,11 @@ const updateDbAndConfirmTransactions = async (op) => {
               splTokenSendTxId: { [Op.in]: failedAirdropTxIds },
               status: { [Op.ne]: USER_AIRDROP_STATUS.CLAIMED },
             },
-          }
+          },
         );
 
         logger.info(
-          `Reset ${failedAirdropTxIds.length} failed airdrop claim rewards back to UNCLAIMED`
+          `Reset ${failedAirdropTxIds.length} failed airdrop claim rewards back to UNCLAIMED`,
         );
       }
 
