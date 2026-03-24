@@ -50,6 +50,7 @@ const TicketReservationService = require("../services/ticket-reservation.service
 const dotenv = require("dotenv");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../config/constants");
+const { safeRound } = require("../util/util");
 dotenv.config();
 
 class TicketController {
@@ -167,8 +168,8 @@ class TicketController {
       const ticketPrice = raffleData.ticketPrice;
       const totalSolAmount = ticketPrice * ticketCount;
 
-      const commissionAmount = totalSolAmount * commissionRate;
-      const creatorAmount = totalSolAmount * (1 - commissionRate);
+      const commissionAmount = safeRound(totalSolAmount * commissionRate);
+      const creatorAmount = safeRound(totalSolAmount - commissionAmount);
 
       const senderPublicKey = new PublicKey(senderPubkey);
       // Commission portion goes to FUND_RECEIVER_WALLET, creator portion goes to platform wallet
