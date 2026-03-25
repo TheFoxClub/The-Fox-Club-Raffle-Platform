@@ -935,7 +935,7 @@ const createAirdropClaimTransaction = async ({
           }
 
           const { transferFeeConfig, decimals, tokenProgramId } = tokenDetail;
-          const uiAmount = amount * Math.pow(10, decimals);
+          const uiAmount = Math.round(amount * Math.pow(10, decimals));
 
           // Get token accounts
           const fromAta = getAssociatedTokenAddressSync(
