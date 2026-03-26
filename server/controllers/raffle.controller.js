@@ -105,14 +105,14 @@ class RaffleController {
         {
           // raffles,
           raffles: formattedRaffles,
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -167,14 +167,14 @@ class RaffleController {
         {
           // raffles,
           raffles: formattedRaffles,
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -226,14 +226,14 @@ class RaffleController {
         res,
         httpStatus.OK,
         "Upcoming raffles retrieved successfully",
-        { raffles: formattedRaffles }
+        { raffles: formattedRaffles },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -294,14 +294,14 @@ class RaffleController {
         {
           // raffles,
           raffles: formattedRaffles,
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -412,14 +412,14 @@ class RaffleController {
         "User raffles retrieved successfully",
         {
           raffles,
-        }
+        },
       );
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -433,14 +433,14 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "At least one reward is required"
+          "At least one reward is required",
         );
       }
       if (!Array.isArray(rewards) || rewards.length > 5) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Please select only 5 different rewards at max."
+          "Please select only 5 different rewards at max.",
         );
       }
 
@@ -452,25 +452,25 @@ class RaffleController {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Fund Receiver wallet not configured"
+          "Fund Receiver wallet not configured",
         );
       }
 
       // Check for mixed reward types (NFT + SPL tokens) which are not supported
       const hasNFT = rewards.some(
-        (reward) => reward.rewardType?.toUpperCase() === "NFT"
+        (reward) => reward.rewardType?.toUpperCase() === "NFT",
       );
       const hasSPLToken = rewards.some((reward) =>
         ["SPL_TOKEN", "SPL_TOKEN_2022", "SOLANA"].includes(
-          reward.rewardType?.toUpperCase()
-        )
+          reward.rewardType?.toUpperCase(),
+        ),
       );
 
       if (hasNFT && hasSPLToken) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only."
+          "Mixed reward types (NFT + SPL tokens) are not currently supported in a single raffle. Please use either NFTs only or SPL tokens only.",
         );
       }
 
@@ -521,7 +521,7 @@ class RaffleController {
       });
 
       logger.info(
-        `Preparing reward transfer transaction for ${splTokenSendSummary.length} rewards from user ${fromAddress}`
+        `Preparing reward transfer transaction for ${splTokenSendSummary.length} rewards from user ${fromAddress}`,
       );
 
       //transaction fee
@@ -541,12 +541,12 @@ class RaffleController {
       if (!transferResponse.success) {
         logger.error(
           `Failed to create reward transfer transaction for user ${fromAddress}:`,
-          transferResponse.message
+          transferResponse.message,
         );
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Failed to create reward transfer transaction: ${transferResponse.message}`
+          `Failed to create reward transfer transaction: ${transferResponse.message}`,
         );
       }
 
@@ -571,14 +571,14 @@ class RaffleController {
             totalRewards: rewards.length,
             nftTypeInfo,
           },
-        }
+        },
       );
     } catch (err) {
       logger.error("Error in prepareRewardTransfer:", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -620,7 +620,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User wallet not found. Please connect your wallet."
+          "User wallet not found. Please connect your wallet.",
         );
       }
 
@@ -628,7 +628,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Fund Receiver wallet not configured"
+          "Fund Receiver wallet not configured",
         );
       }
 
@@ -636,7 +636,7 @@ class RaffleController {
       let verifiedCollectionAddress = undefined;
       if (rewards.length === 1 && rewards[0].rewardType === "NFT") {
         verifiedCollectionAddress = JSON.parse(
-          rewards[0].metadataJson
+          rewards[0].metadataJson,
         ).collection;
       }
 
@@ -655,7 +655,7 @@ class RaffleController {
           return respond(
             res,
             httpStatus.NOT_FOUND,
-            "Draft raffle not found or you don't have permission to modify it."
+            "Draft raffle not found or you don't have permission to modify it.",
           );
         }
 
@@ -701,11 +701,11 @@ class RaffleController {
 
               if (!tokenRecord) {
                 console.warn(
-                  `Token address ${tokenAddress} does not match tokenType ${tokenType} or is not verified`
+                  `Token address ${tokenAddress} does not match tokenType ${tokenType} or is not verified`,
                 );
               } else {
                 console.log(
-                  `Validated token: ${tokenRecord.symbol} (${tokenRecord.name}) with tokenType ${tokenType}`
+                  `Validated token: ${tokenRecord.symbol} (${tokenRecord.name}) with tokenType ${tokenType}`,
                 );
               }
             }
@@ -776,7 +776,7 @@ class RaffleController {
             },
             {
               where: { raffleId: draftId },
-            }
+            },
           );
         }
 
@@ -798,7 +798,7 @@ class RaffleController {
 
               if (mappedType === undefined) {
                 logger.warn(
-                  `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`
+                  `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
                 );
                 mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
               }
@@ -837,12 +837,12 @@ class RaffleController {
               ) {
                 mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
                 logger.info(
-                  `Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`
+                  `Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`,
                 );
               } else {
                 mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
                 logger.info(
-                  `Detected legacy NFT, setting rewardType to 1 (SPL_TOKEN)`
+                  `Detected legacy NFT, setting rewardType to 1 (SPL_TOKEN)`,
                 );
               }
             }
@@ -873,8 +873,8 @@ class RaffleController {
                     reward.rewardType === RAFFLE_REWARD_TYPES.NFT
                       ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN
                       : reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
-                      ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022
-                      : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
+                        ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022
+                        : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
                   txId: rewardTransferSignature,
                   tokenAddress: reward.mintAddress,
                   decimals: reward.decimals ? reward.decimals : 9,
@@ -891,18 +891,17 @@ class RaffleController {
                   additionalJson: rewardTransferData || null,
                 };
 
-                const txRecord = await SplTokenSendTransaction.create(
-                  splTokenSendTxData
-                );
+                const txRecord =
+                  await SplTokenSendTransaction.create(splTokenSendTxData);
 
                 // Update the reward with the transaction ID
                 await RaffleReward.update(
                   { splTokenTransferTxId: txRecord.id },
-                  { where: { id: reward.id } }
+                  { where: { id: reward.id } },
                 );
 
                 return txRecord;
-              }
+              },
             );
 
             await Promise.all(rewardTransactionPromises);
@@ -924,11 +923,11 @@ class RaffleController {
         const raffleDataResponse = updatedRaffle.get({ plain: true });
         raffleDataResponse.tokenType = mapEnumValue(
           TOKEN_TYPE,
-          raffleDataResponse.tokenType
+          raffleDataResponse.tokenType,
         );
         raffleDataResponse.status = mapEnumValue(
           RAFFLE_STATUS,
-          raffleDataResponse.status
+          raffleDataResponse.status,
         );
 
         if (raffleDataResponse.raffle_rewards) {
@@ -942,8 +941,8 @@ class RaffleController {
         logger.info(
           `Draft raffle ${draftId} converted to live raffle by user ${userId}. Status: DRAFT → ${mapEnumValue(
             RAFFLE_STATUS,
-            correctStatus
-          )} (${correctStatus})`
+            correctStatus,
+          )} (${correctStatus})`,
         );
 
         return respond(
@@ -952,7 +951,7 @@ class RaffleController {
           "Draft raffle converted to live raffle successfully",
           {
             raffle: raffleDataResponse,
-          }
+          },
         );
       }
 
@@ -970,11 +969,11 @@ class RaffleController {
             return respond(
               res,
               httpStatus.BAD_REQUEST,
-              "You already have a draft raffle. Please edit or delete the existing draft before creating a new one."
+              "You already have a draft raffle. Please edit or delete the existing draft before creating a new one.",
             );
           } else {
             logger.info(
-              `User ${userId} is creating a new live raffle while having an existing draft (ID: ${existingDraft.id}). Draft will remain untouched.`
+              `User ${userId} is creating a new live raffle while having an existing draft (ID: ${existingDraft.id}). Draft will remain untouched.`,
             );
           }
         }
@@ -986,7 +985,7 @@ class RaffleController {
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            "Missing required fields: title, totalTickets, ticketPrice, startDate, endDate"
+            "Missing required fields: title, totalTickets, ticketPrice, startDate, endDate",
           );
         }
 
@@ -994,7 +993,7 @@ class RaffleController {
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            "At least one reward is required"
+            "At least one reward is required",
           );
         }
 
@@ -1002,7 +1001,7 @@ class RaffleController {
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            "Start date must be before end date"
+            "Start date must be before end date",
           );
         }
       }
@@ -1011,7 +1010,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Fund Receiver wallet not configured"
+          "Fund Receiver wallet not configured",
         );
       }
 
@@ -1025,7 +1024,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Number of winners (${totalWinners}) cannot be greater than total rewards (${rewards.length})`
+          `Number of winners (${totalWinners}) cannot be greater than total rewards (${rewards.length})`,
         );
       }
 
@@ -1034,14 +1033,14 @@ class RaffleController {
         // If rewardTransferSignature is provided, rewards were already transferred
         if (rewardTransferSignature) {
           logger.info(
-            `Reward transfer already completed with signature: ${rewardTransferSignature}`
+            `Reward transfer already completed with signature: ${rewardTransferSignature}`,
           );
           // Proceed to create raffle since rewards are confirmed transferred
         } else {
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            "Reward transfer signature is required for raffles with rewards"
+            "Reward transfer signature is required for raffles with rewards",
           );
         }
       }
@@ -1089,11 +1088,11 @@ class RaffleController {
 
             if (!tokenRecord) {
               console.warn(
-                `Token address ${tokenAddress} does not match tokenType ${tokenType} or is not verified`
+                `Token address ${tokenAddress} does not match tokenType ${tokenType} or is not verified`,
               );
             } else {
               console.log(
-                `Validated token: ${tokenRecord.symbol} (${tokenRecord.name}) with tokenType ${tokenType}`
+                `Validated token: ${tokenRecord.symbol} (${tokenRecord.name}) with tokenType ${tokenType}`,
               );
             }
           }
@@ -1168,7 +1167,7 @@ class RaffleController {
 
             if (mappedType === undefined) {
               logger.warn(
-                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`
+                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
               );
               mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
             }
@@ -1206,12 +1205,12 @@ class RaffleController {
             ) {
               mappedType = RAFFLE_REWARD_TYPES.NFT; // 0
               logger.info(
-                `Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`
+                `Detected ${nftTypeInfo}, setting rewardType to 0 (NFT)`,
               );
             } else {
               mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN; // 1
               logger.info(
-                `Detected legacy NFT, setting rewardType to 1 (SPL_TOKEN)`
+                `Detected legacy NFT, setting rewardType to 1 (SPL_TOKEN)`,
               );
             }
           }
@@ -1223,7 +1222,7 @@ class RaffleController {
               reward.rewardType
             }", mapped to: ${mappedType}, isDraft: ${
               statusEnum === RAFFLE_STATUS.DRAFT
-            }`
+            }`,
           );
 
           return {
@@ -1252,8 +1251,8 @@ class RaffleController {
                   reward.rewardType === RAFFLE_REWARD_TYPES.NFT
                     ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN
                     : reward.rewardType === RAFFLE_REWARD_TYPES.SPL_TOKEN_2022
-                    ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022
-                    : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
+                      ? SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022
+                      : SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN,
                 txId: rewardTransferSignature,
                 tokenAddress: reward.mintAddress,
                 decimals: reward.decimals ? reward.decimals : 9,
@@ -1270,18 +1269,17 @@ class RaffleController {
                 additionalJson: rewardTransferData || null,
               };
 
-              const txRecord = await SplTokenSendTransaction.create(
-                splTokenSendTxData
-              );
+              const txRecord =
+                await SplTokenSendTransaction.create(splTokenSendTxData);
 
               // Update the reward with the transaction ID
               await RaffleReward.update(
                 { splTokenTransferTxId: txRecord.id },
-                { where: { id: reward.id } }
+                { where: { id: reward.id } },
               );
 
               return txRecord;
-            }
+            },
           );
 
           await Promise.all(rewardTransactionPromises);
@@ -1314,7 +1312,7 @@ class RaffleController {
       }
 
       logger.info(
-        `Raffle created successfully: ${raffle.id} by user ${user.pubkey}`
+        `Raffle created successfully: ${raffle.id} by user ${user.pubkey}`,
       );
 
       // Emit Socket.IO event for new raffle creation
@@ -1340,7 +1338,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -1356,7 +1354,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Missing required data: signedTransaction, raffleData, or rewardTransferData"
+          "Missing required data: signedTransaction, raffleData, or rewardTransferData",
         );
       }
 
@@ -1369,7 +1367,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User wallet not found. Please connect your wallet."
+          "User wallet not found. Please connect your wallet.",
         );
       }
 
@@ -1433,7 +1431,7 @@ class RaffleController {
 
             if (rewardType === undefined) {
               logger.warn(
-                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`
+                `Unknown rewardType "${reward.rewardType}", defaulting to SPL_TOKEN`,
               );
               rewardType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
             }
@@ -1442,7 +1440,7 @@ class RaffleController {
           }
 
           logger.info(
-            `Mapping reward: ${reward.rewardName}, rewardType string: ${reward.rewardType}, mapped to: ${rewardType}`
+            `Mapping reward: ${reward.rewardName}, rewardType string: ${reward.rewardType}, mapped to: ${rewardType}`,
           );
 
           return {
@@ -1474,14 +1472,14 @@ class RaffleController {
           signedTransaction,
           submitEndpoint: "/raffle/store-reward-signature",
           raffleId: raffle.id,
-        }
+        },
       );
     } catch (err) {
       logger.error("Error completing raffle creation:", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -1496,7 +1494,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Missing required data: signature, raffleId, or rewardTransferData"
+          "Missing required data: signature, raffleId, or rewardTransferData",
         );
       }
 
@@ -1510,7 +1508,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.NOT_FOUND,
-          "Raffle not found or you don't have permission to modify it"
+          "Raffle not found or you don't have permission to modify it",
         );
       }
 
@@ -1518,7 +1516,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Cannot store reward transfer signature for draft raffles"
+          "Cannot store reward transfer signature for draft raffles",
         );
       }
 
@@ -1531,7 +1529,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User wallet not found. Please connect your wallet."
+          "User wallet not found. Please connect your wallet.",
         );
       }
 
@@ -1565,7 +1563,7 @@ class RaffleController {
               tokenDecimals = tokenDetail.decimals || 0;
             } catch (tokenError) {
               logger.warn(
-                `Could not fetch token details for ${reward.mintAddress}, using 0 decimals`
+                `Could not fetch token details for ${reward.mintAddress}, using 0 decimals`,
               );
               tokenDecimals = 0;
             }
@@ -1581,7 +1579,7 @@ class RaffleController {
               tokenDecimals = tokenDetail.decimals || 0;
             } catch (tokenError) {
               logger.warn(
-                `Could not fetch token details for ${reward.mintAddress}, using 0 decimals`
+                `Could not fetch token details for ${reward.mintAddress}, using 0 decimals`,
               );
               tokenDecimals = 0;
             }
@@ -1603,7 +1601,7 @@ class RaffleController {
                 tokenDecimals = tokenDetail.decimals || 0;
               } catch (tokenError) {
                 logger.warn(
-                  `Could not fetch token details for ${reward.mintAddress}, using 0 decimals`
+                  `Could not fetch token details for ${reward.mintAddress}, using 0 decimals`,
                 );
                 tokenDecimals = 0;
               }
@@ -1611,7 +1609,7 @@ class RaffleController {
         }
 
         const uiAmountInSmallestUnits = Math.round(
-          uiAmount * Math.pow(10, tokenDecimals)
+          uiAmount * Math.pow(10, tokenDecimals),
         );
 
         const splTokenSendTxData = {
@@ -1634,9 +1632,8 @@ class RaffleController {
           rewardIndex: reward.transferIndex || i,
         };
 
-        const splTokenSendTxDb = await SplTokenSendTransaction.create(
-          splTokenSendTxData
-        );
+        const splTokenSendTxDb =
+          await SplTokenSendTransaction.create(splTokenSendTxData);
         splTokenSendTxRecords.push(splTokenSendTxDb);
       }
 
@@ -1658,7 +1655,7 @@ class RaffleController {
           },
           {
             where: { id: raffleRewards[i].id },
-          }
+          },
         );
       }
 
@@ -1677,11 +1674,11 @@ class RaffleController {
 
       raffleDataResponse.tokenType = mapEnumValue(
         TOKEN_TYPE,
-        raffleDataResponse.tokenType
+        raffleDataResponse.tokenType,
       );
       raffleDataResponse.status = mapEnumValue(
         RAFFLE_STATUS,
-        raffleDataResponse.status
+        raffleDataResponse.status,
       );
 
       if (raffleDataResponse.raffle_rewards) {
@@ -1693,7 +1690,7 @@ class RaffleController {
       }
 
       logger.info(
-        `Reward transfer signature stored for raffle ${raffleId} by user ${user.pubkey}, signature: ${signature}`
+        `Reward transfer signature stored for raffle ${raffleId} by user ${user.pubkey}, signature: ${signature}`,
       );
 
       // Award XP for raffle creation
@@ -1702,7 +1699,7 @@ class RaffleController {
         await XpProcessor.processRaffleCreationXp(raffleId);
       } catch (xpError) {
         logger.error(
-          `Error awarding creation XP for raffle ${raffleId}: ${xpError.message}`
+          `Error awarding creation XP for raffle ${raffleId}: ${xpError.message}`,
         );
         // Don't fail the raffle creation if XP fails
       }
@@ -1721,14 +1718,14 @@ class RaffleController {
             platformWallet: platformWallet,
             transactionRecords: splTokenSendTxRecords.length,
           },
-        }
+        },
       );
     } catch (err) {
       logger.error("Error storing reward signature:", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -1752,7 +1749,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User wallet not found. Please connect your wallet."
+          "User wallet not found. Please connect your wallet.",
         );
       }
 
@@ -1780,7 +1777,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "This reward has already been claimed"
+          "This reward has already been claimed",
         );
       }
 
@@ -1794,7 +1791,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Rewards can only be claimed after the raffle has ended"
+          "Rewards can only be claimed after the raffle has ended",
         );
       }
 
@@ -1802,7 +1799,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.FORBIDDEN,
-          "You are not a winner of this reward"
+          "You are not a winner of this reward",
         );
       }
 
@@ -1810,7 +1807,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Platform wallet not configured for this raffle"
+          "Platform wallet not configured for this raffle",
         );
       }
 
@@ -1820,7 +1817,7 @@ class RaffleController {
       let amount = Number(reward.amount ?? 1);
 
       logger.info(
-        `Reward type from DB: ${reward.rewardType}, NFT enum: ${RAFFLE_REWARD_TYPES.NFT}`
+        `Reward type from DB: ${reward.rewardType}, NFT enum: ${RAFFLE_REWARD_TYPES.NFT}`,
       );
 
       switch (reward.rewardType) {
@@ -1851,7 +1848,7 @@ class RaffleController {
       logger.info(`Type set for claim: ${type}, tokenAddress: ${tokenAddress}`);
 
       logger.info(
-        `Creating UNSIGNED claim transaction for reward ${reward.id} to winner ${user.pubkey}`
+        `Creating UNSIGNED claim transaction for reward ${reward.id} to winner ${user.pubkey}`,
       );
 
       // Create UNSIGNED transaction (user signs first for security)
@@ -1869,19 +1866,19 @@ class RaffleController {
       if (!transferResponse.success) {
         logger.error(
           `Failed to create claim transaction for user ${user.pubkey}:`,
-          transferResponse.message
+          transferResponse.message,
         );
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Failed to create claim transaction: ${transferResponse.message}`
+          `Failed to create claim transaction: ${transferResponse.message}`,
         );
       }
 
       // Check if this is a pNFT that was already submitted and confirmed
       if (transferResponse.data.autoSubmit && transferResponse.data.confirmed) {
         logger.info(
-          `pNFT claim transaction already confirmed for reward ${reward.id}`
+          `pNFT claim transaction already confirmed for reward ${reward.id}`,
         );
 
         // Mark reward as claimed
@@ -1892,11 +1889,11 @@ class RaffleController {
           },
           {
             where: { id: reward.id },
-          }
+          },
         );
 
         logger.info(
-          `pNFT reward ${reward.id} claimed successfully with signature: ${transferResponse.data.signature}`
+          `pNFT reward ${reward.id} claimed successfully with signature: ${transferResponse.data.signature}`,
         );
 
         return respond(res, httpStatus.OK, "pNFT reward claimed successfully", {
@@ -1909,7 +1906,7 @@ class RaffleController {
       }
 
       logger.info(
-        `UNSIGNED claim transaction created for reward ${reward.id}. Checksum: ${transferResponse.data.checksum}`
+        `UNSIGNED claim transaction created for reward ${reward.id}. Checksum: ${transferResponse.data.checksum}`,
       );
 
       return respond(res, httpStatus.OK, "Claim transaction created", {
@@ -1928,7 +1925,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -1946,7 +1943,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Missing required data: signedTransaction, checksum, raffleId, or rewardId"
+          "Missing required data: signedTransaction, checksum, raffleId, or rewardId",
         );
       }
 
@@ -1959,7 +1956,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User wallet not found. Please connect your wallet."
+          "User wallet not found. Please connect your wallet.",
         );
       }
 
@@ -1977,7 +1974,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.NOT_FOUND,
-          "Reward not found or already claimed"
+          "Reward not found or already claimed",
         );
       }
 
@@ -2000,7 +1997,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Raffle must be ended to claim rewards"
+          "Raffle must be ended to claim rewards",
         );
       }
 
@@ -2025,7 +2022,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Invalid transaction format"
+          "Invalid transaction format",
         );
       }
 
@@ -2052,7 +2049,7 @@ class RaffleController {
         umiTx = {
           message: {
             accounts: versionedMessage.staticAccountKeys.map((key) =>
-              publicKey(key.toBase58())
+              publicKey(key.toBase58()),
             ),
             instructions: instructions,
             recentBlockhash: versionedMessage.recentBlockhash,
@@ -2060,7 +2057,7 @@ class RaffleController {
         };
 
         logger.info(
-          "Reconstructed UMI transaction from versioned transaction for checksum validation"
+          "Reconstructed UMI transaction from versioned transaction for checksum validation",
         );
       } else {
         // Convert legacy transaction to UMI format
@@ -2078,17 +2075,17 @@ class RaffleController {
 
       if (!isValidChecksum) {
         logger.error(
-          `Checksum validation failed for reward ${rewardId} by user ${user.pubkey}`
+          `Checksum validation failed for reward ${rewardId} by user ${user.pubkey}`,
         );
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Transaction checksum validation failed. Transaction may have been tampered with."
+          "Transaction checksum validation failed. Transaction may have been tampered with.",
         );
       }
 
       logger.info(
-        `Checksum validated successfully for reward ${rewardId}. Adding platform signature...`
+        `Checksum validated successfully for reward ${rewardId}. Adding platform signature...`,
       );
 
       let platformSignedTx;
@@ -2097,7 +2094,7 @@ class RaffleController {
         logger.info("Adding platform signature to pNFT transaction...");
 
         const platformSigner = Keypair.fromSecretKey(
-          new Uint8Array(walletKeypair)
+          new Uint8Array(walletKeypair),
         );
 
         // Sign the versioned transaction with platform wallet
@@ -2122,19 +2119,19 @@ class RaffleController {
       }
 
       logger.info(
-        `Platform signature added. Submitting fully-signed transaction for reward ${rewardId}.`
+        `Platform signature added. Submitting fully-signed transaction for reward ${rewardId}.`,
       );
 
       try {
         const signedTransactionBase64 =
           Buffer.from(fullySignedTxBytes).toString("base64");
         const submissionResult = await submitTransactionToBlockchain(
-          signedTransactionBase64
+          signedTransactionBase64,
         );
 
         if (!submissionResult.success) {
           throw new Error(
-            `Transaction submission failed: ${submissionResult.error}`
+            `Transaction submission failed: ${submissionResult.error}`,
           );
         }
 
@@ -2155,14 +2152,14 @@ class RaffleController {
             tokenDecimals = tokenDetail.decimals || 0;
           } catch (tokenError) {
             logger.warn(
-              `Could not fetch token details for ${reward.mintAddress}, using default decimals`
+              `Could not fetch token details for ${reward.mintAddress}, using default decimals`,
             );
             tokenDecimals = 0; // Default for unknown tokens
           }
         }
 
         const uiAmountInSmallestUnits = Math.round(
-          calculatedUiAmount * Math.pow(10, tokenDecimals)
+          calculatedUiAmount * Math.pow(10, tokenDecimals),
         );
 
         const splTokenSendTxData = {
@@ -2184,9 +2181,8 @@ class RaffleController {
           rewardIndex: 0,
         };
 
-        const splTokenSendTxRecord = await SplTokenSendTransaction.create(
-          splTokenSendTxData
-        );
+        const splTokenSendTxRecord =
+          await SplTokenSendTransaction.create(splTokenSendTxData);
 
         // Update reward with claim information and transaction reference
         await RaffleReward.update(
@@ -2196,7 +2192,7 @@ class RaffleController {
           },
           {
             where: { id: rewardId },
-          }
+          },
         );
 
         // Emit Socket.IO event for reward claim update
@@ -2212,7 +2208,7 @@ class RaffleController {
         });
 
         logger.info(
-          `Reward ${rewardId} successfully claimed by user ${user.pubkey} with signature ${signature}`
+          `Reward ${rewardId} successfully claimed by user ${user.pubkey} with signature ${signature}`,
         );
 
         return respond(res, httpStatus.OK, "Reward claimed successfully", {
@@ -2227,7 +2223,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Failed to submit claim transaction: ${submissionError.message}`
+          `Failed to submit claim transaction: ${submissionError.message}`,
         );
       }
     } catch (err) {
@@ -2235,7 +2231,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -2287,7 +2283,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -2314,7 +2310,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.FORBIDDEN,
-          "You are not authorized to update this raffle"
+          "You are not authorized to update this raffle",
         );
       }
 
@@ -2324,7 +2320,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Cannot update raffle after tickets have been sold"
+          "Cannot update raffle after tickets have been sold",
         );
       }
 
@@ -2387,7 +2383,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -2410,7 +2406,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.FORBIDDEN,
-          "You are not authorized to delete this raffle"
+          "You are not authorized to delete this raffle",
         );
       }
 
@@ -2419,7 +2415,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Cannot delete raffle with sold tickets. Please end the raffle instead."
+          "Cannot delete raffle with sold tickets. Please end the raffle instead.",
         );
       }
 
@@ -2429,7 +2425,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.NOT_ACCEPTABLE,
-          txResult.message || "Error creating refund transaction"
+          txResult.message || "Error creating refund transaction",
         );
       }
 
@@ -2455,7 +2451,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -2473,7 +2469,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.NOT_ACCEPTABLE,
-          "Missing required parameters"
+          "Missing required parameters",
         );
       }
 
@@ -2511,7 +2507,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Invalid transaction format"
+          "Invalid transaction format",
         );
       }
 
@@ -2538,7 +2534,7 @@ class RaffleController {
         umiTx = {
           message: {
             accounts: versionedMessage.staticAccountKeys.map((key) =>
-              publicKey(key.toBase58())
+              publicKey(key.toBase58()),
             ),
             instructions: instructions,
             recentBlockhash: versionedMessage.recentBlockhash,
@@ -2546,7 +2542,7 @@ class RaffleController {
         };
 
         logger.info(
-          "Reconstructed UMI transaction from versioned transaction for checksum validation"
+          "Reconstructed UMI transaction from versioned transaction for checksum validation",
         );
       } else {
         // Convert legacy transaction to UMI format
@@ -2564,17 +2560,17 @@ class RaffleController {
 
       if (!isValidChecksum) {
         logger.error(
-          `Checksum validation failed for raffle refund  ${raffleId} by user ${userPubkey}`
+          `Checksum validation failed for raffle refund  ${raffleId} by user ${userPubkey}`,
         );
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Transaction checksum validation failed. Transaction may have been tampered with."
+          "Transaction checksum validation failed. Transaction may have been tampered with.",
         );
       }
 
       logger.info(
-        `Checksum validated successfully for creator refund raffle ${raffleId}. Adding platform signature...`
+        `Checksum validated successfully for creator refund raffle ${raffleId}. Adding platform signature...`,
       );
 
       let platformSignedTx;
@@ -2583,7 +2579,7 @@ class RaffleController {
         logger.info("Adding platform signature to pNFT transaction...");
 
         const platformSigner = Keypair.fromSecretKey(
-          new Uint8Array(walletKeypair)
+          new Uint8Array(walletKeypair),
         );
 
         // Sign the versioned transaction with platform wallet
@@ -2608,19 +2604,19 @@ class RaffleController {
       }
 
       logger.info(
-        `Platform signature added. Submitting fully-signed transaction for creator raffle refund ${raffleId}.`
+        `Platform signature added. Submitting fully-signed transaction for creator raffle refund ${raffleId}.`,
       );
 
       try {
         const signedTransactionBase64 =
           Buffer.from(fullySignedTxBytes).toString("base64");
         const submissionResult = await submitTransactionToBlockchain(
-          signedTransactionBase64
+          signedTransactionBase64,
         );
 
         if (!submissionResult.success) {
           throw new Error(
-            `Transaction submission failed: ${submissionResult.error}`
+            `Transaction submission failed: ${submissionResult.error}`,
           );
         }
 
@@ -2653,7 +2649,7 @@ class RaffleController {
             splTokenSendTransactionData,
             {
               transaction: dbTransaction,
-            }
+            },
           );
         }
         await raffle.update(
@@ -2663,7 +2659,7 @@ class RaffleController {
           },
           {
             transaction: dbTransaction,
-          }
+          },
         );
         await dbTransaction.commit();
       } catch (submissionError) {
@@ -2674,7 +2670,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Failed to submit claim transaction: ${submissionError.message}`
+          `Failed to submit claim transaction: ${submissionError.message}`,
         );
       }
 
@@ -2684,7 +2680,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -2706,7 +2702,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.FORBIDDEN,
-          "You are not authorized to end this raffle"
+          "You are not authorized to end this raffle",
         );
       }
 
@@ -2728,7 +2724,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -2881,7 +2877,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -2931,7 +2927,7 @@ class RaffleController {
       let verifiedCollectionAddress = undefined;
       if (rewards.length === 1 && rewards[0].rewardType === "NFT") {
         verifiedCollectionAddress = JSON.parse(
-          rewards[0].metadataJson
+          rewards[0].metadataJson,
         ).collection;
       }
 
@@ -2960,7 +2956,7 @@ class RaffleController {
 
             if (mappedType === undefined) {
               logger.warn(
-                `Unknown rewardType "${r.rewardType}", defaulting to SPL_TOKEN`
+                `Unknown rewardType "${r.rewardType}", defaulting to SPL_TOKEN`,
               );
               mappedType = RAFFLE_REWARD_TYPES.SPL_TOKEN;
             }
@@ -2988,7 +2984,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -3019,7 +3015,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -3044,7 +3040,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.FORBIDDEN,
-          "You are not authorized to select winners for this raffle"
+          "You are not authorized to select winners for this raffle",
         );
       }
 
@@ -3058,7 +3054,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Raffle must be ended before selecting winners"
+          "Raffle must be ended before selecting winners",
         );
       }
 
@@ -3081,7 +3077,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        err.message || parseSequelizeErrors(err)
+        err.message || parseSequelizeErrors(err),
       );
     }
   }
@@ -3114,7 +3110,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -3180,7 +3176,7 @@ class RaffleController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -3280,12 +3276,12 @@ class RaffleController {
             message: !hasEnded
               ? "You can claim the revenue generated from the raffle only after it ends"
               : hasClaimed
-              ? `Payout ${
-                  claimStatus === "confirmed" ? "completed" : claimStatus
-                }`
-              : unclaimedAmount > 0
-              ? "Ready to claim"
-              : "No amount available to claim",
+                ? `Payout ${
+                    claimStatus === "confirmed" ? "completed" : claimStatus
+                  }`
+                : unclaimedAmount > 0
+                  ? "Ready to claim"
+                  : "No amount available to claim",
           },
         };
       });
@@ -3297,14 +3293,14 @@ class RaffleController {
         {
           raffles: formattedRaffles,
           totalRaffles: formattedRaffles.length,
-        }
+        },
       );
     } catch (err) {
       logger.error("Error getting user hosted raffles:", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err)
+        parseSequelizeErrors(err),
       );
     }
   }
@@ -3347,7 +3343,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User wallet not found. Please connect your wallet."
+          "User wallet not found. Please connect your wallet.",
         );
       }
 
@@ -3368,7 +3364,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.NOT_FOUND,
-          "Raffle not found or you don't have permission to claim from this raffle"
+          "Raffle not found or you don't have permission to claim from this raffle",
         );
       }
 
@@ -3385,7 +3381,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "You can claim the revenue generated from the raffle only after it ends"
+          "You can claim the revenue generated from the raffle only after it ends",
         );
       }
 
@@ -3404,7 +3400,7 @@ class RaffleController {
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            "Payout has already been claimed for this raffle"
+            "Payout has already been claimed for this raffle",
           );
         }
       }
@@ -3420,7 +3416,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "No unclaimed amount available for this raffle"
+          "No unclaimed amount available for this raffle",
         );
       }
 
@@ -3433,7 +3429,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Minimum payout amount is ${MIN_PAYOUT_AMOUNT} ${tokenSymbol}`
+          `Minimum payout amount is ${MIN_PAYOUT_AMOUNT} ${tokenSymbol}`,
         );
       }
 
@@ -3446,12 +3442,12 @@ class RaffleController {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Platform wallet not configured"
+          "Platform wallet not configured",
         );
       }
 
       logger.info(
-        `Creating payout transaction for raffle ${raffleIdNum} to creator ${user.pubkey}, amount: ${unclaimedAmount}`
+        `Creating payout transaction for raffle ${raffleIdNum} to creator ${user.pubkey}, amount: ${unclaimedAmount}`,
       );
 
       // Create pre-signed payout transaction (platform signs, user pays fees)
@@ -3470,12 +3466,12 @@ class RaffleController {
         }
         logger.error(
           `Failed to create payout transaction for raffle ${raffleIdNum}:`,
-          payoutResponse.message
+          payoutResponse.message,
         );
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `Failed to create payout transaction: ${payoutResponse.message}`
+          `Failed to create payout transaction: ${payoutResponse.message}`,
         );
       }
 
@@ -3496,11 +3492,11 @@ class RaffleController {
         // Get token details for decimals
         const tokenDetail =
           await require("../helpers/solana/token-program").getTokenDetail(
-            raffle.tokenAddress
+            raffle.tokenAddress,
           );
         decimals = tokenDetail.decimals;
         uiAmount = Math.round(
-          unclaimedAmount * Math.pow(10, decimals)
+          unclaimedAmount * Math.pow(10, decimals),
         ).toString();
       } else if (raffle.tokenType === TOKEN_TYPE.SPL_TOKEN_2022) {
         // SPL Token 2022 payout
@@ -3509,11 +3505,11 @@ class RaffleController {
         // Get token details for decimals
         const tokenDetail =
           await require("../helpers/solana/token-program").getTokenDetail(
-            raffle.tokenAddress
+            raffle.tokenAddress,
           );
         decimals = tokenDetail.decimals;
         uiAmount = Math.round(
-          unclaimedAmount * Math.pow(10, decimals)
+          unclaimedAmount * Math.pow(10, decimals),
         ).toString();
       } else if (raffle.tokenType === TOKEN_TYPE.USDC) {
         // USDC payout (special case of SPL token)
@@ -3521,7 +3517,7 @@ class RaffleController {
         tokenAddress = raffle.tokenAddress || SPL_TOKEN_ADDRESS.USDC;
         decimals = 6;
         uiAmount = Math.round(
-          unclaimedAmount * Math.pow(10, decimals)
+          unclaimedAmount * Math.pow(10, decimals),
         ).toString();
       } else {
         // Fallback to SOL for unknown token types
@@ -3562,7 +3558,7 @@ class RaffleController {
 
         payoutTxRecord = await SplTokenSendTransaction.create(
           splTokenSendTxData,
-          { transaction }
+          { transaction },
         );
       }
 
@@ -3573,13 +3569,13 @@ class RaffleController {
         {
           where: { id: raffleIdNum },
           transaction: transaction,
-        }
+        },
       );
 
       await transaction.commit();
 
       logger.info(
-        `Payout transaction created for raffle ${raffleIdNum} to creator ${user.pubkey}, amount: ${unclaimedAmount}. Transaction ID: ${payoutTxRecord.id}`
+        `Payout transaction created for raffle ${raffleIdNum} to creator ${user.pubkey}, amount: ${unclaimedAmount}. Transaction ID: ${payoutTxRecord.id}`,
       );
 
       return respond(
@@ -3601,7 +3597,7 @@ class RaffleController {
             type: "SOLANA",
             amount: unclaimedAmount,
           },
-        }
+        },
       );
     } catch (err) {
       // Only rollback if transaction is still active
@@ -3614,7 +3610,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Insufficient funds in platform wallet to process payout"
+          "Insufficient funds in platform wallet to process payout",
         );
       }
 
@@ -3622,14 +3618,14 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Transaction expired. Please try again."
+          "Transaction expired. Please try again.",
         );
       }
 
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "An error occurred while processing your payout. Please try again later."
+        "An error occurred while processing your payout. Please try again later.",
       );
     }
   }
@@ -3646,7 +3642,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Missing required data: signedTransaction, transactionId, and raffleId"
+          "Missing required data: signedTransaction, transactionId, and raffleId",
         );
       }
 
@@ -3673,7 +3669,7 @@ class RaffleController {
         return respond(
           res,
           httpStatus.NOT_FOUND,
-          "Payout transaction not found or already processed"
+          "Payout transaction not found or already processed",
         );
       }
 
@@ -3690,13 +3686,12 @@ class RaffleController {
         return respond(
           res,
           httpStatus.NOT_FOUND,
-          "Raffle not found or transaction mismatch"
+          "Raffle not found or transaction mismatch",
         );
       }
 
-      const submissionResult = await submitTransactionToBlockchain(
-        signedTransaction
-      );
+      const submissionResult =
+        await submitTransactionToBlockchain(signedTransaction);
 
       let nextTxStatus = SPL_TOKEN_SEND_TX_STATUS.SUCCESS;
 
@@ -3704,12 +3699,12 @@ class RaffleController {
         if (!submissionResult.signature) {
           logger.error(
             "Payout transaction submission failed without signature:",
-            submissionResult.error
+            submissionResult.error,
           );
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            `Transaction submission failed: ${submissionResult.error || submissionResult.message}`
+            `Transaction submission failed: ${submissionResult.error || submissionResult.message}`,
           );
         }
 
@@ -3721,19 +3716,19 @@ class RaffleController {
         try {
           const recheckConfirmation = await connection.confirmTransaction(
             submissionResult.signature,
-            "confirmed"
+            "confirmed",
           );
 
           if (recheckConfirmation?.value?.err === null) {
             nextTxStatus = SPL_TOKEN_SEND_TX_STATUS.SUCCESS;
           } else if (recheckConfirmation?.value?.err) {
             logger.warn(
-              `Payout recheck returned err for ${submissionResult.signature}. Keeping tx as PENDING for cron handling.`
+              `Payout recheck returned err for ${submissionResult.signature}. Keeping tx as PENDING for cron handling.`,
             );
           }
         } catch (confirmErr) {
           logger.warn(
-            `Error rechecking payout confirmation for ${submissionResult.signature}. Keeping tx as PENDING for cron handling.`
+            `Error rechecking payout confirmation for ${submissionResult.signature}. Keeping tx as PENDING for cron handling.`,
           );
         }
       }
@@ -3747,11 +3742,11 @@ class RaffleController {
         },
         {
           where: { id: transactionId },
-        }
+        },
       );
 
       logger.info(
-        `Payout transaction signature submitted for transaction ${transactionId}, signature: ${signature}`
+        `Payout transaction signature submitted for transaction ${transactionId}, signature: ${signature}`,
       );
 
       return respond(
@@ -3769,14 +3764,14 @@ class RaffleController {
             nextTxStatus === SPL_TOKEN_SEND_TX_STATUS.SUCCESS
               ? "Your payout transaction is confirmed."
               : "Your payout is being processed and will be confirmed shortly.",
-        }
+        },
       );
     } catch (err) {
       logger.error("Error submitting payout transaction:", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to submit payout transaction"
+        "Failed to submit payout transaction",
       );
     }
   }

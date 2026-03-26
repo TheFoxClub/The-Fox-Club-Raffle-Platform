@@ -15,6 +15,7 @@ import {
   Check,
   Wallet,
   AlertTriangle,
+  Users2,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Progress } from "../../components/ui/Progress";
@@ -28,6 +29,7 @@ import { getTokenSymbol } from "../../utils/tokenUtils";
 import { getVerifiedPaymentTokens } from "../raffle/api";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
+import { Input } from "../../components/ui/Input";
 
 type EligibleWallet = {
   id: number;
@@ -85,7 +87,7 @@ const LEADERBOARD_PAGE_SIZE = 10;
 export default function AdminRewards() {
   // const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  
+
   // Wallet connection
   const { publicKey, signTransaction, connected } = useWallet();
 
@@ -113,21 +115,33 @@ export default function AdminRewards() {
   });
   const [airdropName, setAirdropName] = useState("");
   const todayDate = new Date().toISOString().split("T")[0];
-  const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>([]);
+  const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>(
+    [],
+  );
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardLimit, setLeaderboardLimit] = useState(
+    LEADERBOARD_PAGE_SIZE,
+  );
+  const [hasLeaderboardLimit, setHasLeaderboardLimit] = useState(true);
   const [leaderboardPagination, setLeaderboardPagination] = useState({
     total: 0,
     page: 1,
-    limit: LEADERBOARD_PAGE_SIZE,
+    limit: hasLeaderboardLimit ? leaderboardLimit : -1, //sending -1 to set no limit
     totalPages: 0,
   });
   const [airdrops, setAirdrops] = useState<Airdrop[]>([]);
   const [totalAirdropAmount, setTotalAirdropAmount] = useState<number>(0);
   const [creatingAirdrop, setCreatingAirdrop] = useState(false);
-  
+
   // Token selection (similar to CreateRaffle)
   const [tokenOptions, setTokenOptions] = useState<
-    { value: string; label: string; decimals: number; tokenType: number; name?: string }[]
+    {
+      value: string;
+      label: string;
+      decimals: number;
+      tokenType: number;
+      name?: string;
+    }[]
   >([]);
   const [tokenOptionsLoading, setTokenOptionsLoading] = useState(true);
   const [selectedToken, setSelectedToken] = useState<{
@@ -212,7 +226,9 @@ export default function AdminRewards() {
           }));
 
           const uniqueTokens = Array.from(
-            new Map(tokens.map((t: { value: string }) => [t.value, t])).values()
+            new Map(
+              tokens.map((t: { value: string }) => [t.value, t]),
+            ).values(),
           ) as typeof tokens;
 
           setTokenOptions(uniqueTokens);
@@ -280,21 +296,30 @@ export default function AdminRewards() {
         return;
       }
 
+      if(hasLeaderboardLimit && leaderboardLimit < 1){
+        toast.error("Leaderboard limit should be greater 0")
+        return;
+      }
+
       setLeaderboardLoading(true);
       const params = new URLSearchParams({
         startDate: selectedStartDate,
         endDate: selectedEndDate,
         page: String(page),
-        limit: String(LEADERBOARD_PAGE_SIZE),
+        limit: hasLeaderboardLimit? String(leaderboardLimit) : "-1",
       });
 
-      const res = await server.get(`/airdrop/xp-leaderboard?${params.toString()}`);
-      
+      const res = await server.get(
+        `/airdrop/xp-leaderboard?${params.toString()}`,
+      );
+
       if (res.data.success) {
-        const usersWithSelection = res.data.data.leaderboard.map((user: LeaderboardUser) => ({
-          ...user,
-          rewardAmount: 0,
-        }));
+        const usersWithSelection = res.data.data.leaderboard.map(
+          (user: LeaderboardUser) => ({
+            ...user,
+            rewardAmount: 0,
+          }),
+        );
         setLeaderboardUsers(usersWithSelection);
 
         const pagination = res.data.data.pagination || {
@@ -304,7 +329,7 @@ export default function AdminRewards() {
           totalPages: usersWithSelection.length > 0 ? 1 : 0,
         };
         setLeaderboardPagination(pagination);
-        
+
         // Auto-distribute using proportional-to-XP method
         if (totalAirdropAmount > 0) {
           distributeRewards(usersWithSelection, totalAirdropAmount);
@@ -319,10 +344,7 @@ export default function AdminRewards() {
   };
 
   // Distribute rewards proportionally to period XP.
-  const distributeRewards = (
-    users: LeaderboardUser[],
-    total: number
-  ) => {
+  const distributeRewards = (users: LeaderboardUser[], total: number) => {
     if (users.length === 0) return;
 
     const totalXp = users.reduce((sum, u) => sum + u.periodXp, 0);
@@ -330,7 +352,7 @@ export default function AdminRewards() {
       ...u,
       rewardAmount:
         totalXp > 0
-          ? parseFloat(((u.periodXp / totalXp) * total).toFixed(6))
+          ? ((u.periodXp / totalXp) * total)
           : 0,
     }));
 
@@ -345,21 +367,18 @@ export default function AdminRewards() {
 
   // Create airdrop with token transfer
   const createAirdrop = async () => {
-    console.log("=== CREATE AIRDROP START ===");
-    
-    const selectedUsers = leaderboardUsers.filter((u) => u.rewardAmount && u.rewardAmount > 0);
-    console.log("Selected users:", selectedUsers.length);
-    console.log("Selected users data:", selectedUsers);
-    
+
+    const selectedUsers = leaderboardUsers.filter(
+      (u) => u.rewardAmount && u.rewardAmount > 0,
+    );
+
     // Validation
     if (selectedUsers.length === 0) {
-      console.log("Validation failed: No recipients");
       toast.error("Please select at least one recipient with a reward amount");
       return;
     }
 
     if (!selectedToken) {
-      console.log("Validation failed: No token selected");
       toast.error("Please select a reward token");
       return;
     }
@@ -380,17 +399,16 @@ export default function AdminRewards() {
       return;
     }
 
-    const totalDistributed = selectedUsers.reduce((sum, u) => sum + (u.rewardAmount || 0), 0);
-    console.log("Total to distribute:", totalDistributed);
-    console.log("Selected token:", selectedToken);
+    const totalDistributed = selectedUsers.reduce(
+      (sum, u) => sum + (u.rewardAmount || 0),
+      0,
+    );
 
     try {
       setCreatingAirdrop(true);
-      
+
       // Step 1: Prepare funding transaction
-      console.log("Step 1: Preparing funding transaction...");
       toast.info("Preparing funding transaction...");
-      console.log(`tot: ${totalDistributed}, rewTy: ${selectedToken.tokenType}, tokAddr: ${selectedToken.value}, decimals: ${selectedToken.decimals} from: ${publicKey.toString()}`);
       const prepareRes = await server.post("/airdrop/prepare-funding", {
         totalAmount: totalDistributed,
         rewardType: selectedToken.tokenType,
@@ -400,26 +418,34 @@ export default function AdminRewards() {
       });
 
       if (!prepareRes.data.success) {
-        throw new Error(prepareRes.data.message || "Failed to prepare funding transaction");
+        throw new Error(
+          prepareRes.data.message || "Failed to prepare funding transaction",
+        );
       }
 
-      const { transaction: serializedTx, checksum, fundingData } = prepareRes.data.data;
-      console.log("Funding data:", fundingData);
+      const {
+        transaction: serializedTx,
+        checksum,
+        fundingData,
+      } = prepareRes.data.data;
 
       // Step 2: Deserialize and sign transaction
-      console.log("Step 2: Signing transaction...");
       toast.info("Please sign the funding transaction in your wallet...");
 
       let tx: Transaction | VersionedTransaction;
 
       try {
         // Try legacy transaction first
-        const txBytes = Uint8Array.from(atob(serializedTx), (c) => c.charCodeAt(0));
+        const txBytes = Uint8Array.from(atob(serializedTx), (c) =>
+          c.charCodeAt(0),
+        );
         tx = Transaction.from(txBytes);
       } catch {
         try {
           // Fallback to versioned transaction
-          const txBytes = Uint8Array.from(atob(serializedTx), (c) => c.charCodeAt(0));
+          const txBytes = Uint8Array.from(atob(serializedTx), (c) =>
+            c.charCodeAt(0),
+          );
           tx = VersionedTransaction.deserialize(txBytes);
         } catch (e) {
           console.error("Failed to deserialize transaction:", e);
@@ -429,9 +455,6 @@ export default function AdminRewards() {
 
       // Sign transaction and submit it to backend (backend broadcasts on-chain)
       const signedTx = await signTransaction(tx);
-      console.log("Transaction signed");
-
-      console.log("Step 3: Submitting funding transaction...");
       toast.info("Submitting funding transaction...");
 
       const signedTxBase64 =
@@ -441,11 +464,10 @@ export default function AdminRewards() {
               signedTx.serialize({
                 requireAllSignatures: false,
                 verifySignatures: false,
-              })
+              }),
             ).toString("base64");
 
       // Step 4: Submit signed tx + create airdrop campaign records
-      console.log("Step 4: Creating airdrop record...");
       toast.info("Creating airdrop...");
 
       // Backend calculates each user's amount as: (xp / totalXp) * totalAmount
@@ -478,46 +500,46 @@ export default function AdminRewards() {
 
       toast.success(
         <div>
-            Airdrop created and funded successfully!{" "}
-            {signature ? (
-              <a
-                href={`https://solscan.io/tx/${signature}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                View on Solscan
-              </a>
-            ) : null}
-          </div>
-        )
-      console.log("Airdrop created:", confirmRes.data.data);
-      
+          Airdrop created and funded successfully!{" "}
+          {signature ? (
+            <a
+              href={`https://solscan.io/tx/${signature}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on Solscan
+            </a>
+          ) : null}
+        </div>,
+      );
+
       // Reset form
       setAirdropName("");
       setTotalAirdropAmount(0);
       setLeaderboardUsers([]);
-      
+
       // Refresh airdrops list after successful creation
       await fetchAirdrops();
-      
     } catch (error: any) {
       console.error("=== AIRDROP ERROR ===");
       console.error("Error:", error);
-      
+
       // Handle user rejection
-      if (error.message?.includes("User rejected") || error.name === "WalletSignTransactionError") {
+      if (
+        error.message?.includes("User rejected") ||
+        error.name === "WalletSignTransactionError"
+      ) {
         toast.error("Transaction cancelled by user");
       } else {
         toast.error(
           error.response?.data?.message ||
             error.message ||
-            "Failed to create airdrop"
+            "Failed to create airdrop",
         );
       }
     } finally {
       setCreatingAirdrop(false);
-      console.log("=== CREATE AIRDROP END ===");
     }
   };
 
@@ -543,7 +565,7 @@ export default function AdminRewards() {
       toast.error(
         error.response?.data?.message ||
           error.message ||
-          "Failed to update status"
+          "Failed to update status",
       );
     }
   };
@@ -640,7 +662,9 @@ export default function AdminRewards() {
       const [leaderboardRes, walletRes, airdropRes] = await Promise.all([
         server.get("/admin/leaderboard"),
         server.get("/pool"),
-        server.get("/airdrop?limit=10").catch(() => ({ data: { success: false } })),
+        server
+          .get("/airdrop?limit=10")
+          .catch(() => ({ data: { success: false } })),
       ]);
 
       setTopHosts(
@@ -656,7 +680,7 @@ export default function AdminRewards() {
         })),
       );
       setEligibleWallets(walletRes.data.data.rows);
-      
+
       if (airdropRes.data.success) {
         setAirdrops(airdropRes.data.data.airdrops || []);
       }
@@ -754,346 +778,421 @@ export default function AdminRewards() {
 
       {/* Airdrop Creation Section */}
       <div className="glass-card p-4 sm:p-6 rounded-xl border border-border/50 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Gift className="h-5 w-5 text-primary" />
-                Create Leaderboard Airdrop
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Reward top XP earners for a selected date range
-              </p>
-            </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Gift className="h-5 w-5 text-primary" />
+              Create Leaderboard Airdrop
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Reward top XP earners for a selected date range
+            </p>
           </div>
+        </div>
 
-          {/* Airdrop Form */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Airdrop Name *</label>
-              <input
-                type="text"
-                value={airdropName}
-                onChange={(e) => setAirdropName(e.target.value)}
-                placeholder="e.g., March 2026 Rewards"
+        {/* Airdrop Form */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              Airdrop Name *
+            </label>
+            <input
+              type="text"
+              value={airdropName}
+              onChange={(e) => setAirdropName(e.target.value)}
+              placeholder="e.g., March 2026 Rewards"
+              className="w-full border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              Reward Token *
+            </label>
+            {tokenOptionsLoading ? (
+              <div className="w-full border border-input rounded-lg p-2 text-sm bg-background text-muted-foreground">
+                Loading tokens...
+              </div>
+            ) : (
+              <select
+                value={selectedToken?.value || ""}
+                onChange={(e) => {
+                  const token = tokenOptions.find(
+                    (t) => t.value === e.target.value,
+                  );
+                  setSelectedToken(token || null);
+                }}
                 className="w-full border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Reward Token *</label>
-              {tokenOptionsLoading ? (
-                <div className="w-full border border-input rounded-lg p-2 text-sm bg-background text-muted-foreground">
-                  Loading tokens...
-                </div>
-              ) : (
-                <select
-                  value={selectedToken?.value || ""}
-                  onChange={(e) => {
-                    const token = tokenOptions.find((t) => t.value === e.target.value);
-                    setSelectedToken(token || null);
-                  }}
-                  className="w-full border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-                >
-                  {tokenOptions.map((token) => (
-                    <option key={token.value} value={token.value}>
-                      {token.label} {token.name && token.name !== token.label ? `(${token.name})` : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+              >
+                {tokenOptions.map((token) => (
+                  <option key={token.value} value={token.value}>
+                    {token.label}{" "}
+                    {token.name && token.name !== token.label
+                      ? `(${token.name})`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
+        </div>
 
-          {/* Month/Year Selection */}
+        <div>
+          <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+            <Users2 width={16} height={16} />
+            Number of Airdrop Claimers
+          </h3>
+          <div className="flex flex-row gap-2">
+            <input
+              type="checkbox"
+              name="leaderboardLimit"
+              id="leaderboardLimit"
+              checked={hasLeaderboardLimit}
+              onChange={(e) => setHasLeaderboardLimit(e.target.checked)}
+            />
+            <label htmlFor="leaderboardLimit">Set Leaderboard Limit</label>
+          </div>
+          {hasLeaderboardLimit && (
+            <Input
+              type="number"
+              value={leaderboardLimit}
+              onChange={(e) => setLeaderboardLimit(Number(e.target.value))}
+              className="w-50 mt-2 text-center "
+            />
+          )}
+        </div>
+
+        {/* Month/Year Selection */}
+        <div className="border-t border-border/30 pt-4">
+          <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Select Leaderboard Date Range
+          </h3>
+          <div className="flex flex-wrap flex-col gap-4">
+            <div className="flex gap-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedStartDate}
+                  onChange={(e) => setSelectedStartDate(e.target.value)}
+                  className="border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedEndDate}
+                  onChange={(e) => {
+                    const nextEndDate = e.target.value;
+                    if (nextEndDate > todayDate) {
+                      setSelectedEndDate(todayDate);
+                      toast.warning(
+                        "End date cannot be in the future. Using today's date.",
+                      );
+                      return;
+                    }
+                    setSelectedEndDate(nextEndDate);
+                  }}
+                  max={todayDate}
+                  className="border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+                />
+              </div>
+            </div>
+            <Button
+              onClick={() => fetchPeriodLeaderboard(1)}
+              disabled={leaderboardLoading}
+              className="gradient-primary"
+            >
+              {leaderboardLoading ? (
+                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Users className="h-4 w-4 mr-2" />
+              )}
+              Load Leaderboard
+            </Button>
+          </div>
+        </div>
+
+        {/* Distribution Settings */}
+        {leaderboardUsers.length > 0 && (
           <div className="border-t border-border/30 pt-4">
             <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Select Leaderboard Date Range
+              <Coins className="h-4 w-4" />
+              Reward Distribution
             </h3>
-            <div className="flex flex-wrap flex-col gap-4">
-              <div className="flex gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Start Date</label>
-                  <input
-                    type="date"
-                    value={selectedStartDate}
-                    onChange={(e) => setSelectedStartDate(e.target.value)}
-                    className="border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">End Date</label>
-                  <input
-                    type="date"
-                    value={selectedEndDate}
-                    onChange={(e) => {
-                      const nextEndDate = e.target.value;
-                      if (nextEndDate > todayDate) {
-                        setSelectedEndDate(todayDate);
-                        toast.warning("End date cannot be in the future. Using today's date.");
-                        return;
-                      }
-                      setSelectedEndDate(nextEndDate);
-                    }}
-                    max={todayDate}
-                    className="border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-                  />
-                </div>
+            <div className="flex flex-wrap items-end gap-4 mb-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">
+                  Total Amount ({selectedTokenSymbol})
+                </label>
+                <input
+                  type="number"
+                  value={totalAirdropAmount || ""}
+                  onChange={(e) =>
+                    handleTotalAmountChange(parseFloat(e.target.value) || 0)
+                  }
+                  min={0}
+                  step={0.001}
+                  placeholder="0.00"
+                  className="w-32 border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+                />
               </div>
-              <Button
-                onClick={() => fetchPeriodLeaderboard(1)}
-                disabled={leaderboardLoading}
-                className="gradient-primary"
-              >
-                {leaderboardLoading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Users className="h-4 w-4 mr-2" />
-                )}
-                Load Leaderboard
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Distribution method: proportional to XP in the selected period.
+              </p>
             </div>
-          </div>
 
-          {/* Distribution Settings */}
-          {leaderboardUsers.length > 0 && (
-            <div className="border-t border-border/30 pt-4">
-              <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-                <Coins className="h-4 w-4" />
-                Reward Distribution
-              </h3>
-              <div className="flex flex-wrap items-end gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    Total Amount ({selectedTokenSymbol})
-                  </label>
-                  <input
-                    type="number"
-                    value={totalAirdropAmount || ""}
-                    onChange={(e) => handleTotalAmountChange(parseFloat(e.target.value) || 0)}
-                    min={0}
-                    step={0.001}
-                    placeholder="0.00"
-                    className="w-32 border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Distribution method: proportional to XP in the selected period.
-                </p>
-              </div>
-
-              {/* Recipients Table */}
-              <div className="border rounded-lg overflow-hidden">
-                <div className="max-h-80 overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 sticky top-0">
-                      <tr>
-                        <th className="p-2 text-left">Rank</th>
-                        <th className="p-2 text-left">Wallet</th>
-                        <th className="p-2 text-left">Period XP</th>
-                        <th className="p-2 text-left">Reward ({selectedTokenSymbol})</th>
+            {/* Recipients Table */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 sticky top-0">
+                    <tr>
+                      <th className="p-2 text-left">Rank</th>
+                      <th className="p-2 text-left">Wallet</th>
+                      <th className="p-2 text-left">Period XP</th>
+                      <th className="p-2 text-left">
+                        Reward ({selectedTokenSymbol})
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboardUsers.map((user) => (
+                      <tr
+                        key={user.userId}
+                        className="border-t border-border/30 bg-primary/5"
+                      >
+                        <td className="p-2">
+                          <span
+                            className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                              user.rank === 1
+                                ? "bg-yellow-500/20 text-yellow-400"
+                                : user.rank === 2
+                                  ? "bg-gray-400/20 text-gray-300"
+                                  : user.rank === 3
+                                    ? "bg-orange-500/20 text-orange-400"
+                                    : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {user.rank}
+                          </span>
+                        </td>
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs">
+                              {shortWallet(user.walletAddress)}
+                            </span>
+                            {user.username && (
+                              <span className="text-xs text-muted-foreground">
+                                ({user.username})
+                              </span>
+                            )}
+                            <button
+                              onClick={() =>
+                                copyToClipboard(user.walletAddress)
+                              }
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-2 font-semibold">
+                          {user.periodXp.toLocaleString()}
+                        </td>
+                        <td className="p-2">
+                          <span className="font-medium">
+                            {(user.rewardAmount || 0).toFixed(6)}
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {leaderboardUsers.map((user) => (
-                        <tr
-                          key={user.userId}
-                          className="border-t border-border/30 bg-primary/5"
-                        >
-                          <td className="p-2">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                              user.rank === 1 ? "bg-yellow-500/20 text-yellow-400" :
-                              user.rank === 2 ? "bg-gray-400/20 text-gray-300" :
-                              user.rank === 3 ? "bg-orange-500/20 text-orange-400" :
-                              "bg-muted text-muted-foreground"
-                            }`}>
-                              {user.rank}
-                            </span>
-                          </td>
-                          <td className="p-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs">{shortWallet(user.walletAddress)}</span>
-                              {user.username && (
-                                <span className="text-xs text-muted-foreground">({user.username})</span>
-                              )}
-                              <button
-                                onClick={() => copyToClipboard(user.walletAddress)}
-                                className="text-muted-foreground hover:text-primary"
-                              >
-                                <Copy className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="p-2 font-semibold">{user.periodXp.toLocaleString()}</td>
-                          <td className="p-2">
-                            <span className="font-medium">
-                              {(user.rewardAmount || 0).toFixed(6)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            </div>
 
-              <div className="mt-3 flex items-center justify-between text-sm">
-                <p className="text-muted-foreground">
-                  Page {leaderboardPagination.page} of {Math.max(leaderboardPagination.totalPages, 1)}
-                  {" "}
-                  ({leaderboardPagination.total} users)
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={
-                      leaderboardLoading ||
-                      leaderboardPagination.page <= 1 ||
-                      leaderboardPagination.totalPages === 0
-                    }
-                    onClick={() =>
-                      fetchPeriodLeaderboard(Math.max(1, leaderboardPagination.page - 1))
-                    }
-                  >
-                    <ChevronUp className="h-4 w-4 mr-1" /> Prev
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={
-                      leaderboardLoading ||
-                      leaderboardPagination.page >= leaderboardPagination.totalPages ||
-                      leaderboardPagination.totalPages === 0
-                    }
-                    onClick={() =>
-                      fetchPeriodLeaderboard(leaderboardPagination.page + 1)
-                    }
-                  >
-                    Next <ChevronDown className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Summary */}
-              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-muted/30 rounded-lg">
-                <div className="flex gap-6 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Selected:</span>{" "}
-                    <span className="font-semibold">{leaderboardUsers.length} users</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Total to distribute:</span>{" "}
-                    <span className="font-semibold text-primary">
-                      {leaderboardUsers
-                        .reduce((sum, u) => sum + (u.rewardAmount || 0), 0)
-                        .toFixed(6)} {selectedTokenSymbol}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Wallet className="h-4 w-4" />
-                    {connected ? (
-                      <span className="text-green-400 text-xs">Connected</span>
-                    ) : (
-                      <span className="text-yellow-400 text-xs">Not Connected</span>
-                    )}
-                  </div>
-                </div>
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <p className="text-muted-foreground">
+                Page {leaderboardPagination.page} of{" "}
+                {Math.max(leaderboardPagination.totalPages, 1)} (
+                {leaderboardPagination.total} users)
+              </p>
+              <div className="flex items-center gap-2">
                 <Button
-                  onClick={createAirdrop}
-                  disabled={creatingAirdrop || !connected || leaderboardUsers.filter((u) => u.rewardAmount).length === 0}
-                  className="gradient-primary"
-                  title={!connected ? "Connect wallet to create airdrop" : ""}
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    leaderboardLoading ||
+                    leaderboardPagination.page <= 1 ||
+                    leaderboardPagination.totalPages === 0
+                  }
+                  onClick={() =>
+                    fetchPeriodLeaderboard(
+                      Math.max(1, leaderboardPagination.page - 1),
+                    )
+                  }
                 >
-                  {creatingAirdrop ? (
-                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  {!connected ? "Connect Wallet" : "Fund & Create Airdrop"}
+                  <ChevronUp className="h-4 w-4 mr-1" /> Prev
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    leaderboardLoading ||
+                    leaderboardPagination.page >=
+                      leaderboardPagination.totalPages ||
+                    leaderboardPagination.totalPages === 0
+                  }
+                  onClick={() =>
+                    fetchPeriodLeaderboard(leaderboardPagination.page + 1)
+                  }
+                >
+                  Next <ChevronDown className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>
-          )}
 
-          {/* Existing Airdrops */}
-          {airdrops.length > 0 && (
-            <div className="border-t border-border/30 pt-4">
-              <h3 className="text-base font-semibold mb-3">Recent Airdrops</h3>
-              <div className="space-y-2">
-                {airdrops.map((airdrop) => (
-                  (() => {
-                    const remainingCount = Math.max(
-                      0,
-                      (airdrop.totalReceivers || 0) - (airdrop.claimedCount || 0)
-                    );
-
-                    return (
-                  <div
-                    key={airdrop.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-card/50 rounded-lg border border-border/30 gap-3"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">
-                          {airdrop.airdropName || `Airdrop #${airdrop.id}`}
-                        </span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            AIRDROP_STATUS_COLORS[airdrop.status] || "bg-gray-500/20 text-gray-400"
-                          }`}
-                        >
-                          {AIRDROP_STATUS_LABELS[airdrop.status] || "Unknown"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatAirdropDate(airdrop.startDate)} - {formatAirdropDate(airdrop.endDate)} •
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {airdrop.totalReceivers} recipients • {airdrop.totalAmount} {airdrop.tokenSymbol || selectedTokenSymbol} •
-                        Claimed: {airdrop.claimedCount}/{airdrop.totalReceivers} • Remaining: {remainingCount}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      {airdrop.status === 2 && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateAirdropStatus(airdrop.id, 3)}
-                            title="Make Claimable"
-                          >
-                            <Check className="h-3 w-3 mr-1" /> Make Claimable
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateAirdropStatus(airdrop.id, 5)}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      )}
-                      {airdrop.status === 3 && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateAirdropStatus(airdrop.id, 5)}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                    );
-                  })()
-                ))}
+            {/* Summary */}
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-muted/30 rounded-lg">
+              <div className="flex gap-6 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Selected:</span>{" "}
+                  <span className="font-semibold">
+                    {leaderboardUsers.length} users
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">
+                    Total to distribute:
+                  </span>{" "}
+                  <span className="font-semibold text-primary">
+                    {leaderboardUsers
+                      .reduce((sum, u) => sum + (u.rewardAmount || 0), 0)
+                      .toFixed(6)}{" "}
+                    {selectedTokenSymbol}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Wallet className="h-4 w-4" />
+                  {connected ? (
+                    <span className="text-green-400 text-xs">Connected</span>
+                  ) : (
+                    <span className="text-yellow-400 text-xs">
+                      Not Connected
+                    </span>
+                  )}
+                </div>
               </div>
+              <Button
+                onClick={createAirdrop}
+                disabled={
+                  creatingAirdrop ||
+                  !connected ||
+                  leaderboardUsers.filter((u) => u.rewardAmount).length === 0
+                }
+                className="gradient-primary"
+                title={!connected ? "Connect wallet to create airdrop" : ""}
+              >
+                {creatingAirdrop ? (
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                {!connected ? "Connect Wallet" : "Fund & Create Airdrop"}
+              </Button>
             </div>
-          )}
-        </div>
-      
+          </div>
+        )}
+
+        {/* Existing Airdrops */}
+        {airdrops.length > 0 && (
+          <div className="border-t border-border/30 pt-4">
+            <h3 className="text-base font-semibold mb-3">Recent Airdrops</h3>
+            <div className="space-y-2">
+              {airdrops.map((airdrop) =>
+                (() => {
+                  const remainingCount = Math.max(
+                    0,
+                    (airdrop.totalReceivers || 0) - (airdrop.claimedCount || 0),
+                  );
+
+                  return (
+                    <div
+                      key={airdrop.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-card/50 rounded-lg border border-border/30 gap-3"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">
+                            {airdrop.airdropName || `Airdrop #${airdrop.id}`}
+                          </span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              AIRDROP_STATUS_COLORS[airdrop.status] ||
+                              "bg-gray-500/20 text-gray-400"
+                            }`}
+                          >
+                            {AIRDROP_STATUS_LABELS[airdrop.status] || "Unknown"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatAirdropDate(airdrop.startDate)} -{" "}
+                          {formatAirdropDate(airdrop.endDate)} •
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {airdrop.totalReceivers} recipients •{" "}
+                          {airdrop.totalAmount}{" "}
+                          {airdrop.tokenSymbol || selectedTokenSymbol} •
+                          Claimed: {airdrop.claimedCount}/
+                          {airdrop.totalReceivers} • Remaining: {remainingCount}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {airdrop.status === 2 && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateAirdropStatus(airdrop.id, 3)}
+                              title="Make Claimable"
+                            >
+                              <Check className="h-3 w-3 mr-1" /> Make Claimable
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateAirdropStatus(airdrop.id, 5)}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        )}
+                        {airdrop.status === 3 && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateAirdropStatus(airdrop.id, 5)}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })(),
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Eligible Wallets Section */}
       {/*(<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">

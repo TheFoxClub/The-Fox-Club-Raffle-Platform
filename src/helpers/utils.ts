@@ -11,3 +11,8 @@ export const loadImageSrcFromFile = async (file): Promise<string> => {
     }
   });
 };
+
+export const shortenPubkey = (pubkey: string, chars = 4) => {
+  if (!pubkey) return "";
+  return `${pubkey.slice(0, chars)}...${pubkey.slice(-chars)}`;
+};
