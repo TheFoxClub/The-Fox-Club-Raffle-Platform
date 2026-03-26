@@ -6,6 +6,7 @@ const {
   RaffleReward,
   TicketReservation,
   VerifiedToken,
+  sequelize,
 } = require("../models");
 const {
   PublicKey,
@@ -62,7 +63,7 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Insufficient data provided"
+          "Insufficient data provided",
         );
       }
 
@@ -74,7 +75,7 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "User Not Found, please Login Again"
+          "User Not Found, please Login Again",
         );
       }
 
@@ -109,7 +110,7 @@ class TicketController {
             return respond(
               res,
               httpStatus.BAD_REQUEST,
-              "Raffle token configuration is invalid"
+              "Raffle token configuration is invalid",
             );
           }
 
@@ -134,7 +135,7 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          `This raffle requires payment in ${raffleTokenName}. Please use the correct token.`
+          `This raffle requires payment in ${raffleTokenName}. Please use the correct token.`,
         );
       }
 
@@ -154,9 +155,8 @@ class TicketController {
         });
       }
 
-      const nftHolderInfo = await NFTService.checkNFTCollectionHolder(
-        senderPubkey
-      );
+      const nftHolderInfo =
+        await NFTService.checkNFTCollectionHolder(senderPubkey);
       const isNFTHolder = nftHolderInfo.isHolder;
       const feeData = await getFeeData();
 
@@ -195,12 +195,12 @@ class TicketController {
 
         if (!tokenDetails) {
           await TicketReservationService.cancelReservation(
-            reservationResult.reservation.reservationId
+            reservationResult.reservation.reservationId,
           );
           return respond(
             res,
             httpStatus.BAD_REQUEST,
-            "Invalid or unverified token type"
+            "Invalid or unverified token type",
           );
         }
 
@@ -222,12 +222,12 @@ class TicketController {
             break;
           default:
             await TicketReservationService.cancelReservation(
-              reservationResult.reservation.reservationId
+              reservationResult.reservation.reservationId,
             );
             return respond(
               res,
               httpStatus.BAD_REQUEST,
-              "Unsupported token type"
+              "Unsupported token type",
             );
         }
       }
@@ -237,13 +237,13 @@ class TicketController {
       transaction.add(
         ComputeBudgetProgram.setComputeUnitPrice({
           microLamports: 100_000,
-        })
+        }),
       );
 
       transaction.add(
         ComputeBudgetProgram.setComputeUnitLimit({
           units: 200_000,
-        })
+        }),
       );
 
       //transaction fee
@@ -254,7 +254,7 @@ class TicketController {
           fromPubkey: new PublicKey(senderPubkey),
           toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
           lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-        })
+        }),
       );
 
       switch (type) {
@@ -265,7 +265,7 @@ class TicketController {
               fromPubkey: senderPublicKey,
               lamports: Math.round(commissionAmount * LAMPORTS_PER_SOL),
               toPubkey: commissionReceiverPublicKey,
-            })
+            }),
           );
           // Creator portion → platform wallet
           transaction.add(
@@ -273,7 +273,7 @@ class TicketController {
               fromPubkey: senderPublicKey,
               lamports: Math.round(creatorAmount * LAMPORTS_PER_SOL),
               toPubkey: platformPublicKey,
-            })
+            }),
           );
           tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
           break;
@@ -281,10 +281,10 @@ class TicketController {
         default: {
           // SPL Token transfer — split into commission and creator portions
           const commissionTokenAmount = Math.round(
-            commissionAmount * Math.pow(10, tokenDecimals)
+            commissionAmount * Math.pow(10, tokenDecimals),
           );
           const creatorTokenAmount = Math.round(
-            creatorAmount * Math.pow(10, tokenDecimals)
+            creatorAmount * Math.pow(10, tokenDecimals),
           );
           const mint = new PublicKey(tokenAddress);
           const rpcConnection = getUmi().rpc;
@@ -293,7 +293,7 @@ class TicketController {
             mint,
             senderPublicKey,
             false,
-            tokenProgramId
+            tokenProgramId,
           );
 
           // Commission receiver ATA (FUND_RECEIVER_WALLET)
@@ -301,11 +301,11 @@ class TicketController {
             mint,
             commissionReceiverPublicKey,
             false,
-            tokenProgramId
+            tokenProgramId,
           );
           try {
             const accountInfo = await rpcConnection.getAccount(
-              commissionReceiverTokenAccount
+              commissionReceiverTokenAccount,
             );
             if (!accountInfo.exists) {
               transaction.add(
@@ -315,8 +315,8 @@ class TicketController {
                   commissionReceiverPublicKey,
                   mint,
                   tokenProgramId,
-                  ASSOCIATED_TOKEN_PROGRAM_ID
-                )
+                  ASSOCIATED_TOKEN_PROGRAM_ID,
+                ),
               );
             }
           } catch (error) {
@@ -327,8 +327,8 @@ class TicketController {
                 commissionReceiverPublicKey,
                 mint,
                 tokenProgramId,
-                ASSOCIATED_TOKEN_PROGRAM_ID
-              )
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+              ),
             );
           }
 
@@ -337,12 +337,11 @@ class TicketController {
             mint,
             platformPublicKey,
             false,
-            tokenProgramId
+            tokenProgramId,
           );
           try {
-            const accountInfo = await rpcConnection.getAccount(
-              platformTokenAccount
-            );
+            const accountInfo =
+              await rpcConnection.getAccount(platformTokenAccount);
             if (!accountInfo.exists) {
               transaction.add(
                 createAssociatedTokenAccountInstruction(
@@ -351,8 +350,8 @@ class TicketController {
                   platformPublicKey,
                   mint,
                   tokenProgramId,
-                  ASSOCIATED_TOKEN_PROGRAM_ID
-                )
+                  ASSOCIATED_TOKEN_PROGRAM_ID,
+                ),
               );
             }
           } catch (error) {
@@ -363,8 +362,8 @@ class TicketController {
                 platformPublicKey,
                 mint,
                 tokenProgramId,
-                ASSOCIATED_TOKEN_PROGRAM_ID
-              )
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+              ),
             );
           }
 
@@ -376,8 +375,8 @@ class TicketController {
                 senderPublicKey,
                 BigInt(commissionTokenAmount),
                 [],
-                tokenProgramId
-              )
+                tokenProgramId,
+              ),
             );
           }
 
@@ -389,8 +388,8 @@ class TicketController {
                 senderPublicKey,
                 BigInt(creatorTokenAmount),
                 [],
-                tokenProgramId
-              )
+                tokenProgramId,
+              ),
             );
           }
           break;
@@ -463,7 +462,7 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
@@ -471,7 +470,7 @@ class TicketController {
       const confirmationResult =
         await TicketReservationService.confirmReservation(
           reservationId,
-          signature
+          signature,
         );
 
       if (!confirmationResult.success) {
@@ -479,7 +478,7 @@ class TicketController {
           res,
           httpStatus.BAD_REQUEST,
           confirmationResult.message,
-          { error: confirmationResult.error }
+          { error: confirmationResult.error },
         );
       }
 
@@ -494,7 +493,7 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation details do not match request"
+          "Reservation details do not match request",
         );
       }
 
@@ -534,7 +533,7 @@ class TicketController {
           decimals = tokenDetail.decimals || 9;
         } catch (error) {
           logger.warn(
-            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`
+            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
           );
           decimals = tokenDecimals || 9;
         }
@@ -548,7 +547,7 @@ class TicketController {
           decimals = tokenDetail.decimals || 9;
         } catch (error) {
           logger.warn(
-            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`
+            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
           );
           decimals = tokenDecimals || 9;
         }
@@ -580,20 +579,32 @@ class TicketController {
         rewardTransferType: "ticket_purchase", // Mark as ticket purchase for XP processing
       };
 
-      const splTokenSendTxDb = await SplTokenSendTransaction.create(
-        splTokenSendTxData
-      );
+      const splTokenSendTxDb =
+        await SplTokenSendTransaction.create(splTokenSendTxData);
 
       if (raffleId && ticketCount) {
         try {
           // Fetch current raffle data to properly handle string fields
-          const currentRaffle = await Raffle.findOne({ where: { id: raffleId } });
-          
+          const currentRaffle = await Raffle.findOne({
+            where: { id: raffleId },
+          });
+
           const revenueToAdd = lamports / Math.pow(10, decimals);
-          const updatedTotalCommission = (parseFloat(currentRaffle.totalCommission || 0) + parseFloat(commissionAmount)).toString();
-          const updatedClaimableAmount = (parseFloat(currentRaffle.claimableAmount || 0) + parseFloat(creatorAmount)).toString();
-          const updatedTotalRevenue = (parseFloat(currentRaffle.totalRevenue || 0) + revenueToAdd).toString();
-          const updatedPlatformRevenue = (parseFloat(currentRaffle.platformRevenue || 0) + parseFloat(commissionAmount)).toString();
+          const updatedTotalCommission = (
+            parseFloat(currentRaffle.totalCommission || 0) +
+            parseFloat(commissionAmount)
+          ).toString();
+          const updatedClaimableAmount = (
+            parseFloat(currentRaffle.claimableAmount || 0) +
+            parseFloat(creatorAmount)
+          ).toString();
+          const updatedTotalRevenue = (
+            parseFloat(currentRaffle.totalRevenue || 0) + revenueToAdd
+          ).toString();
+          const updatedPlatformRevenue = (
+            parseFloat(currentRaffle.platformRevenue || 0) +
+            parseFloat(commissionAmount)
+          ).toString();
 
           await Raffle.update(
             {
@@ -605,7 +616,7 @@ class TicketController {
             },
             {
               where: { id: raffleId },
-            }
+            },
           );
 
           const user = await User.findOne({ where: { pubkey: pubkey } });
@@ -718,7 +729,7 @@ class TicketController {
               res,
               httpStatus.OK,
               "Tickets purchased successfully!",
-              responseData
+              responseData,
             );
           }
         } catch (ticketError) {
@@ -731,7 +742,7 @@ class TicketController {
               message: "Transaction stored successfully",
               signature: signatureToStore,
               error: "Ticket creation failed",
-            }
+            },
           );
         }
       }
@@ -792,7 +803,7 @@ class TicketController {
         groupedTickets[raffleId].tickets.push(ticket);
         groupedTickets[raffleId].totalTickets++;
         groupedTickets[raffleId].totalSpent += parseFloat(
-          ticket.raffle.ticketPrice
+          ticket.raffle.ticketPrice,
         );
         groupedTickets[raffleId].ticketNumbers.push(ticket.ticketNumber);
 
@@ -843,7 +854,7 @@ class TicketController {
           sold: group.ticketsSold,
           total: group.totalTickets,
           percentage: Math.round(
-            (group.ticketsSold / group.totalTickets) * 100
+            (group.ticketsSold / group.totalTickets) * 100,
           ),
         },
       }));
@@ -857,7 +868,7 @@ class TicketController {
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
         "Failed to fetch user tickets",
-        { error: error.message }
+        { error: error.message },
       );
     }
   }
@@ -873,13 +884,12 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
-      const result = await TicketReservationService.cancelReservation(
-        reservationId
-      );
+      const result =
+        await TicketReservationService.cancelReservation(reservationId);
 
       if (!result.success) {
         return respond(res, httpStatus.BAD_REQUEST, result.message, {
@@ -893,7 +903,7 @@ class TicketController {
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to cancel reservation"
+        "Failed to cancel reservation",
       );
     }
   }
@@ -909,13 +919,12 @@ class TicketController {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "Reservation ID is required"
+          "Reservation ID is required",
         );
       }
 
-      const result = await TicketReservationService.getReservationStatus(
-        reservationId
-      );
+      const result =
+        await TicketReservationService.getReservationStatus(reservationId);
 
       if (!result.success) {
         return respond(res, httpStatus.NOT_FOUND, result.message, {
@@ -927,14 +936,14 @@ class TicketController {
         res,
         httpStatus.OK,
         "Reservation status retrieved successfully",
-        result.reservation
+        result.reservation,
       );
     } catch (error) {
       logger.error("Error getting reservation status:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to get reservation status"
+        "Failed to get reservation status",
       );
     }
   }
@@ -957,14 +966,83 @@ class TicketController {
         res,
         httpStatus.OK,
         "Available tickets retrieved successfully",
-        { availableTickets }
+        { availableTickets },
       );
     } catch (error) {
       logger.error("Error getting available tickets:", error);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        "Failed to get available tickets"
+        "Failed to get available tickets",
+      );
+    }
+  }
+
+  //get ticket purchasers by raffle
+  static async getTicketPurchasersByRaffleId(req, res) {
+    try {
+      const { raffleId, page = 1, limit = 10 } = req.params;
+
+      if (!raffleId) {
+        return respond(res, httpStatus.BAD_REQUEST, "Insufficient data");
+      }
+
+      const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+      const parsedLimit = Math.max(parseInt(limit, 10) || 10, 1);
+      const offset = (parsedPage - 1) * parsedLimit;
+
+      const { count: totalUsers, rows: userTickets } = await RaffleTicket.findAndCountAll({
+        where: { raffleId },
+        attributes: [
+          "userId",
+          [sequelize.fn("COUNT", sequelize.col("*")), "ticketCount"],
+          [sequelize.col("user.pubkey"), "userPubkey"], // flatten top-level
+        ],
+        include: [
+          {
+            model: User,
+            attributes: [],
+          },
+        ],
+        group: ["userId", "user.pubkey"],
+        order: [[sequelize.literal("ticketCount"), "DESC"],["userId", "ASC"]],
+        ...(parsedLimit !== -1 && {
+          limit: parsedLimit,
+          offset,
+        }),
+        raw: true,
+      });
+
+      // calculate total pages
+      const totalPages = Math.ceil(totalUsers.length / parsedLimit);
+
+      const ticketPurchasers = {
+        buyers: userTickets.map((t, idx) => ({
+          rank: offset + idx + 1,
+          userId: t.userId,
+          userPubkey: t.userPubkey,
+          ticketCount: parseInt(t.ticketCount, 10),
+        })),
+        pagination: {
+          total: totalUsers.length,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages,
+        },
+      };
+
+      return respond(
+        res,
+        httpStatus.OK,
+        "Ticket buyers fetched successfully",
+        ticketPurchasers,
+      );
+    } catch (error) {
+      logger.error("Error in getTicketPurchasersByRaffleId: ", error);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to get ticket purchasers",
       );
     }
   }

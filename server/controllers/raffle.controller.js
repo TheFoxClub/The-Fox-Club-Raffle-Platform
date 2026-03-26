@@ -344,18 +344,8 @@ class RaffleController {
       const ticketPurchasers = await RaffleTicket.findAll({
         where: { raffleId: id },
         attributes: [
-          "userId",
-          [sequelize.fn("COUNT", sequelize.col("*")), "ticketCount"],
-          [sequelize.col("user.pubkey"), "userPubkey"], // flatten top-level
+          [sequelize.fn("DISTINCT", sequelize.col("userId")), "userId"],
         ],
-        include: [
-          {
-            model: User,
-            attributes: [],
-          },
-        ],
-        group: ["userId","user.pubkey"],
-         order: [[sequelize.literal("ticketCount"), "DESC"]],
         raw: true,
       });
 
@@ -391,14 +381,13 @@ class RaffleController {
         hasWinners: winners.length > 0,
         winnersSelected: raffle.winnersSelected,
         purchaserUserIds,
-        ticketPurchasers,
       });
     } catch (err) {
       logger.error(err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
-        parseSequelizeErrors(err),
+        parseSequelizeErrors(err)
       );
     }
   }

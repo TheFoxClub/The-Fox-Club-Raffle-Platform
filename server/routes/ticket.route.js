@@ -10,5 +10,6 @@ router.get("/reservation-status/:reservationId", auth.bearer, TicketController.g
 router.get("/available-tickets/:raffleId", TicketController.getAvailableTickets);
 
 router.get("/user-tickets", auth.bearer, TicketController.getUserTickets);
+router.get("/purchasers/:raffleId/:page", TicketController.getTicketPurchasersByRaffleId)
 
 module.exports = router;

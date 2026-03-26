@@ -24,7 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import server from "../../config/server";
+import server, { getRequest } from "../../config/server";
 import { toast } from "react-toastify";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
@@ -110,6 +110,13 @@ type TTicketPurchaser = {
   userPubkey: string;
   userId: number;
   ticketCount: number;
+};
+
+type TPagination = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 };
 
 // Reward types mapping
@@ -207,6 +214,8 @@ const RaffleDetail = () => {
   const [ticketPurchasers, setTicketPurchasers] = useState<TTicketPurchaser[]>(
     [],
   );
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<TPagination | null>(null);
 
   const extractErrorMessage = (error: any): string => {
     if (!error) return "";
@@ -225,6 +234,26 @@ const RaffleDetail = () => {
       return "";
     }
   };
+
+  useEffect(() => {
+    const fetchTicketPurchasers = async () => {
+      try {
+        const res = await server.get(`/ticket/purchasers/${raffleId}/${page}`);
+        if (res?.data?.success) {
+          setTicketPurchasers(res.data.data.buyers || []);
+          setPagination(res.data.data.pagination);
+        } else {
+          setTicketPurchasers([]);
+          toast.error(res.data.message || "Error fetching purchased tickets");
+        }
+      } catch (error) {
+        setTicketPurchasers([]);
+        toast.error("Error fetching ticket purchasers");
+      }
+    };
+
+    fetchTicketPurchasers();
+  }, [raffleId, page]);
 
   const getRewardImage = (reward: RaffleReward) => {
     if (reward.imageUrl) return reward.imageUrl;
@@ -433,7 +462,6 @@ const RaffleDetail = () => {
       setLoading(true);
       const res = await server.get(`/raffle/${raffleId}`);
       if (res.data.success) {
-        setTicketPurchasers(res.data.data.ticketPurchasers);
         const data = res.data.data.raffle;
 
         const mappedRaffle: RaffleType = {
@@ -560,9 +588,7 @@ const RaffleDetail = () => {
 
     // Set up event listeners
     const handleRaffleUpdate = (data: any) => {
-      // console.log("Raffle update received:", data);
       if (data.raffleId === raffleIdNum) {
-        // console.log("Processing raffle update for current raffle:", data);
         setRaffle((prev) => {
           if (!prev) return prev;
 
@@ -592,9 +618,7 @@ const RaffleDetail = () => {
     };
 
     const handleTicketPurchase = (data: any) => {
-      // console.log("Ticket purchase received:", data);
       if (data.raffleId === raffleIdNum) {
-        // console.log("Processing ticket purchase for current raffle:", data);
         setRaffle((prev) => {
           if (!prev) return prev;
           return {
@@ -1299,27 +1323,26 @@ const RaffleDetail = () => {
           </h2>
         </div>
         <div className="relative overflow-x-auto w-full bg-neutral-primary-soft shadow-md rounded-lg border border-secondary mt-2">
-          {ticketPurchasers && ticketPurchasers.length > 0 ? (
-            ticketPurchasers.map((item, key) => (
-              <table className="min-w-full w-full text-sm text-left text-gray-700">
-                <thead className=" uppercase text-white tracking-wider">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-lg font-semibold text-primary"
-                    >
-                      User
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-lg font-semibold text-right text-primary"
-                    >
-                      Tickets Bought
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
+          <table className="min-w-full w-full text-sm text-left text-gray-700">
+            <thead className=" uppercase text-white tracking-wider">
+              <tr>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-lg font-semibold text-primary"
+                >
+                  User
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-lg font-semibold text-right text-primary"
+                >
+                  Tickets Bought
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {ticketPurchasers && ticketPurchasers.length > 0 ? (
+                ticketPurchasers.map((item, key) => (
                   <tr key={key} className="border border-bottom">
                     <th
                       scope="row"
@@ -1343,14 +1366,54 @@ const RaffleDetail = () => {
                       {item.ticketCount}
                     </td>
                   </tr>
-                </tbody>
-              </table>
-            ))
-          ) : (
-            <div className="p-4">
-              <span className="text-center py-4 text-gray-500 italic font-bold">
-                No Tickets Data
-              </span>
+                ))
+              ) : (
+                <div className="p-4">
+                  <span className="text-center py-4 text-gray-500 italic font-bold">
+                    No Tickets Data
+                  </span>
+                </div>
+              )}
+            </tbody>
+          </table>
+          {pagination && pagination.totalPages >= 1 && (
+            <div className="flex items-center justify-center gap-2 my-4">
+              {/* Prev */}
+              <button
+                disabled={page === 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="px-3 py-1 rounded-md bg-white/10 text-white disabled:opacity-40"
+              >
+                Prev
+              </button>
+
+              {/* Page Numbers */}
+              {[...Array(pagination.totalPages)].map((_, i) => {
+                const pageNumber = i + 1;
+
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setPage(pageNumber)}
+                    className={`px-3 py-1 rounded-md transition ${
+                      page === pageNumber
+                        ? "bg-secondary text-white"
+                        : "bg-white/10 text-white hover:bg-white/20"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+
+              {/* Next */}
+              <button
+                disabled={page === pagination.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="px-3 py-1 rounded-md bg-white/10 text-white disabled:opacity-40"
+              >
+                Next
+              </button>
             </div>
           )}
         </div>
