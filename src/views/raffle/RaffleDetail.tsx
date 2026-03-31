@@ -32,6 +32,7 @@ import { storeSignature, cancelReservation } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
 import { shortenPubkey } from "../../helpers/utils";
+import { HttpStatusCode } from "axios";
 
 const mapNumericTokenType = (numericTokenType: number): string => {
   switch (numericTokenType) {
@@ -424,8 +425,8 @@ const RaffleDetail = () => {
         toast.error("Transaction was rejected by wallet");
       } else if (error.message.includes("blockhash")) {
         toast.error("Transaction Expired. Please try again.");
-      } else if (error.message.includes("insufficient")) {
-        toast.error("Insufficient balance");
+      } else if (error.message.includes("insufficient") || error.response.data.message) {
+        toast.error(error?.response?.data?.message || "Insufficient balance");
       } else if (error.message.includes("EXISTING_RESERVATION")) {
         toast.error("You already have an active reservation for this raffle");
 

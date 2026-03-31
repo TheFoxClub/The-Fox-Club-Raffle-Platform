@@ -52,6 +52,7 @@ const dotenv = require("dotenv");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../config/constants");
 const { safeRound } = require("../util/util");
+const { solanaBalanceChecker, tokenBalanceChecker } = require("../util/balanceChecker");
 dotenv.config();
 
 class TicketController {
@@ -259,6 +260,17 @@ class TicketController {
 
       switch (type) {
         case "solana":
+          //solana balance checker
+          const feeData = await getFeeData();
+          const hasEnoughSolBalance = await solanaBalanceChecker(senderPubkey, totalSolAmount + Number(feeData.transaction_fee || 0.001));
+
+          if(hasEnoughSolBalance.success === false){
+            await TicketReservationService.cancelReservation(
+            reservationResult.reservation.reservationId,
+          );
+            return respond(res, httpStatus.BAD_REQUEST, hasEnoughSolBalance.message)
+          }
+
           // Commission portion → FUND_RECEIVER_WALLET
           transaction.add(
             SystemProgram.transfer({
@@ -279,6 +291,15 @@ class TicketController {
           break;
 
         default: {
+
+          //token balance checker
+          const hasEnoughTokenBalance = await tokenBalanceChecker(senderPubkey,tokenAddress,totalSolAmount * Math.pow(10, tokenDecimals));
+          if(hasEnoughTokenBalance.success === false){
+            await TicketReservationService.cancelReservation(
+            reservationResult.reservation.reservationId,
+          );
+            return respond(res, httpStatus.BAD_REQUEST, hasEnoughTokenBalance.message)
+          }
           // SPL Token transfer — split into commission and creator portions
           const commissionTokenAmount = Math.round(
             commissionAmount * Math.pow(10, tokenDecimals),
