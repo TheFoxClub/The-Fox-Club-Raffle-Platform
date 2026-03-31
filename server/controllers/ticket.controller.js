@@ -169,8 +169,8 @@ class TicketController {
       const ticketPrice = raffleData.ticketPrice;
       const totalSolAmount = ticketPrice * ticketCount;
 
-      const commissionAmount = safeRound(totalSolAmount * commissionRate);
-      const creatorAmount = safeRound(totalSolAmount - commissionAmount);
+      let commissionAmount = safeRound(totalSolAmount * commissionRate);
+      let creatorAmount = safeRound(totalSolAmount - commissionAmount);                 
 
       const senderPublicKey = new PublicKey(senderPubkey);
       // Commission portion goes to FUND_RECEIVER_WALLET, creator portion goes to platform wallet
@@ -301,12 +301,13 @@ class TicketController {
             return respond(res, httpStatus.BAD_REQUEST, hasEnoughTokenBalance.message)
           }
           // SPL Token transfer — split into commission and creator portions
-          const commissionTokenAmount = Math.round(
+          const commissionTokenAmount = Math.ceil(
             commissionAmount * Math.pow(10, tokenDecimals),
           );
-          const creatorTokenAmount = Math.round(
-            creatorAmount * Math.pow(10, tokenDecimals),
-          );
+          const creatorTokenAmount = totalSolAmount * Math.pow(10, tokenDecimals) - commissionTokenAmount;
+          commissionAmount = ((Number(commissionTokenAmount) * 100) / Math.pow(10,tokenDecimals)) / 100
+          creatorAmount = ((Number(creatorTokenAmount) * 100) / Math.pow(10,tokenDecimals)) / 100
+          
           const mint = new PublicKey(tokenAddress);
           const rpcConnection = getUmi().rpc;
 
