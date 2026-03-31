@@ -156,7 +156,7 @@ foxclub-raffle-site/
 │   ├── helpers/
 │   │   ├── cache/            # Cache for faster loading 
 │   │   └── solana/           # Solana utilities & wallets
-│   ├── middlewares/           # Express middlewares
+│   ├── middlewares/          # Express middlewares
 │   ├── migrations/           # Database migrations
 │   ├── models/               # Sequelize ORM models
 │   ├── routes/               # API routes
