@@ -52,6 +52,7 @@ const { FUND_RECEIVER_WALLET } = require("../config/credentials");
 const SocketService = require("../services/socket.service");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { getRaffleRefundTransaction } = require("../services/raffles/refund");
+const { solanaBalanceChecker } = require("../util/balanceChecker");
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -1753,6 +1754,13 @@ class RaffleController {
         );
       }
 
+      //transaction fee check
+      const fee = await getFeeData();
+      const hasEnoughBalance = await solanaBalanceChecker(user.pubkey, Number(fee.transaction_fee || DEFAULT_COMMISSION));
+      if(hasEnoughBalance.success === false){
+        return respond(res, httpStatus.BAD_REQUEST, hasEnoughBalance.message)
+      }
+
       const raffle = await Raffle.findOne({
         where: { id: raffleId },
         include: [
@@ -3345,6 +3353,16 @@ class RaffleController {
           httpStatus.BAD_REQUEST,
           "User wallet not found. Please connect your wallet.",
         );
+      }
+
+      //transaction fee check
+      const fee = await getFeeData();
+      const hasEnoughBalance = await solanaBalanceChecker(user.pubkey, Number(fee.transaction_fee || DEFAULT_COMMISSION));
+      if(hasEnoughBalance.success === false){
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return respond(res, httpStatus.BAD_REQUEST, hasEnoughBalance.message)
       }
 
       // Get raffle with row-level locking to prevent race conditions
