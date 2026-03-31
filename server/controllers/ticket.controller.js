@@ -52,6 +52,7 @@ const dotenv = require("dotenv");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../config/constants");
 const { safeRound } = require("../util/util");
+const { solanaBalanceChecker, tokenBalanceChecker } = require("../util/balanceChecker");
 dotenv.config();
 
 class TicketController {
@@ -168,8 +169,8 @@ class TicketController {
       const ticketPrice = raffleData.ticketPrice;
       const totalSolAmount = ticketPrice * ticketCount;
 
-      const commissionAmount = safeRound(totalSolAmount * commissionRate);
-      const creatorAmount = safeRound(totalSolAmount - commissionAmount);
+      let commissionAmount = safeRound(totalSolAmount * commissionRate);
+      let creatorAmount = safeRound(totalSolAmount - commissionAmount);                 
 
       const senderPublicKey = new PublicKey(senderPubkey);
       // Commission portion goes to FUND_RECEIVER_WALLET, creator portion goes to platform wallet
@@ -259,6 +260,17 @@ class TicketController {
 
       switch (type) {
         case "solana":
+          //solana balance checker
+          const feeData = await getFeeData();
+          const hasEnoughSolBalance = await solanaBalanceChecker(senderPubkey, totalSolAmount + Number(feeData.transaction_fee || 0.001));
+
+          if(hasEnoughSolBalance.success === false){
+            await TicketReservationService.cancelReservation(
+            reservationResult.reservation.reservationId,
+          );
+            return respond(res, httpStatus.BAD_REQUEST, hasEnoughSolBalance.message)
+          }
+
           // Commission portion → FUND_RECEIVER_WALLET
           transaction.add(
             SystemProgram.transfer({
@@ -279,13 +291,23 @@ class TicketController {
           break;
 
         default: {
+
+          //token balance checker
+          const hasEnoughTokenBalance = await tokenBalanceChecker(senderPubkey,tokenAddress,totalSolAmount * Math.pow(10, tokenDecimals));
+          if(hasEnoughTokenBalance.success === false){
+            await TicketReservationService.cancelReservation(
+            reservationResult.reservation.reservationId,
+          );
+            return respond(res, httpStatus.BAD_REQUEST, hasEnoughTokenBalance.message)
+          }
           // SPL Token transfer — split into commission and creator portions
-          const commissionTokenAmount = Math.round(
+          const commissionTokenAmount = Math.ceil(
             commissionAmount * Math.pow(10, tokenDecimals),
           );
-          const creatorTokenAmount = Math.round(
-            creatorAmount * Math.pow(10, tokenDecimals),
-          );
+          const creatorTokenAmount = totalSolAmount * Math.pow(10, tokenDecimals) - commissionTokenAmount;
+          commissionAmount = ((Number(commissionTokenAmount) * 100) / Math.pow(10,tokenDecimals)) / 100
+          creatorAmount = ((Number(creatorTokenAmount) * 100) / Math.pow(10,tokenDecimals)) / 100
+          
           const mint = new PublicKey(tokenAddress);
           const rpcConnection = getUmi().rpc;
 
