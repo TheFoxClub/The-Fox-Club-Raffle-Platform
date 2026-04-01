@@ -149,21 +149,26 @@ const updateDbAndConfirmTransactions = async (op) => {
         if (tx.details.txType === "solana") {
           return tx.details.amounts.some(
             (amount) =>
-              amount ===
-                Number(existingTransaction.commissionAmount) * LAMPORTS_PER_SOL === amount || // <-- transferring commission and amount to same wallet.
+              (amount ===
+                Number(existingTransaction.commissionAmount) *
+                  LAMPORTS_PER_SOL) ===
+                amount || // <-- transferring commission and amount to same wallet.
               amount === Number(existingTransaction.uiAmount) ||
               amount ===
                 Number(existingTransaction.creatorAmount) * LAMPORTS_PER_SOL, // <-- transferring commission and amount to same wallet.
           );
         }
         return (
-          Number(existingTransaction.uiAmount) === tx.details.amount ||
-          Number(existingTransaction.commissionAmount) *
-            Math.pow(10, Number(existingTransaction.decimals)) ===
-            tx.details.amount ||
-          Number(existingTransaction.creatorAmount) *
-            Math.pow(10, Number(existingTransaction.decimals)) ===
-            tx.details.amount
+          Math.round(Number(existingTransaction.uiAmount)) ===
+            Math.round(tx.details.amount) ||
+          Math.round(
+            Number(existingTransaction.commissionAmount) *
+              Math.pow(10, Number(existingTransaction.decimals)),
+          ) === Math.round(Number(tx.details.amount)) ||
+          Math.round(
+            Number(existingTransaction.creatorAmount) *
+              Math.pow(10, Number(existingTransaction.decimals)),
+          ) === Math.round(Number(tx.details.amount))
         );
       };
 
@@ -323,15 +328,16 @@ const updateDbAndConfirmTransactions = async (op) => {
         } else {
           // Handle mismatched payout transactions - reset creatorClaimTxId
           try {
-            await Raffle.update(
-              { creatorClaimTxId: null },
-              {
-                where: {
-                  id: existingTransaction.raffleId,
-                  creatorClaimTxId: existingTransaction.id,
-                },
-              },
-            );
+            //temporarily turning off reclaim for mismtached transactions
+            // await Raffle.update(
+            //   { creatorClaimTxId: null },
+            //   {
+            //     where: {
+            //       id: existingTransaction.raffleId,
+            //       creatorClaimTxId: existingTransaction.id,
+            //     },
+            //   },
+            // );
 
             logger.info(
               `Reset creatorClaimTxId for raffle ${existingTransaction.raffleId} due to mismatched payout transaction ${existingTransaction.txId}`,

@@ -3258,7 +3258,7 @@ class RaffleController {
               claimStatus = "confirmed";
               break;
             case SPL_TOKEN_SEND_TX_STATUS.MISMATCHED:
-              claimStatus = "failed";
+              claimStatus = "pending";
               break;
             default:
               claimStatus = "unknown";
@@ -3580,15 +3580,36 @@ class RaffleController {
         );
       }
 
-      await Raffle.update(
+      // FIX: Use atomic UPDATE with WHERE condition to prevent race condition
+      // Only update if creatorClaimTxId is still NULL (indicating we're the first)
+      const [affectedRows] = await Raffle.update(
         {
           creatorClaimTxId: payoutTxRecord.id,
         },
         {
-          where: { id: raffleIdNum },
+          where: { 
+            id: raffleIdNum,
+            creatorClaimTxId: null, // ← ATOMIC: Only update if still null
+          },
           transaction: transaction,
         },
       );
+
+      // Check if the update actually happened
+      // If affectedRows === 0, another request got there first
+      if (affectedRows === 0) {
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        logger.warn(
+          `Race condition detected: Another request already claimed payout for raffle ${raffleIdNum}`,
+        );
+        return respond(
+          res,
+          httpStatus.CONFLICT,
+          "Payout is already being processed. If this persists, the payout may have already been claimed.",
+        );
+      }
 
       await transaction.commit();
 
