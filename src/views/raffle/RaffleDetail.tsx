@@ -1350,7 +1350,7 @@ const RaffleDetail = () => {
                       className="px-6 py-4 text-white font-medium whitespace-nowrap flex items-center"
                     >
                       <span
-                        className="font-bold text-lg truncate cursor-pointer hover:text-primary transition mr-2"
+                        className="font-bold text-base truncate cursor-pointer hover:text-primary transition mr-2"
                         title={item.userPubkey} // full pubkey on hover
                       >
                         {shortenPubkey(item.userPubkey)}
