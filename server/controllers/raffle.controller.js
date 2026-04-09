@@ -1217,12 +1217,9 @@ class RaffleController {
           }
 
           logger.info(
-            `Creating reward in createRaffle: ${
-              reward.rewardName
-            }, rewardType: "${
-              reward.rewardType
-            }", mapped to: ${mappedType}, isDraft: ${
-              statusEnum === RAFFLE_STATUS.DRAFT
+            `Creating reward in createRaffle: ${reward.rewardName
+            }, rewardType: "${reward.rewardType
+            }", mapped to: ${mappedType}, isDraft: ${statusEnum === RAFFLE_STATUS.DRAFT
             }`,
           );
 
@@ -1757,7 +1754,7 @@ class RaffleController {
       //transaction fee check
       const fee = await getFeeData();
       const hasEnoughBalance = await solanaBalanceChecker(user.pubkey, Number(fee.transaction_fee || DEFAULT_COMMISSION));
-      if(hasEnoughBalance.success === false){
+      if (hasEnoughBalance.success === false) {
         return respond(res, httpStatus.BAD_REQUEST, hasEnoughBalance.message)
       }
 
@@ -3284,9 +3281,8 @@ class RaffleController {
             message: !hasEnded
               ? "You can claim the revenue generated from the raffle only after it ends"
               : hasClaimed
-                ? `Payout ${
-                    claimStatus === "confirmed" ? "completed" : claimStatus
-                  }`
+                ? `Payout ${claimStatus === "confirmed" ? "completed" : claimStatus
+                }`
                 : unclaimedAmount > 0
                   ? "Ready to claim"
                   : "No amount available to claim",
@@ -3358,7 +3354,7 @@ class RaffleController {
       //transaction fee check
       const fee = await getFeeData();
       const hasEnoughBalance = await solanaBalanceChecker(user.pubkey, Number(fee.transaction_fee || DEFAULT_COMMISSION));
-      if(hasEnoughBalance.success === false){
+      if (hasEnoughBalance.success === false) {
         if (transaction && !transaction.finished) {
           await transaction.rollback();
         }
@@ -3546,14 +3542,17 @@ class RaffleController {
       }
 
       let payoutTxRecord;
+      let isReusingExistingRecord = false;
 
       if (raffle.creatorClaimTxId) {
+        // Reuse the existing pending payout record (previous attempt was never signed)
         payoutTxRecord = await SplTokenSendTransaction.findOne({
           where: {
             id: raffle.creatorClaimTxId,
           },
           raw: true,
         });
+        isReusingExistingRecord = true;
       } else {
         const splTokenSendTxData = {
           senderPubkey: platformWallet,
@@ -3580,35 +3579,37 @@ class RaffleController {
         );
       }
 
-      // FIX: Use atomic UPDATE with WHERE condition to prevent race condition
-      // Only update if creatorClaimTxId is still NULL (indicating we're the first)
-      const [affectedRows] = await Raffle.update(
-        {
-          creatorClaimTxId: payoutTxRecord.id,
-        },
-        {
-          where: { 
-            id: raffleIdNum,
-            creatorClaimTxId: null, // ← ATOMIC: Only update if still null
+      // Only do the atomic UPDATE if we created a new record (not reusing an existing one).
+      // If we're reusing an existing pending record, creatorClaimTxId is already set correctly.
+      if (!isReusingExistingRecord) {
+        // Atomic UPDATE: only succeeds if creatorClaimTxId is still NULL (prevents race conditions)
+        const [affectedRows] = await Raffle.update(
+          {
+            creatorClaimTxId: payoutTxRecord.id,
           },
-          transaction: transaction,
-        },
-      );
+          {
+            where: {
+              id: raffleIdNum,
+              creatorClaimTxId: null, // ← ATOMIC: Only update if still null
+            },
+            transaction: transaction,
+          },
+        );
 
-      // Check if the update actually happened
-      // If affectedRows === 0, another request got there first
-      if (affectedRows === 0) {
-        if (transaction && !transaction.finished) {
-          await transaction.rollback();
+        // If affectedRows === 0, another concurrent request already set creatorClaimTxId
+        if (affectedRows === 0) {
+          if (transaction && !transaction.finished) {
+            await transaction.rollback();
+          }
+          logger.warn(
+            `Race condition detected: Another request already claimed payout for raffle ${raffleIdNum}`,
+          );
+          return respond(
+            res,
+            httpStatus.CONFLICT,
+            "Payout is already being processed. If this persists, the payout may have already been claimed.",
+          );
         }
-        logger.warn(
-          `Race condition detected: Another request already claimed payout for raffle ${raffleIdNum}`,
-        );
-        return respond(
-          res,
-          httpStatus.CONFLICT,
-          "Payout is already being processed. If this persists, the payout may have already been claimed.",
-        );
       }
 
       await transaction.commit();
