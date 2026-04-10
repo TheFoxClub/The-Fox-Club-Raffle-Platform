@@ -60,6 +60,7 @@ const {
 
 const {
   transfer: cnftTransfer,
+  getAssetWithProof,
 } = require("@metaplex-foundation/mpl-bubblegum");
 
 const wallet = require("./wallet.json");
@@ -634,7 +635,8 @@ const handleCNFT = async ({
     );
     const asset = await umi.rpc.getAsset(publicKey(mint));
     const assetProof = await umi.rpc.getAssetProof(publicKey(mint));
-    const assetWithProof = createAssetWithProof(asset, assetProof);
+    // const assetWithProof = createAssetWithProof(asset, assetProof);
+    const assetWithProof = await getAssetWithProof(umi, publicKey(mint), {truncateCanopy: true})
     let cnftTransferBuilder = cnftTransfer(umi, {
       ...assetWithProof,
       leafOwner: createNoopSigner(publicKey(fromAccountAddress)),
