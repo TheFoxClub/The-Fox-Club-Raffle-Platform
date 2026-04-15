@@ -71,7 +71,21 @@ export default function PeriodicLeaderboard() {
 
   const formatDate = (value?: string) => {
     if (!value) return "-";
-    return new Date(value).toLocaleDateString();
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "-";
+
+    const date = parsed.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    const time = parsed.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    return `${date} ${time}`;
   };
 
   const copyToClipboard = async (text: string) => {
@@ -80,6 +94,34 @@ export default function PeriodicLeaderboard() {
       toast.success("Wallet address copied");
     } catch {
       toast.error("Failed to copy wallet address");
+    }
+  };
+
+  const getPeriodStatus = (startDate?: string, endDate?: string) => {
+    if (!startDate || !endDate) return null;
+
+    const now = new Date();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (now < start) {
+      return {
+        status: "Upcoming",
+        color: "bg-accent border-accent shadow-[0_0_20px_var(--accent)]",
+        textColor: "text-white",
+      };
+    } else if (now > end) {
+      return {
+        status: "Ended",
+        color: "bg-muted border-border shadow-[0_0_20px_var(--muted)]",
+        textColor: "text-white",
+      };
+    } else {
+      return {
+        status: "Ongoing",
+        color: "bg-primary border-primary shadow-[0_0_20px_var(--primary)]",
+        textColor: "text-white",
+      };
     }
   };
 
@@ -137,6 +179,19 @@ export default function PeriodicLeaderboard() {
                     {data.airdrop.airdropName || "Latest Airdrop"}
                   </h2>
                 </div>
+                {getPeriodStatus(data.airdrop.startDate, data.airdrop.endDate) && (
+                  <div
+                    className={`px-4 py-2 rounded-lg border font-semibold ${
+                      getPeriodStatus(data.airdrop.startDate, data.airdrop.endDate)?.color
+                    }`}
+                  >
+                    <span
+                      className={getPeriodStatus(data.airdrop.startDate, data.airdrop.endDate)?.textColor}
+                    >
+                      {getPeriodStatus(data.airdrop.startDate, data.airdrop.endDate)?.status}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -16,6 +16,7 @@ import {
   Wallet,
   AlertTriangle,
   Users2,
+  Info,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Progress } from "../../components/ui/Progress";
@@ -30,6 +31,14 @@ import { getVerifiedPaymentTokens } from "../raffle/api";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import { Input } from "../../components/ui/Input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../../components/ui/Dialog";
 
 type EligibleWallet = {
   id: number;
@@ -64,6 +73,21 @@ type Airdrop = {
   createdAt: string;
 };
 
+type ClaimablePreviewRecipient = {
+  pubKey: string;
+  xp: number;
+  amount: number;
+};
+
+type ClaimablePreview = {
+  airdropId: number;
+  airdropName?: string;
+  tokenSymbol: string | null;
+  totalReceivers: number;
+  totalAmount: number;
+  recipients: ClaimablePreviewRecipient[];
+};
+
 const AIRDROP_STATUS_LABELS: Record<number, string> = {
   0: "Draft",
   1: "Pending",
@@ -83,6 +107,66 @@ const AIRDROP_STATUS_COLORS: Record<number, string> = {
 };
 
 const LEADERBOARD_PAGE_SIZE = 10;
+
+const toLocalDateTimeInput = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const normalizeDateTimeInput = (value: string, boundary: "start" | "end") => {
+  if (!value) return value;
+
+  const rawValue = value.trim();
+  const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(rawValue);
+
+  if (hasTimezone) {
+    return new Date(rawValue).toISOString();
+  }
+
+  const normalizedValue = rawValue.includes(" ")
+    ? rawValue.replace(" ", "T")
+    : rawValue;
+
+  const dateMatch = normalizedValue.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/,
+  );
+
+  if (!dateMatch) return normalizedValue;
+
+  const [, year, month, day, hour, minute, second, millisecond] = dateMatch;
+  const localDate = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    hour ? Number(hour) : boundary === "end" ? 23 : 0,
+    minute ? Number(minute) : boundary === "end" ? 59 : 0,
+    second ? Number(second) : 0,
+    millisecond ? Number(millisecond.padEnd(3, "0")) : 0,
+  );
+
+  return localDate.toISOString();
+};
+
+const parseAsUtcDate = (value?: string) => {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+  const normalized = raw.includes(" ") ? raw.replace(" ", "T") : raw;
+  const utcInput = hasTimezone ? normalized : `${normalized}Z`;
+  const parsed = new Date(utcInput);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
 export default function AdminRewards() {
   // const { toast } = useToast();
@@ -108,17 +192,19 @@ export default function AdminRewards() {
   const [selectedStartDate, setSelectedStartDate] = useState(() => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    return start.toISOString().split("T")[0];
+    return toLocalDateTimeInput(start);
   });
   const [selectedEndDate, setSelectedEndDate] = useState(() => {
-    return new Date().toISOString().split("T")[0];
+    const end = new Date();
+    end.setHours(23, 59, 0, 0);
+    return toLocalDateTimeInput(end);
   });
   const [airdropName, setAirdropName] = useState("");
-  const todayDate = new Date().toISOString().split("T")[0];
   const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>(
     [],
   );
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
   const [leaderboardLimit, setLeaderboardLimit] = useState(
     LEADERBOARD_PAGE_SIZE,
   );
@@ -132,6 +218,12 @@ export default function AdminRewards() {
   const [airdrops, setAirdrops] = useState<Airdrop[]>([]);
   const [totalAirdropAmount, setTotalAirdropAmount] = useState<number>(0);
   const [creatingAirdrop, setCreatingAirdrop] = useState(false);
+  const [claimablePreviewOpen, setClaimablePreviewOpen] = useState(false);
+  const [claimablePreviewLoading, setClaimablePreviewLoading] =
+    useState(false);
+  const [confirmingClaimable, setConfirmingClaimable] = useState(false);
+  const [claimablePreview, setClaimablePreview] =
+    useState<ClaimablePreview | null>(null);
 
   // Token selection (similar to CreateRaffle)
   const [tokenOptions, setTokenOptions] = useState<
@@ -177,11 +269,26 @@ export default function AdminRewards() {
     if (!value) return "N/A";
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return "N/A";
-    return parsed.toLocaleDateString("en-US", {
+    const date = parsed.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
+    const time = parsed.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    return `${date} ${time}`;
+  };
+
+  const isEndDateReached = (value?: string) => {
+    const endDateUtc = parseAsUtcDate(value);
+    if (!endDateUtc) return false;
+
+    // Compare epoch timestamps so gating is based on UTC instant.
+    return Date.now() >= endDateUtc.getTime();
   };
 
   const mapNumericTokenType = (numericTokenType: number): string => {
@@ -281,18 +388,22 @@ export default function AdminRewards() {
   // Fetch leaderboard for the selected date range
   const fetchPeriodLeaderboard = async (page = 1) => {
     try {
-      if (!selectedStartDate || !selectedEndDate) {
+      const normalizedStartDate = normalizeDateTimeInput(
+        selectedStartDate,
+        "start",
+      );
+      const normalizedEndDate = normalizeDateTimeInput(
+        selectedEndDate,
+        "end",
+      );
+
+      if (!normalizedStartDate || !normalizedEndDate) {
         toast.error("Please select both start and end dates");
         return;
       }
 
-      if (new Date(selectedStartDate) > new Date(selectedEndDate)) {
+      if (new Date(normalizedStartDate) > new Date(normalizedEndDate)) {
         toast.error("Start date cannot be after end date");
-        return;
-      }
-
-      if (selectedEndDate > todayDate) {
-        toast.error("End date cannot be in the future");
         return;
       }
 
@@ -303,8 +414,8 @@ export default function AdminRewards() {
 
       setLeaderboardLoading(true);
       const params = new URLSearchParams({
-        startDate: selectedStartDate,
-        endDate: selectedEndDate,
+        startDate: normalizedStartDate,
+        endDate: normalizedEndDate,
         page: String(page),
         limit: hasLeaderboardLimit? String(leaderboardLimit) : "-1",
       });
@@ -321,6 +432,7 @@ export default function AdminRewards() {
           }),
         );
         setLeaderboardUsers(usersWithSelection);
+        setLeaderboardLoaded(true);
 
         const pagination = res.data.data.pagination || {
           total: usersWithSelection.length,
@@ -329,6 +441,10 @@ export default function AdminRewards() {
           totalPages: usersWithSelection.length > 0 ? 1 : 0,
         };
         setLeaderboardPagination(pagination);
+
+        if ((pagination.total || 0) === 0) {
+          toast.info("Currently no participants for the selected date.");
+        }
 
         // Auto-distribute using proportional-to-XP method
         if (totalAirdropAmount > 0) {
@@ -367,13 +483,25 @@ export default function AdminRewards() {
 
   // Create airdrop with token transfer
   const createAirdrop = async () => {
+    const normalizedStartDate = normalizeDateTimeInput(
+      selectedStartDate,
+      "start",
+    );
+    const normalizedEndDate = normalizeDateTimeInput(selectedEndDate, "end");
 
     const selectedUsers = leaderboardUsers.filter(
       (u) => u.rewardAmount && u.rewardAmount > 0,
     );
+    const noParticipantsForRange =
+      leaderboardLoaded && leaderboardPagination.total === 0;
+
+    const enteredTotalAmount = Number(totalAirdropAmount || 0);
+    const totalDistributed = noParticipantsForRange
+      ? enteredTotalAmount
+      : selectedUsers.reduce((sum, u) => sum + (u.rewardAmount || 0), 0);
 
     // Validation
-    if (selectedUsers.length === 0) {
+    if (selectedUsers.length === 0 && !noParticipantsForRange) {
       toast.error("Please select at least one recipient with a reward amount");
       return;
     }
@@ -388,6 +516,16 @@ export default function AdminRewards() {
       return;
     }
 
+    if (!normalizedStartDate || !normalizedEndDate) {
+      toast.error("Please enter both start and end date/time");
+      return;
+    }
+
+    if (new Date(normalizedStartDate) > new Date(normalizedEndDate)) {
+      toast.error("Start date cannot be after end date");
+      return;
+    }
+
     // Check wallet connection
     if (!connected || !publicKey) {
       toast.error("Please connect your wallet to fund the airdrop");
@@ -399,10 +537,10 @@ export default function AdminRewards() {
       return;
     }
 
-    const totalDistributed = selectedUsers.reduce(
-      (sum, u) => sum + (u.rewardAmount || 0),
-      0,
-    );
+    if (totalDistributed <= 0) {
+      toast.error("Please enter a total amount greater than 0");
+      return;
+    }
 
     try {
       setCreatingAirdrop(true);
@@ -426,7 +564,6 @@ export default function AdminRewards() {
       const {
         transaction: serializedTx,
         checksum,
-        fundingData,
       } = prepareRes.data.data;
 
       // Step 2: Deserialize and sign transaction
@@ -470,23 +607,17 @@ export default function AdminRewards() {
       // Step 4: Submit signed tx + create airdrop campaign records
       toast.info("Creating airdrop...");
 
-      // Backend calculates each user's amount as: (xp / totalXp) * totalAmount
-      const totalXp = selectedUsers.reduce((sum, u) => sum + u.periodXp, 0);
-
       const confirmRes = await server.post("/airdrop/confirm-funding", {
         airdropName: airdropName.trim(),
-        startDate: selectedStartDate,
-        endDate: selectedEndDate,
+        startDate: normalizedStartDate,
+        endDate: normalizedEndDate,
         totalAmount: totalDistributed,
         rewardType: selectedToken.tokenType,
         tokenAddress: selectedToken.value,
         tokenSymbol: selectedToken.label,
         tokenDecimals: selectedToken.decimals,
-        recipients: selectedUsers.map((u) => ({
-          pubKey: u.walletAddress,
-          xp: u.periodXp,
-        })),
-        totalXp,
+        hasLeaderboardLimit,
+        leaderboardLimit: hasLeaderboardLimit ? leaderboardLimit : null,
         signedTransaction: signedTxBase64,
         checksum,
         fromAddress: publicKey.toString(),
@@ -567,6 +698,49 @@ export default function AdminRewards() {
           error.message ||
           "Failed to update status",
       );
+    }
+  };
+
+  const openMakeClaimablePreview = async (id: number) => {
+    try {
+      setClaimablePreviewLoading(true);
+      const res = await server.get(`/airdrop/${id}/make-claimable/preview`);
+
+      if (!res.data.success) {
+        throw new Error(res.data.message || "Failed to preview claimable data");
+      }
+
+      setClaimablePreview(res.data.data);
+      setClaimablePreviewOpen(true);
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to preview claimable data",
+      );
+    } finally {
+      setClaimablePreviewLoading(false);
+    }
+  };
+
+  const confirmMakeAirdropClaimable = async () => {
+    if (!claimablePreview?.airdropId) return;
+
+    try {
+      setConfirmingClaimable(true);
+      await server.post(`/airdrop/${claimablePreview.airdropId}/make-claimable`);
+      toast.success("Airdrop is now claimable");
+      setClaimablePreviewOpen(false);
+      setClaimablePreview(null);
+      fetchAirdrops();
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to make airdrop claimable",
+      );
+    } finally {
+      setConfirmingClaimable(false);
     }
   };
 
@@ -871,10 +1045,10 @@ export default function AdminRewards() {
             <div className="flex gap-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">
-                  Start Date
+                  Start Date & Time
                 </label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={selectedStartDate}
                   onChange={(e) => setSelectedStartDate(e.target.value)}
                   className="border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
@@ -882,23 +1056,12 @@ export default function AdminRewards() {
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">
-                  End Date
+                  End Date & Time
                 </label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={selectedEndDate}
-                  onChange={(e) => {
-                    const nextEndDate = e.target.value;
-                    if (nextEndDate > todayDate) {
-                      setSelectedEndDate(todayDate);
-                      toast.warning(
-                        "End date cannot be in the future. Using today's date.",
-                      );
-                      return;
-                    }
-                    setSelectedEndDate(nextEndDate);
-                  }}
-                  max={todayDate}
+                  onChange={(e) => setSelectedEndDate(e.target.value)}
                   className="border border-input rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background"
                 />
               </div>
@@ -919,7 +1082,7 @@ export default function AdminRewards() {
         </div>
 
         {/* Distribution Settings */}
-        {leaderboardUsers.length > 0 && (
+        {leaderboardLoaded && (
           <div className="border-t border-border/30 pt-4">
             <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
               <Coins className="h-4 w-4" />
@@ -948,74 +1111,88 @@ export default function AdminRewards() {
             </div>
 
             {/* Recipients Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="max-h-80 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 sticky top-0">
-                    <tr>
-                      <th className="p-2 text-left">Rank</th>
-                      <th className="p-2 text-left">Wallet</th>
-                      <th className="p-2 text-left">Period XP</th>
-                      <th className="p-2 text-left">
-                        Reward ({selectedTokenSymbol})
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaderboardUsers.map((user) => (
-                      <tr
-                        key={user.userId}
-                        className="border-t border-border/30 bg-primary/5"
-                      >
-                        <td className="p-2">
-                          <span
-                            className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                              user.rank === 1
-                                ? "bg-yellow-500/20 text-yellow-400"
-                                : user.rank === 2
-                                  ? "bg-gray-400/20 text-gray-300"
-                                  : user.rank === 3
-                                    ? "bg-orange-500/20 text-orange-400"
-                                    : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {user.rank}
-                          </span>
-                        </td>
-                        <td className="p-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs">
-                              {shortWallet(user.walletAddress)}
-                            </span>
-                            {user.username && (
-                              <span className="text-xs text-muted-foreground">
-                                ({user.username})
-                              </span>
-                            )}
-                            <button
-                              onClick={() =>
-                                copyToClipboard(user.walletAddress)
-                              }
-                              className="text-muted-foreground hover:text-primary"
-                            >
-                              <Copy className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="p-2 font-semibold">
-                          {user.periodXp.toLocaleString()}
-                        </td>
-                        <td className="p-2">
-                          <span className="font-medium">
-                            {(user.rewardAmount || 0).toFixed(6)}
-                          </span>
-                        </td>
+            {leaderboardUsers.length > 0 ? (
+              <div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <Info className="h-4 w-4" />
+                  This table is not indicating final distribution amounts.
+                </div>
+              <div className="border rounded-lg overflow-hidden">
+                <div className="max-h-80 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="p-2 text-left">Rank</th>
+                        <th className="p-2 text-left">Wallet</th>
+                        <th className="p-2 text-left">Period XP</th>
+                        <th className="p-2 text-left">
+                          Reward ({selectedTokenSymbol})
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {leaderboardUsers.map((user) => (
+                        <tr
+                          key={user.userId}
+                          className="border-t border-border/30 bg-primary/5"
+                        >
+                          <td className="p-2">
+                            <span
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                                user.rank === 1
+                                  ? "bg-yellow-500/20 text-yellow-400"
+                                  : user.rank === 2
+                                    ? "bg-gray-400/20 text-gray-300"
+                                    : user.rank === 3
+                                      ? "bg-orange-500/20 text-orange-400"
+                                      : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {user.rank}
+                            </span>
+                          </td>
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs">
+                                {shortWallet(user.walletAddress)}
+                              </span>
+                              {user.username && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({user.username})
+                                </span>
+                              )}
+                              <button
+                                onClick={() =>
+                                  copyToClipboard(user.walletAddress)
+                                }
+                                className="text-muted-foreground hover:text-primary"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="p-2 font-semibold">
+                            {user.periodXp.toLocaleString()}
+                          </td>
+                          <td className="p-2">
+                            <span className="font-medium">
+                              {(user.rewardAmount || 0).toFixed(6)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+              </div>
+            ) : (
+              <div className="border rounded-lg p-4 text-sm text-muted-foreground bg-muted/20">
+                Currently no participants for the selected date. You can still
+                fund and create this airdrop now. Leaderboard XP will update in
+                real time until the airdrop end date.
+              </div>
+            )}
 
             <div className="mt-3 flex items-center justify-between text-sm">
               <p className="text-muted-foreground">
@@ -1094,7 +1271,10 @@ export default function AdminRewards() {
                 disabled={
                   creatingAirdrop ||
                   !connected ||
-                  leaderboardUsers.filter((u) => u.rewardAmount).length === 0
+                  (
+                    leaderboardUsers.filter((u) => u.rewardAmount).length === 0 &&
+                    !(leaderboardLoaded && leaderboardPagination.total === 0)
+                  )
                 }
                 className="gradient-primary"
                 title={!connected ? "Connect wallet to create airdrop" : ""}
@@ -1156,14 +1336,17 @@ export default function AdminRewards() {
                       <div className="flex gap-2">
                         {airdrop.status === 2 && (
                           <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateAirdropStatus(airdrop.id, 3)}
-                              title="Make Claimable"
-                            >
-                              <Check className="h-3 w-3 mr-1" /> Make Claimable
-                            </Button>
+                            {isEndDateReached(airdrop.endDate) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openMakeClaimablePreview(airdrop.id)}
+                                disabled={claimablePreviewLoading}
+                                title="Make Claimable"
+                              >
+                                <Check className="h-3 w-3 mr-1" /> Make Claimable
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
@@ -1193,6 +1376,80 @@ export default function AdminRewards() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={claimablePreviewOpen}
+        onOpenChange={(open) => {
+          setClaimablePreviewOpen(open);
+          if (!open) {
+            setClaimablePreview(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Confirm Make Claimable</DialogTitle>
+            <DialogDescription>
+              Review planned claimable allocations before confirming.
+            </DialogDescription>
+          </DialogHeader>
+
+          {claimablePreview ? (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  Airdrop: {claimablePreview.airdropName || `#${claimablePreview.airdropId}`}
+                </p>
+                <p>
+                  Total Receivers: {claimablePreview.totalReceivers} | Total Amount: {Number(claimablePreview.totalAmount || 0).toFixed(6)} {claimablePreview.tokenSymbol || selectedTokenSymbol}
+                </p>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto border rounded-md">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 sticky top-0">
+                    <tr>
+                      <th className="p-2 text-left">Pubkey</th>
+                      <th className="p-2 text-left">XP</th>
+                      <th className="p-2 text-left">Planned Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {claimablePreview.recipients.map((recipient) => (
+                      <tr key={recipient.pubKey} className="border-t border-border/30">
+                        <td className="p-2 font-mono text-xs break-all">{recipient.pubKey}</td>
+                        <td className="p-2">{Number(recipient.xp || 0).toLocaleString()}</td>
+                        <td className="p-2">{Number(recipient.amount || 0).toFixed(9)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No preview data available.</p>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setClaimablePreviewOpen(false);
+                setClaimablePreview(null);
+              }}
+              disabled={confirmingClaimable}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmMakeAirdropClaimable}
+              disabled={!claimablePreview || confirmingClaimable}
+            >
+              {confirmingClaimable ? "Confirming..." : "Confirm & Make Claimable"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Eligible Wallets Section */}
       {/*(<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">

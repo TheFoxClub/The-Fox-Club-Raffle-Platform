@@ -39,6 +39,191 @@ const AIRDROP_STATUS = AirdropDetail.STATUS;
 const REWARD_TYPE = AirdropDetail.REWARD_TYPE;
 const USER_REWARD_STATUS = UserAirdropReward.STATUS;
 
+const normalizeDateTimeInput = (value, boundary = "start") => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return new Date(value);
+  }
+
+  const rawValue = String(value).trim();
+  // Checks for Trailing Z (UTC) or timezone offset like +00:00 or -0700 to determine if it's already in ISO format with timezone
+  const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(rawValue);
+
+  if (hasTimezone) {
+    return new Date(rawValue);
+  }
+
+  const normalizedValue = rawValue.includes(" ")
+    ? rawValue.replace(" ", "T")
+    : rawValue;
+
+  // Checks for YYYY-MM-DDTHH:MM:SS.MS where SS and MS are optional. Eg: 2025-12-31T14:30:22.123
+  const dateMatch = normalizedValue.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/,
+  );
+
+  if (!dateMatch) {
+    return new Date(normalizedValue);
+  }
+
+  const [, year, month, day, hour, minute, second, millisecond] = dateMatch;
+  return new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      hour ? Number(hour) : boundary === "end" ? 23 : 0,
+      minute ? Number(minute) : boundary === "end" ? 59 : 0,
+      second ? Number(second) : 0,
+      millisecond ? Number(millisecond.padEnd(3, "0")) : 0,
+    ),
+  );
+};
+
+// Builds the ranking using the formula: user rank(position) = (amount of XP earned by user in the period / total XP earned by all users in the period) * total airdrop amount
+const buildXpLeaderboardForRange = async ({
+  rangeStart,
+  rangeEnd,
+  page = 1,
+  limit = 10,
+}) => {
+  const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+  const rawLimit = parseInt(limit, 10);
+  const parsedLimit = rawLimit === -1 ? -1 : Math.max(rawLimit || 10, 1);
+
+  const topEarners = await XpTable.findAll({
+    attributes: [
+      "userId",
+      [sequelize.fn("SUM", sequelize.col("xpEarned")), "periodXp"],
+      [sequelize.fn("SUM", sequelize.col("usdValue")), "periodUsdValue"],
+      [sequelize.fn("COUNT", sequelize.col("XpTable.id")), "transactionCount"],
+    ],
+    where: {
+      createdAt: {
+        [Op.gte]: rangeStart,
+        [Op.lte]: rangeEnd,
+      },
+    },
+    group: ["userId"],
+    order: [[sequelize.fn("SUM", sequelize.col("xpEarned")), "DESC"]],
+    raw: true,
+  });
+
+  const totalParticipants = topEarners.length;
+  let paginatedEarners;
+  let totalPages;
+  let offset = 0;
+
+  if (parsedLimit === -1) {
+    paginatedEarners = topEarners;
+    totalPages = totalParticipants > 0 ? 1 : 0;
+  } else {
+    totalPages =
+      totalParticipants > 0 ? Math.ceil(totalParticipants / parsedLimit) : 0;
+    offset = (parsedPage - 1) * parsedLimit;
+    paginatedEarners = topEarners.slice(offset, offset + parsedLimit);
+  }
+
+  const leaderboard = await Promise.all(
+    paginatedEarners.map(async (earner, index) => {
+      const user = await User.findByPk(earner.userId, {
+        attributes: ["id", "pubkey", "totalXp"],
+        include: [
+          {
+            model: UserInfo,
+            attributes: ["username"],
+            required: false,
+          },
+        ],
+      });
+
+      return {
+        rank: offset + index + 1,
+        userId: earner.userId,
+        walletAddress: user?.pubkey || "Unknown",
+        username: user?.user_info?.username || null,
+        periodXp: parseFloat(earner.periodXp || 0),
+        periodUsdValue: parseFloat(earner.periodUsdValue || 0),
+        transactionCount: parseInt(earner.transactionCount || 0, 10),
+        allTimeXp: parseFloat(user?.totalXp || 0),
+      };
+    }),
+  );
+
+  return {
+    parsedPage,
+    parsedLimit,
+    totalParticipants,
+    totalPages,
+    leaderboard,
+  };
+};
+
+const getMakeClaimablePlan = async ({ airdrop }) => {
+  const now = new Date();
+  const campaignEndDate = normalizeDateTimeInput(airdrop.endDate, "end");
+
+  if (now < campaignEndDate) {
+    throw new Error("Airdrop can only be made claimable after endDate is reached");
+  }
+
+  const config = airdrop.activationConfig || {};
+  const hasLeaderboardLimit = Boolean(config.hasLeaderboardLimit);
+  const configuredLimit = parseInt(config.leaderboardLimit, 10);
+  const limit =
+    hasLeaderboardLimit && !Number.isNaN(configuredLimit)
+      ? Math.max(configuredLimit, 1)
+      : -1;
+
+  const rangeStart = normalizeDateTimeInput(airdrop.startDate, "start");
+  const rangeEnd = normalizeDateTimeInput(airdrop.endDate, "end");
+
+  const leaderboardData = await buildXpLeaderboardForRange({
+    rangeStart,
+    rangeEnd,
+    page: 1,
+    limit,
+  });
+
+  const validRecipients = leaderboardData.leaderboard.filter(
+    (item) => item.walletAddress && item.walletAddress !== "Unknown",
+  );
+
+  if (!validRecipients.length) {
+    throw new Error("No eligible recipients found for this airdrop range");
+  }
+
+  const parsedTotalAmount = parseFloat(airdrop.totalAmount || 0);
+  const totalXp = validRecipients.reduce(
+    (sum, user) => sum + parseFloat(user.periodXp || 0),
+    0,
+  );
+
+  if (totalXp <= 0 || parsedTotalAmount <= 0) {
+    throw new Error(
+      "Cannot create rewards because total XP or total amount is invalid",
+    );
+  }
+
+  const recipients = validRecipients.map((recipient) => {
+    const userXp = parseFloat(recipient.periodXp || 0);
+    const amount = parseFloat(((userXp / totalXp) * parsedTotalAmount).toFixed(9));
+
+    return {
+      pubKey: recipient.walletAddress,
+      xp: userXp,
+      amount,
+    };
+  });
+
+  return {
+    recipients,
+    totalXp,
+    totalAmount: parsedTotalAmount,
+  };
+};
+
 const decodeSignedTransaction = (signedTransaction) => {
   const txBytes = Buffer.from(signedTransaction, "base64");
 
@@ -117,13 +302,12 @@ const validateTransactionChecksum = (tx, isVersioned, checksum) => {
 class AirdropController {
   /**
    * Public periodic leaderboard based on the latest airdrop period.
-   * Uses latest airdrop and ranks users by XP stored in user_airdrop_rewards.
+   * Uses the latest airdrop period and ranks users by XP earned in that date range.
    */
   static async getLatestPeriodicLeaderboard(req, res) {
     try {
       const parsedPage = Math.max(parseInt(req.query.page, 10) || 1, 1);
       const parsedLimit = Math.max(parseInt(req.query.limit, 10) || 50, 1);
-      const offset = (parsedPage - 1) * parsedLimit;
 
       const latestAirdropRows = await sequelize.query(
         `
@@ -149,8 +333,8 @@ class AirdropController {
       }
 
       const latestAirdrop = latestAirdropRows[0];
-      const rangeStart = new Date(latestAirdrop.startDate);
-      const rangeEnd = new Date(latestAirdrop.endDate);
+      const rangeStart = normalizeDateTimeInput(latestAirdrop.startDate, "start");
+      const rangeEnd = normalizeDateTimeInput(latestAirdrop.endDate, "end");
 
       if (
         Number.isNaN(rangeStart.getTime()) ||
@@ -163,57 +347,15 @@ class AirdropController {
         );
       }
 
-      rangeStart.setHours(0, 0, 0, 0);
-      rangeEnd.setHours(23, 59, 59, 999);
       const normalizedStartDate = rangeStart.toISOString();
       const normalizedEndDate = rangeEnd.toISOString();
 
-      const rewardRows = await UserAirdropReward.findAll({
-        attributes: [
-          "pubKey",
-          [sequelize.fn("SUM", sequelize.col("xp")), "periodXp"],
-          [
-            sequelize.fn("COUNT", sequelize.col("UserAirdropReward.id")),
-            "transactionCount",
-          ],
-        ],
-        where: {
-          airdropRewardId: latestAirdrop.id,
-        },
-        group: ["pubKey"],
-        order: [[sequelize.fn("SUM", sequelize.col("xp")), "DESC"]],
-        raw: true,
+      const leaderboardData = await buildXpLeaderboardForRange({
+        rangeStart,
+        rangeEnd,
+        page: parsedPage,
+        limit: parsedLimit,
       });
-
-      const total = rewardRows.length;
-      const totalPages = total > 0 ? Math.ceil(total / parsedLimit) : 0;
-      const pageRows = rewardRows.slice(offset, offset + parsedLimit);
-
-      const users = await Promise.all(
-        pageRows.map(async (row, index) => {
-          const dbUser = await User.findOne({
-            where: { pubkey: row.pubKey },
-            attributes: ["id", "pubkey", "totalXp"],
-            include: [
-              {
-                model: UserInfo,
-                attributes: ["username"],
-                required: false,
-              },
-            ],
-          });
-
-          return {
-            rank: offset + index + 1,
-            userId: dbUser?.id || 0,
-            walletAddress: dbUser?.pubkey || row.pubKey || "Unknown",
-            username: dbUser?.user_info?.username || null,
-            periodXp: parseFloat(row.periodXp || 0),
-            transactionCount: parseInt(row.transactionCount || 0, 10),
-            allTimeXp: parseFloat(dbUser?.totalXp || 0),
-          };
-        }),
-      );
 
       return respond(
         res,
@@ -229,17 +371,17 @@ class AirdropController {
             tokenAddress: latestAirdrop.tokenAddress || null,
             createdAt: latestAirdrop.createdAt,
           },
-          users,
+          users: leaderboardData.leaderboard,
           pagination: {
-            total,
-            page: parsedPage,
-            limit: parsedLimit,
-            totalPages,
+            total: leaderboardData.totalParticipants,
+            page: leaderboardData.parsedPage,
+            limit: leaderboardData.parsedLimit,
+            totalPages: leaderboardData.totalPages,
           },
         },
       );
     } catch (err) {
-      logger.error("Error fetching periodic leaderboard:", err);
+      logger.error("Error fetching periodic XP leaderboard:", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
@@ -249,20 +391,13 @@ class AirdropController {
   }
 
   /**
-   * Get periodic XP leaderboard for airdrop recipient selection
+   * Get periodic XP leaderboard for airdrop recipient selection.
    */
   static async getXpLeaderboard(req, res) {
     try {
       const { startDate, endDate, page = 1, limit = 10 } = req.query;
-      const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
-      const rawLimit = parseInt(limit, 10);
-      const parsedLimit = rawLimit === -1 ? -1 : Math.max(rawLimit || 10, 1);
 
-      const hasCustomRange = Boolean(startDate && endDate);
-      let rangeStart;
-      let rangeEnd;
-
-      if (!hasCustomRange) {
+      if (!startDate || !endDate) {
         return respond(
           res,
           httpStatus.BAD_REQUEST,
@@ -270,8 +405,8 @@ class AirdropController {
         );
       }
 
-      rangeStart = new Date(startDate);
-      rangeEnd = new Date(endDate);
+      const rangeStart = normalizeDateTimeInput(startDate, "start");
+      const rangeEnd = normalizeDateTimeInput(endDate, "end");
 
       if (
         Number.isNaN(rangeStart.getTime()) ||
@@ -283,9 +418,6 @@ class AirdropController {
           "Invalid startDate or endDate format",
         );
       }
-
-      rangeStart.setHours(0, 0, 0, 0);
-      rangeEnd.setHours(23, 59, 59, 999);
 
       if (rangeStart > rangeEnd) {
         return respond(
@@ -299,75 +431,12 @@ class AirdropController {
         `Fetching XP leaderboard from ${rangeStart.toISOString()} to ${rangeEnd.toISOString()}`,
       );
 
-      const topEarners = await XpTable.findAll({
-        attributes: [
-          "userId",
-          [sequelize.fn("SUM", sequelize.col("xpEarned")), "periodXp"],
-          [sequelize.fn("SUM", sequelize.col("usdValue")), "periodUsdValue"],
-          [
-            sequelize.fn("COUNT", sequelize.col("XpTable.id")),
-            "transactionCount",
-          ],
-        ],
-        where: {
-          createdAt: {
-            [Op.gte]: rangeStart,
-            [Op.lte]: rangeEnd,
-          },
-        },
-        group: ["userId"],
-        order: [[sequelize.fn("SUM", sequelize.col("xpEarned")), "DESC"]],
-        raw: true,
+      const leaderboardData = await buildXpLeaderboardForRange({
+        rangeStart,
+        rangeEnd,
+        page,
+        limit,
       });
-
-      const totalParticipants = topEarners.length;
-      // const totalPages = totalParticipants > 0 ? Math.ceil(totalParticipants / parsedLimit) : 0;
-      // const offset = (parsedPage - 1) * parsedLimit;
-      // const paginatedEarners = topEarners.slice(offset, offset + parsedLimit);
-
-      let paginatedEarners;
-      let totalPages;
-      let offset = 0;
-
-      if (parsedLimit === -1) {
-        // No limit → return everything
-        paginatedEarners = topEarners;
-        totalPages = 1;
-      } else {
-        totalPages =
-          totalParticipants > 0
-            ? Math.ceil(totalParticipants / parsedLimit)
-            : 0;
-
-        offset = (parsedPage - 1) * parsedLimit;
-        paginatedEarners = topEarners.slice(offset, offset + parsedLimit);
-      }
-
-      const enrichedEarners = await Promise.all(
-        paginatedEarners.map(async (earner, index) => {
-          const user = await User.findByPk(earner.userId, {
-            attributes: ["id", "pubkey", "totalXp"],
-            include: [
-              {
-                model: UserInfo,
-                attributes: ["username"],
-                required: false,
-              },
-            ],
-          });
-
-          return {
-            rank: offset + index + 1,
-            userId: earner.userId,
-            walletAddress: user?.pubkey || "Unknown",
-            username: user?.user_info?.username || null,
-            periodXp: parseFloat(earner.periodXp || 0),
-            periodUsdValue: parseFloat(earner.periodUsdValue || 0),
-            transactionCount: parseInt(earner.transactionCount || 0),
-            allTimeXp: parseFloat(user?.totalXp || 0),
-          };
-        }),
-      );
 
       return respond(
         res,
@@ -379,13 +448,13 @@ class AirdropController {
             startDate: rangeStart.toISOString(),
             endDate: rangeEnd.toISOString(),
           },
-          totalParticipants,
-          leaderboard: enrichedEarners,
+          totalParticipants: leaderboardData.totalParticipants,
+          leaderboard: leaderboardData.leaderboard,
           pagination: {
-            total: totalParticipants,
-            page: parsedPage,
-            limit: parsedLimit,
-            totalPages,
+            total: leaderboardData.totalParticipants,
+            page: leaderboardData.parsedPage,
+            limit: leaderboardData.parsedLimit,
+            totalPages: leaderboardData.totalPages,
           },
         },
       );
@@ -497,10 +566,7 @@ class AirdropController {
       }
 
       const validTransitions = {
-        [AIRDROP_STATUS.FUNDED]: [
-          AIRDROP_STATUS.ACTIVE,
-          AIRDROP_STATUS.CANCELLED,
-        ],
+        [AIRDROP_STATUS.FUNDED]: [AIRDROP_STATUS.CANCELLED],
         [AIRDROP_STATUS.ACTIVE]: [
           AIRDROP_STATUS.COMPLETED,
           AIRDROP_STATUS.CANCELLED,
@@ -660,14 +726,8 @@ class AirdropController {
   }
 
   /**
-   * Confirm airdrop funding and create the campaign + per-user reward records.
-   *
-   * Frontend sends:
-   *   - recipients: [{ pubKey: string, xp: number }]
-   *   - totalXp: number  (sum of all selected recipients' XP — used as denominator)
-   *
-   * Backend calculates each user's token amount as:
-   *   amount = (recipient.xp / totalXp) * totalAmount
+   * Confirm airdrop funding and create the campaign.
+   * Per-user rewards are generated later when make-claimable is explicitly confirmed.
    */
   static async confirmAirdropFunding(req, res) {
     const transaction = await sequelize.transaction();
@@ -682,15 +742,15 @@ class AirdropController {
         tokenSymbol,
         tokenDecimals,
         totalAmount,
-        recipients, // Array of { pubKey: string, xp: number }
-        totalXp, // Sum of all selected users' XP (denominator for proportion)
+        hasLeaderboardLimit,
+        leaderboardLimit,
         signedTransaction,
         checksum,
         fromAddress,
       } = req.body;
 
       logger.info(
-        `Confirming airdrop funding: amount=${totalAmount}, recipients=${recipients?.length}`,
+        `Confirming airdrop funding: amount=${totalAmount}`,
       );
 
       if (!signedTransaction || !checksum) {
@@ -699,40 +759,6 @@ class AirdropController {
           res,
           httpStatus.BAD_REQUEST,
           "signedTransaction and checksum are required",
-        );
-      }
-
-      if (!recipients || recipients.length === 0) {
-        await transaction.rollback();
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "At least one recipient is required",
-        );
-      }
-
-      if (!totalXp || parseFloat(totalXp) <= 0) {
-        await transaction.rollback();
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "totalXp must be greater than 0",
-        );
-      }
-
-      const invalidRecipient = recipients.find(
-        (recipient) =>
-          !recipient?.pubKey ||
-          Number.isNaN(parseFloat(recipient?.xp)) ||
-          parseFloat(recipient?.xp) <= 0,
-      );
-
-      if (invalidRecipient) {
-        await transaction.rollback();
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Each recipient must include valid pubKey and xp values",
         );
       }
 
@@ -759,8 +785,8 @@ class AirdropController {
         );
       }
 
-      const parsedStartDate = new Date(startDate);
-      const parsedEndDate = new Date(endDate);
+      const parsedStartDate = normalizeDateTimeInput(startDate, "start");
+      const parsedEndDate = normalizeDateTimeInput(endDate, "end");
 
       if (
         Number.isNaN(parsedStartDate.getTime()) ||
@@ -865,18 +891,18 @@ class AirdropController {
 
       const airdropWalletAddress = AirdropWallet.getWalletAddress();
       const parsedTotalAmount = parseFloat(totalAmount);
-      const parsedTotalXp = parseFloat(totalXp);
-      const recipientsTotalXp = recipients.reduce(
-        (sum, recipient) => sum + parseFloat(recipient.xp),
-        0,
-      );
+      const shouldApplyLimit = Boolean(hasLeaderboardLimit);
+      const parsedLeaderboardLimit = parseInt(leaderboardLimit, 10);
 
-      if (Math.abs(recipientsTotalXp - parsedTotalXp) > 0.000001) {
+      if (
+        shouldApplyLimit &&
+        (Number.isNaN(parsedLeaderboardLimit) || parsedLeaderboardLimit < 1)
+      ) {
         await transaction.rollback();
         return respond(
           res,
           httpStatus.BAD_REQUEST,
-          "totalXp does not match the sum of recipient xp values",
+          "leaderboardLimit must be greater than 0 when hasLeaderboardLimit is enabled",
         );
       }
 
@@ -889,6 +915,10 @@ class AirdropController {
       // Submit and wait for on-chain confirmation before mutating DB.
       const submissionResult =
         await submitTransactionToBlockchain(signedTransaction);
+
+      logger.info(
+        `Funding submission result: success=${submissionResult.success}, signature=${submissionResult.signature}, note=${submissionResult.note || "none"}`,
+      );
 
       if (!submissionResult.success) {
         await transaction.rollback();
@@ -947,33 +977,19 @@ class AirdropController {
           airdropWallet: airdropWalletAddress,
           splTokenSendTxId: splTxRecord.id,
           creatorUserId: adminUserId,
+          activationConfig: {
+            hasLeaderboardLimit: shouldApplyLimit,
+            leaderboardLimit: shouldApplyLimit
+              ? parsedLeaderboardLimit
+              : null,
+            distributionMethod: "xp_proportional_v1",
+          },
         },
         { transaction },
       );
 
-      // Calculate each user's proportional amount: (userXp / totalXp) * totalAmount
-      const userRewardsData = recipients.map((recipient) => {
-        const userXp = parseFloat(recipient.xp || 0);
-        const calculatedAmount = parseFloat(
-          ((userXp / parsedTotalXp) * parsedTotalAmount).toFixed(9),
-        );
-
-        return {
-          status: USER_REWARD_STATUS.UNCLAIMED,
-          airdropRewardId: airdrop.id,
-          pubKey: recipient.pubKey,
-          amount: calculatedAmount,
-          xp: userXp,
-          splTokenSendTxId: null,
-        };
-      });
-
-      const userRewards = await UserAirdropReward.bulkCreate(userRewardsData, {
-        transaction,
-      });
-
       logger.info(
-        `Airdrop ${airdrop.id} created with ${userRewards.length} user rewards`,
+        `Airdrop ${airdrop.id} funded. Rewards will be created at make-claimable time.`,
       );
 
       await transaction.commit();
@@ -985,7 +1001,7 @@ class AirdropController {
         {
           airdrop: {
             ...airdrop.toJSON(),
-            totalReceivers: userRewards.length,
+            totalReceivers: 0,
           },
           fundingSignature: finalFundingSignature,
           fundingTxRecordId: splTxRecord.id,
@@ -994,6 +1010,147 @@ class AirdropController {
     } catch (err) {
       await transaction.rollback();
       logger.error("Error in confirmAirdropFunding:", err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  /**
+   * Preview the make-claimable allocation plan without creating rows.
+   */
+  static async previewMakeAirdropClaimable(req, res) {
+    try {
+      const { id } = req.params;
+
+      const airdrop = await AirdropDetail.findByPk(id);
+
+      if (!airdrop) {
+        return respond(res, httpStatus.NOT_FOUND, "Airdrop not found");
+      }
+
+      if (airdrop.status !== AIRDROP_STATUS.FUNDED) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Only funded airdrops can be made claimable",
+        );
+      }
+
+      const existingRewardsCount = await UserAirdropReward.count({
+        where: { airdropRewardId: airdrop.id },
+      });
+
+      if (existingRewardsCount > 0) {
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Rewards already generated for this airdrop",
+        );
+      }
+
+      const plan = await getMakeClaimablePlan({ airdrop });
+
+      return respond(res, httpStatus.OK, "Airdrop claimable plan preview", {
+        airdropId: airdrop.id,
+        airdropName: airdrop.airdropName,
+        tokenSymbol: airdrop.tokenSymbol,
+        recipients: plan.recipients,
+        totalReceivers: plan.recipients.length,
+        totalAmount: plan.totalAmount,
+      });
+    } catch (err) {
+      logger.error("Error previewing airdrop claimable plan:", err);
+
+      if (err.message?.includes("endDate") || err.message?.includes("eligible") || err.message?.includes("total XP")) {
+        return respond(res, httpStatus.BAD_REQUEST, err.message);
+      }
+
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err),
+      );
+    }
+  }
+
+  /**
+   * Make a funded airdrop claimable.
+   * Creates user_airdrop_rewards at activation time using the campaign date range.
+   */
+  static async makeAirdropClaimable(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { id } = req.params;
+
+      const airdrop = await AirdropDetail.findByPk(id, { transaction });
+
+      if (!airdrop) {
+        await transaction.rollback();
+        return respond(res, httpStatus.NOT_FOUND, "Airdrop not found");
+      }
+
+      if (airdrop.status !== AIRDROP_STATUS.FUNDED) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Only funded airdrops can be made claimable",
+        );
+      }
+
+      const existingRewardsCount = await UserAirdropReward.count({
+        where: { airdropRewardId: airdrop.id },
+        transaction,
+      });
+
+      if (existingRewardsCount > 0) {
+        await transaction.rollback();
+        return respond(
+          res,
+          httpStatus.BAD_REQUEST,
+          "Rewards already generated for this airdrop",
+        );
+      }
+
+      const plan = await getMakeClaimablePlan({ airdrop });
+
+      const userRewardsData = plan.recipients.map((recipient) => ({
+        status: USER_REWARD_STATUS.UNCLAIMED,
+        airdropRewardId: airdrop.id,
+        pubKey: recipient.pubKey,
+        amount: recipient.amount,
+        xp: recipient.xp,
+        splTokenSendTxId: null,
+      }));
+
+      await UserAirdropReward.bulkCreate(userRewardsData, { transaction });
+
+      await airdrop.update(
+        {
+          status: AIRDROP_STATUS.ACTIVE,
+        },
+        { transaction },
+      );
+
+      await transaction.commit();
+
+      return respond(res, httpStatus.OK, "Airdrop is now claimable", {
+        airdropId: airdrop.id,
+        status: AIRDROP_STATUS.ACTIVE,
+        totalReceivers: userRewardsData.length,
+      });
+    } catch (err) {
+      await transaction.rollback();
+      logger.error("Error making airdrop claimable:", err);
+
+      if (err.message?.includes("endDate") || err.message?.includes("eligible") || err.message?.includes("total XP")) {
+        return respond(res, httpStatus.BAD_REQUEST, err.message);
+      }
+
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,
@@ -1029,6 +1186,7 @@ class AirdropController {
             [Op.in]: [USER_REWARD_STATUS.UNCLAIMED, USER_REWARD_STATUS.PENDING],
           },
         },
+        order: [["createdAt", "DESC"]],
         include: [
           {
             model: AirdropDetail,
@@ -1290,6 +1448,10 @@ class AirdropController {
       const submissionResult =
         await submitTransactionToBlockchain(signedTransaction);
       let shouldStoreAsPending = false;
+
+      logger.info(
+        `Claim submission result: success=${submissionResult.success}, signature=${submissionResult.signature}, note=${submissionResult.note || "none"}`,
+      );
 
       if (!submissionResult.success) {
         if (!submissionResult.signature) {

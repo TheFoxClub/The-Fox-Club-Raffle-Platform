@@ -12,6 +12,18 @@ const {
 
 const connection = getConnectionDas();
 
+const PARSED_TX_BATCH_SIZE = 20;
+
+const chunkArray = (items, size) => {
+  const chunks = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
+};
+
 const readTransactions = async (txs) => {
   try {
     let outputData = [];
@@ -20,23 +32,40 @@ const readTransactions = async (txs) => {
 
     let data = [];
 
-    // for (const txId of txIds) {
-    //   try {
-    //     const txData = await connection.getParsedTransaction(txId, {
-    //       maxSupportedTransactionVersion: 0,
-    //     });
-    //     if (txData) {
-    //       data.push(txData);
-    //     }
-    //   } catch (error) {
-    //     logger.error(error);
-    //     continue;
-    //   }
-    // }
+    const txChunks = chunkArray(txIds, PARSED_TX_BATCH_SIZE);
 
-    data = await connection.getParsedTransactions(txIds, {
-      maxSupportedTransactionVersion: 0,
-    }).then((result) => result?.filter(Boolean));
+    for (const txChunk of txChunks) {
+      try {
+        const chunkData = await connection.getParsedTransactions(txChunk, {
+          maxSupportedTransactionVersion: 0,
+        });
+
+        data.push(...(chunkData?.filter(Boolean) || []));
+      } catch (error) {
+        logger.error(
+          `Failed to fetch parsed transactions for a batch of ${txChunk.length} signatures:`,
+          error,
+        );
+
+        // Fall back to individual lookups so one large batch doesn't block the entire sync loop.
+        for (const txId of txChunk) {
+          try {
+            const txData = await connection.getParsedTransaction(txId, {
+              maxSupportedTransactionVersion: 0,
+            });
+
+            if (txData) {
+              data.push(txData);
+            }
+          } catch (singleError) {
+            logger.error(
+              `Failed to fetch parsed transaction ${txId}:`,
+              singleError,
+            );
+          }
+        }
+      }
+    }
 
     for (let transaction of data) {
       if (!transaction) continue;
