@@ -77,14 +77,14 @@ const sendMultipleSplTokenTx = async ({
 }) => {
   try {
     // Determine the effective direction
-    const effectiveDirection = transferDirection || 
+    const effectiveDirection = transferDirection ||
       (isUserToPlatform ? TRANSFER_DIRECTION.USER_TO_PLATFORM : TRANSFER_DIRECTION.PLATFORM_TO_USER);
-    
+
     // Determine if this is a user-initiated transfer that requires platform fees
-    const shouldChargeTransactionFee = 
+    const shouldChargeTransactionFee =
       effectiveDirection === TRANSFER_DIRECTION.USER_TO_PLATFORM ||
       effectiveDirection === TRANSFER_DIRECTION.USER_TO_AIRDROP;
-    
+
     let transaction = new Transaction();
 
     // Set compute budget for optimal performance
@@ -436,8 +436,7 @@ const createClaimTransaction = async ({
     const { tokenAddress, amount, type } = reward;
 
     logger.info(
-      `createClaimTransaction - type: ${type} (${typeof type}), NFT enum: ${
-        RAFFLE_REWARD_TYPES.NFT
+      `createClaimTransaction - type: ${type} (${typeof type}), NFT enum: ${RAFFLE_REWARD_TYPES.NFT
       }, match: ${type === RAFFLE_REWARD_TYPES.NFT}`
     );
 
@@ -527,7 +526,8 @@ const createClaimTransaction = async ({
 
         const { transferFeeConfig, decimals, tokenProgramId } = tokenDetail;
 
-        const uiAmount = amount * Math.pow(10, decimals);
+        const uiAmount = Math.round(amount * Math.pow(10, decimals));
+        console.log("ui amount: ", uiAmount)
 
         // Get token accounts
         const fromAta = getAssociatedTokenAddressSync(
@@ -592,7 +592,7 @@ const createClaimTransaction = async ({
               fromAta,
               toAta,
               new PublicKey(fromAccount),
-              uiAmount,
+              BigInt(uiAmount),
               [],
               tokenProgramId
             )
@@ -709,8 +709,7 @@ const createPayoutTransaction = async ({
       const tokenDetail = await getTokenDetail(tokenAddress);
       const { decimals, tokenProgramId } = tokenDetail;
 
-      const uiAmount = amount * Math.pow(10, decimals);
-
+      const uiAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
       // Get token accounts
       const fromAta = getAssociatedTokenAddressSync(
         new PublicKey(tokenAddress),
