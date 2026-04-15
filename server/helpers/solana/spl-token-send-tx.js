@@ -4,6 +4,7 @@ const {
   LAMPORTS_PER_SOL,
   ComputeBudgetProgram,
   PublicKey,
+  VersionedTransaction,
 } = require("@solana/web3.js");
 const {
   getAssociatedTokenAddressSync,
@@ -39,6 +40,7 @@ const logger = require("../../util/logger");
 const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
 const { FUND_RECEIVER_WALLET } = require("../../config/credentials.js");
 const { getFeeData } = require("../cache/system-fee.js");
+const { default: bs58 } = require("bs58");
 
 const umi = getUmi();
 
@@ -791,15 +793,69 @@ const createPayoutTransaction = async ({
 };
 
 /**
+ * Decode a signed transaction from base64
+ * @param {string} signedTransaction - Base64 encoded signed transaction
+ * @returns {Object} - { tx, isVersioned }
+ */
+const decodeSignedTransaction = (signedTransaction) => {
+  const txBytes = Buffer.from(signedTransaction, "base64");
+
+  try {
+    return {
+      tx: Transaction.from(txBytes),
+      isVersioned: false,
+    };
+  } catch (legacyError) {
+    return {
+      tx: VersionedTransaction.deserialize(txBytes),
+      isVersioned: true,
+    };
+  }
+};
+
+/**
+ * Extract transaction signature from decoded transaction
+ * @param {Object} tx - Transaction object (legacy or versioned)
+ * @param {boolean} isVersioned - Whether it's a VersionedTransaction
+ * @returns {string} - Encoded signature
+ */
+const getTransactionSignature = (tx, isVersioned) => {
+  if (isVersioned) {
+    if (!tx.signatures || !tx.signatures[0]) {
+      throw new Error("Signed transaction is missing wallet signature");
+    }
+    return bs58.encode(tx.signatures[0]);
+  }
+
+  if (!tx.signature) {
+    throw new Error("Signed transaction is missing wallet signature");
+  }
+
+  return bs58.encode(tx.signature);
+};
+
+/**
  * Submit a signed transaction to the Solana blockchain
  */
 const submitTransactionToBlockchain = async (signedTransactionBase64) => {
   let signature;
+  let derivedSignature;
+  
   try {
     const transactionBuffer = Buffer.from(signedTransactionBase64, "base64");
 
     logger.info(`Submitting transaction to blockchain...`);
     logger.info(`Transaction size: ${transactionBuffer.length} bytes`);
+
+    // Extract signature from the signed transaction BEFORE submission
+    // This ensures we have it even if sendRawTransaction fails
+    try {
+      const { tx, isVersioned } = decodeSignedTransaction(signedTransactionBase64);
+      derivedSignature = getTransactionSignature(tx, isVersioned);
+      logger.info(`Derived signature from transaction: ${derivedSignature}`);
+    } catch (decodeErr) {
+      logger.warn(`Could not derive signature from transaction: ${decodeErr.message}`);
+    }
 
     // Submit to Solana network with simulation first
     signature = await connection.sendRawTransaction(transactionBuffer, {
@@ -832,6 +888,50 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
   } catch (error) {
     logger.error(`Error submitting transaction to blockchain:`, error);
 
+    // Use the derived signature we extracted before submission attempt
+    // This is more reliable than trying to extract from the error object
+    const extractedSignature = derivedSignature || signature;
+
+    // Handle "already been processed" error - transaction likely succeeded on-chain
+    if (error.message && error.message.includes("already been processed")) {
+      logger.warn(`⚠️  DUPLICATE TX DETECTED - Transaction signature: ${extractedSignature}`);
+      logger.warn(`This signature was already submitted to the blockchain.`);
+      
+      // If we have a signature, try to verify it's actually on-chain and confirmed
+      if (extractedSignature) {
+        try {
+          logger.info(`Verifying if transaction ${extractedSignature} is confirmed on-chain...`);
+          const confirmation = await connection.confirmTransaction(
+            extractedSignature,
+            "confirmed"
+          );
+
+          if (confirmation.value.err) {
+            logger.error(`Confirmed transaction has error:`, confirmation.value.err);
+            return {
+              success: false,
+              message: error.message,
+              error: error.message,
+              logs: error.logs || [],
+              signature: extractedSignature,
+            };
+          }
+
+          // Transaction is confirmed! Treat as success despite preflight error
+          logger.info(`✅ Transaction ${extractedSignature} is CONFIRMED on-chain despite preflight error`);
+          return {
+            success: true,
+            signature: extractedSignature,
+            confirmation,
+            note: "Transaction confirmed despite preflight simulation error (likely duplicate submission)",
+          };
+        } catch (confirmErr) {
+          logger.error(`Error confirming transaction ${extractedSignature}:`, confirmErr.message);
+          // Fall through to return error
+        }
+      }
+    }
+
     // Try to get more detailed logs if available
     if (error.logs) {
       logger.error(`Transaction logs:`, error.logs);
@@ -842,7 +942,7 @@ const submitTransactionToBlockchain = async (signedTransactionBase64) => {
       message: error.message,
       error: error.message,
       logs: error.logs || [],
-      signature,
+      signature: extractedSignature,
     };
   }
 };

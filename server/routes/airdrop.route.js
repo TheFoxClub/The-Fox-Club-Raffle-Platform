@@ -29,6 +29,12 @@ router.post("/prepare-funding", auth.bearer, isAdmin, AirdropController.prepareA
 // Confirm airdrop funding and create (after user signs and submits tx)
 router.post("/confirm-funding", auth.bearer, isAdmin, AirdropController.confirmAirdropFunding);
 
+// Preview make-claimable plan without creating user reward rows
+router.get("/:id/make-claimable/preview", auth.bearer, isAdmin, AirdropController.previewMakeAirdropClaimable);
+
+// Make funded airdrop claimable and generate user rewards
+router.post("/:id/make-claimable", auth.bearer, isAdmin, AirdropController.makeAirdropClaimable);
+
 // Update airdrop status (fund, activate, cancel)
 router.put("/:id/status", auth.bearer, isAdmin, AirdropController.updateAirdropStatus);
 
