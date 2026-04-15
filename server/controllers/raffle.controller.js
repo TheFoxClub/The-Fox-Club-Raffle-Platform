@@ -2137,6 +2137,10 @@ class RaffleController {
           signedTransactionBase64,
         );
 
+        logger.info(
+          `Raffle claim submission result: success=${submissionResult.success}, signature=${submissionResult.signature}, note=${submissionResult.note || "none"}`,
+        );
+
         if (!submissionResult.success) {
           throw new Error(
             `Transaction submission failed: ${submissionResult.error}`,
@@ -2620,6 +2624,10 @@ class RaffleController {
           Buffer.from(fullySignedTxBytes).toString("base64");
         const submissionResult = await submitTransactionToBlockchain(
           signedTransactionBase64,
+        );
+
+        logger.info(
+          `Raffle refund submission result: success=${submissionResult.success}, signature=${submissionResult.signature}, note=${submissionResult.note || "none"}`,
         );
 
         if (!submissionResult.success) {
@@ -3731,6 +3739,10 @@ class RaffleController {
 
       const submissionResult =
         await submitTransactionToBlockchain(signedTransaction);
+
+      logger.info(
+        `Raffle creator payout submission result: success=${submissionResult.success}, signature=${submissionResult.signature}, note=${submissionResult.note || "none"}`,
+      );
 
       let nextTxStatus = SPL_TOKEN_SEND_TX_STATUS.SUCCESS;
 

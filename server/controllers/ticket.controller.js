@@ -156,8 +156,10 @@ class TicketController {
         });
       }
 
+      const RaffleCreatorUserData = await User.findOne({ where: { id: raffleData.userId } });
+
       const nftHolderInfo =
-        await NFTService.checkNFTCollectionHolder(senderPubkey);
+        await NFTService.checkNFTCollectionHolder(RaffleCreatorUserData.pubkey);
       const isNFTHolder = nftHolderInfo.isHolder;
       const feeData = await getFeeData();
 
