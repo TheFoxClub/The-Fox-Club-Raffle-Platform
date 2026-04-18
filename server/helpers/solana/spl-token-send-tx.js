@@ -41,6 +41,7 @@ const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
 const { FUND_RECEIVER_WALLET } = require("../../config/credentials.js");
 const { getFeeData } = require("../cache/system-fee.js");
 const { default: bs58 } = require("bs58");
+const {safeRound} = require("../../util/util.js")
 
 const umi = getUmi();
 
@@ -697,7 +698,7 @@ const createPayoutTransaction = async ({
         SystemProgram.transfer({
           fromPubkey: new PublicKey(fromAccount), // Platform wallet
           toPubkey: new PublicKey(toAccount), // User wallet
-          lamports: amount * LAMPORTS_PER_SOL,
+          lamports: safeRound(amount) * LAMPORTS_PER_SOL,
         })
       );
     } else {
