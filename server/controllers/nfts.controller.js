@@ -152,6 +152,7 @@ class HolderController {
 
       const searchParams = {
         owner: publicKey(pubkey),
+        burnt: false,
       };
 
       let result;
