@@ -55,6 +55,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(50),
         allowNull: true,
       },
+      imageUrl: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
       totalAmount: {
         type: DataTypes.STRING(30),
         allowNull: false,

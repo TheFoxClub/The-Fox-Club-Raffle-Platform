@@ -14,9 +14,15 @@ const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
 const { Transaction, VersionedTransaction } = require("@solana/web3.js");
-const { createUmi } = require("@metaplex-foundation/umi-bundle-defaults");
+const {
+  fetchMetadataFromSeeds,
+} = require("@metaplex-foundation/mpl-token-metadata");
+const {
+  createUmi,
+} = require("@metaplex-foundation/umi-bundle-defaults");
 const { publicKey } = require("@metaplex-foundation/umi");
 const { default: bs58 } = require("bs58");
+const axios = require("axios");
 
 const {
   sendMultipleSplTokenTx,
@@ -38,6 +44,7 @@ const connection = getConnection();
 const AIRDROP_STATUS = AirdropDetail.STATUS;
 const REWARD_TYPE = AirdropDetail.REWARD_TYPE;
 const USER_REWARD_STATUS = UserAirdropReward.STATUS;
+const TOKEN_IMAGE_PLACEHOLDER = "/uploads/token-placeholder.png";
 
 const normalizeDateTimeInput = (value, boundary = "start") => {
   if (!value) return null;
@@ -79,6 +86,70 @@ const normalizeDateTimeInput = (value, boundary = "start") => {
       millisecond ? Number(millisecond.padEnd(3, "0")) : 0,
     ),
   );
+};
+
+const normalizeIpfsUri = (value) => {
+  if (!value) return null;
+
+  const uri = String(value).trim();
+  if (!uri) return null;
+
+  if (!uri.startsWith("ipfs://")) {
+    return uri;
+  }
+
+  let path = uri.slice(7);
+  if (path.startsWith("ipfs/")) {
+    path = path.slice(5);
+  }
+
+  const gateway = "https://gateway.pinata.cloud/ipfs/";
+  return `${gateway}${path}`;
+};
+
+const getAirdropTokenImage = async ({ rewardType, tokenAddress }) => {
+  if (rewardType === REWARD_TYPE.SOL || !tokenAddress) {
+    return TOKEN_IMAGE_PLACEHOLDER;
+  }
+
+  try {
+    const umi = createUmi(connection);
+    const metadata = await fetchMetadataFromSeeds(umi, {
+        mint: publicKey(tokenAddress),
+      });
+
+    const metadataUri = normalizeIpfsUri(metadata?.uri);
+    let imageUrl = TOKEN_IMAGE_PLACEHOLDER;
+    if (metadataUri) {
+      try {
+        const metadataResponse = await axios.get(metadataUri, {
+          timeout: 8000,
+          validateStatus: (status) => status >= 200 && status < 400,
+        });
+
+        const contentType = String(
+          metadataResponse?.headers?.["content-type"] || "",
+        ).toLowerCase();
+
+        if (contentType.startsWith("image/")) {
+          imageUrl = metadataUri;
+        } else {
+          imageUrl = normalizeIpfsUri(metadataResponse.data.image) || normalizeIpfsUri(metadataResponse.data.logoURI) || normalizeIpfsUri(metadataResponse.data.image_url) || TOKEN_IMAGE_PLACEHOLDER;
+        }
+      } catch (imageErr) {
+        logger.warn(
+          `Failed to resolve token image for ${tokenAddress}: ${imageErr.message}`,
+        );
+      }
+    }
+
+    return imageUrl;
+  } catch (err) {
+    logger.warn(
+      `Failed to fetch token image for ${tokenAddress}: ${err.message}`,
+    );
+    return TOKEN_IMAGE_PLACEHOLDER;
+  }
 };
 
 // Builds the ranking using the formula: user rank(position) = (amount of XP earned by user in the period / total XP earned by all users in the period) * total airdrop amount
@@ -311,7 +382,7 @@ class AirdropController {
 
       const latestAirdropRows = await sequelize.query(
         `
-          SELECT id, airdropName, startDate, endDate, tokenSymbol, tokenAddress, createdAt
+          SELECT id, airdropName, startDate, endDate, tokenSymbol, tokenAddress, imageUrl, createdAt
           FROM airdrop_details
           ORDER BY createdAt DESC
           LIMIT 1
@@ -369,6 +440,7 @@ class AirdropController {
             endDate: normalizedEndDate,
             tokenSymbol: latestAirdrop.tokenSymbol || null,
             tokenAddress: latestAirdrop.tokenAddress || null,
+            imageUrl: latestAirdrop.imageUrl || TOKEN_IMAGE_PLACEHOLDER,
             createdAt: latestAirdrop.createdAt,
           },
           users: leaderboardData.leaderboard,
@@ -511,6 +583,7 @@ class AirdropController {
           totalAmount: data.totalAmount,
           type: data.type,
           tokenSymbol: data.tokenSymbol,
+          imageUrl: data.imageUrl || TOKEN_IMAGE_PLACEHOLDER,
           status: data.status,
           createdAt: data.createdAt,
           claimedCount,
@@ -906,6 +979,12 @@ class AirdropController {
         );
       }
 
+      // Fetch complete token image from chain
+      const tokenImageUrl = await getAirdropTokenImage({
+        rewardType: numericType,
+        tokenAddress,
+      });
+
       let splType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
       if (numericType === REWARD_TYPE.SPL_TOKEN)
         splType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
@@ -972,6 +1051,7 @@ class AirdropController {
           tokenDecimals: tokenDecimals || 9,
           tokenSymbol:
             tokenSymbol || (numericType === REWARD_TYPE.SOL ? "SOL" : null),
+          imageUrl: tokenImageUrl,
           totalAmount: parsedTotalAmount,
           status: AIRDROP_STATUS.FUNDED,
           airdropWallet: airdropWalletAddress,
@@ -1057,6 +1137,7 @@ class AirdropController {
         airdropId: airdrop.id,
         airdropName: airdrop.airdropName,
         tokenSymbol: airdrop.tokenSymbol,
+        imageUrl: airdrop.imageUrl || TOKEN_IMAGE_PLACEHOLDER,
         recipients: plan.recipients,
         totalReceivers: plan.recipients.length,
         totalAmount: plan.totalAmount,
@@ -1201,6 +1282,7 @@ class AirdropController {
               "endDate",
               "tokenSymbol",
               "tokenAddress",
+              "imageUrl",
               "type",
             ],
           },
@@ -1214,6 +1296,8 @@ class AirdropController {
         endDate: reward.airdropDetail?.endDate || null,
         tokenSymbol: reward.airdropDetail?.tokenSymbol,
         tokenAddress: reward.airdropDetail?.tokenAddress,
+        imageUrl:
+          reward.airdropDetail?.imageUrl || TOKEN_IMAGE_PLACEHOLDER,
         rewardType: reward.airdropDetail?.type,
       }));
 
@@ -1316,6 +1400,7 @@ class AirdropController {
         rewardId: reward.id,
         amount: parseFloat(reward.amount),
         tokenSymbol: campaign.tokenSymbol,
+        imageUrl: campaign.imageUrl || TOKEN_IMAGE_PLACEHOLDER,
       });
     } catch (err) {
       logger.error("Error preparing airdrop claim:", err);
