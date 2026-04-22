@@ -33,6 +33,7 @@ const {
 const { validateChecksum } = require("../helpers/solana/checksum-validation");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { AirdropWallet } = require("../helpers/solana/airdrop-wallet");
+const redisClient = require("../util/redisClient");
 const {
   RAFFLE_REWARD_TYPES,
   SPL_TOKEN_ADDRESS,
@@ -45,6 +46,7 @@ const AIRDROP_STATUS = AirdropDetail.STATUS;
 const REWARD_TYPE = AirdropDetail.REWARD_TYPE;
 const USER_REWARD_STATUS = UserAirdropReward.STATUS;
 const TOKEN_IMAGE_PLACEHOLDER = "/uploads/token-placeholder.png";
+const METADATA_CACHE_TTL = parseInt(process.env.METADATA_CACHE_TTL, 10) || 3600;
 
 const normalizeDateTimeInput = (value, boundary = "start") => {
   if (!value) return null;
@@ -113,34 +115,66 @@ const getAirdropTokenImage = async ({ rewardType, tokenAddress }) => {
   }
 
   try {
-    const umi = createUmi(connection);
-    const metadata = await fetchMetadataFromSeeds(umi, {
+    const metadataCacheKey = `metadata:mint:${tokenAddress}`;
+    const metadataUriPayloadCacheKey = `metadata:mint-uri-payload:${tokenAddress}`;
+    let metadata = (await redisClient.get(metadataCacheKey)) || {};
+    let shouldUpdateMetadataCache = false;
+
+    if (!metadata.uri) {
+      logger.info(`Cache miss for metadata of token: ${tokenAddress}`);
+      const umi = createUmi(connection);
+      const fetchedMetadata = await fetchMetadataFromSeeds(umi, {
         mint: publicKey(tokenAddress),
       });
+
+      metadata = {
+        ...metadata,
+        name: fetchedMetadata?.name || null,
+        symbol: fetchedMetadata?.symbol || null,
+        uri: fetchedMetadata?.uri || null,
+      };
+      shouldUpdateMetadataCache = true;
+    }
+    logger.info(`Cache hit for metadata of token: ${tokenAddress}`);
 
     const metadataUri = normalizeIpfsUri(metadata?.uri);
     let imageUrl = TOKEN_IMAGE_PLACEHOLDER;
     if (metadataUri) {
-      try {
-        const metadataResponse = await axios.get(metadataUri, {
-          timeout: 8000,
-          validateStatus: (status) => status >= 200 && status < 400,
-        });
+      let uriPayloadCache = await redisClient.get(metadataUriPayloadCacheKey);
 
-        const contentType = String(
-          metadataResponse?.headers?.["content-type"] || "",
-        ).toLowerCase();
+      if (!uriPayloadCache) {
+        logger.info(`Cache miss for json_uri payload of token: ${tokenAddress}`);
+        try {
+          const metadataResponse = await axios.get(metadataUri, {
+            timeout: 8000,
+            validateStatus: (status) => status >= 200 && status < 400,
+          });
 
-        if (contentType.startsWith("image/")) {
-          imageUrl = metadataUri;
-        } else {
-          imageUrl = normalizeIpfsUri(metadataResponse.data.image) || normalizeIpfsUri(metadataResponse.data.logoURI) || normalizeIpfsUri(metadataResponse.data.image_url) || TOKEN_IMAGE_PLACEHOLDER;
+          uriPayloadCache = metadataResponse?.data || null;
+
+          await redisClient.set(
+            metadataUriPayloadCacheKey,
+            uriPayloadCache,
+            METADATA_CACHE_TTL,
+          );
+          logger.info(`Cached json_uri payload for token: ${tokenAddress}`);
+        } catch (imageErr) {
+          logger.warn(
+            `Failed to resolve token image for ${tokenAddress}: ${imageErr.message}`,
+          );
         }
-      } catch (imageErr) {
-        logger.warn(
-          `Failed to resolve token image for ${tokenAddress}: ${imageErr.message}`,
-        );
       }
+
+      imageUrl =
+        normalizeIpfsUri(uriPayloadCache?.image) ||
+        normalizeIpfsUri(uriPayloadCache?.logoURI) ||
+        normalizeIpfsUri(uriPayloadCache?.image_url) ||
+        normalizeIpfsUri(uriPayloadCache?.properties?.files?.[0]?.uri) ||
+        TOKEN_IMAGE_PLACEHOLDER;
+    }
+
+    if (shouldUpdateMetadataCache) {
+      await redisClient.set(metadataCacheKey, metadata, METADATA_CACHE_TTL);
     }
 
     return imageUrl;
