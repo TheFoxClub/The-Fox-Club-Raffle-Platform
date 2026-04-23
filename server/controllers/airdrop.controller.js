@@ -9,7 +9,7 @@ const {
   SplTokenSendTransaction,
   sequelize,
 } = require("../models");
-const { getConnection } = require("../config/solana");
+const { getConnection, getUmi } = require("../config/solana");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
@@ -17,9 +17,6 @@ const { Transaction, VersionedTransaction } = require("@solana/web3.js");
 const {
   fetchMetadataFromSeeds,
 } = require("@metaplex-foundation/mpl-token-metadata");
-const {
-  createUmi,
-} = require("@metaplex-foundation/umi-bundle-defaults");
 const { publicKey } = require("@metaplex-foundation/umi");
 const { default: bs58 } = require("bs58");
 const axios = require("axios");
@@ -39,12 +36,14 @@ const {
   SPL_TOKEN_ADDRESS,
   SPL_TOKEN_SEND_TX_STATUS,
   SPL_TOKEN_SEND_TRANSACTION_TYPE,
+  AIRDROP_STATUS,
+  AIRDROP_REWARD_TYPE,
+  USER_AIRDROP_REWARD_STATUS,
 } = require("../config/data");
 
 const connection = getConnection();
-const AIRDROP_STATUS = AirdropDetail.STATUS;
-const REWARD_TYPE = AirdropDetail.REWARD_TYPE;
-const USER_REWARD_STATUS = UserAirdropReward.STATUS;
+const REWARD_TYPE = AIRDROP_REWARD_TYPE;
+const USER_REWARD_STATUS = USER_AIRDROP_REWARD_STATUS;
 const TOKEN_IMAGE_PLACEHOLDER = "/uploads/token-placeholder.png";
 const METADATA_CACHE_TTL = parseInt(process.env.METADATA_CACHE_TTL, 10) || 3600;
 
@@ -122,7 +121,7 @@ const getAirdropTokenImage = async ({ rewardType, tokenAddress }) => {
 
     if (!metadata.uri) {
       logger.info(`Cache miss for metadata of token: ${tokenAddress}`);
-      const umi = createUmi(connection);
+      const umi = getUmi();
       const fetchedMetadata = await fetchMetadataFromSeeds(umi, {
         mint: publicKey(tokenAddress),
       });
@@ -362,7 +361,7 @@ const getTransactionSignature = (tx, isVersioned) => {
 
 const validateTransactionChecksum = (tx, isVersioned, checksum) => {
   try {
-    const umi = createUmi(connection);
+    const umi = getUmi();
     let umiTx;
 
     if (isVersioned) {

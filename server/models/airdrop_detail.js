@@ -104,21 +104,6 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  AirdropDetail.STATUS = {
-    DRAFT: 0,
-    PENDING: 1,
-    FUNDED: 2,
-    ACTIVE: 3,
-    COMPLETED: 4,
-    CANCELLED: 5,
-  };
-
-  AirdropDetail.REWARD_TYPE = {
-    SOL: 0,
-    SPL_TOKEN: 1,
-    SPL_TOKEN_2022: 2,
-  };
-
   return AirdropDetail;
 };
 
