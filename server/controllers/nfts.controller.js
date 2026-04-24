@@ -155,20 +155,36 @@ class HolderController {
         burnt: false,
       };
 
-      let result;
-      let nfts;
+      let nfts = [];
+      let page = 1;
 
-      //filtering verified collections
-      if (allVerifiedCollections.length > 0) {
-        result = await getUmi().rpc.searchAssets(searchParams);
+      
+      while(true){
+        const assets = await getUmi().rpc.searchAssets({
+          ...searchParams,
+          page: page
+        })
+        nfts = nfts.concat(assets.items);
 
-        nfts = result.items.map((item) => ({
+        if(assets?.items?.length < 1000){
+          break
+        }
+        page++;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      if(verifiedCollectionAddresses.length > 0) {
+        nfts = nfts.filter((item) => 
+          verifiedCollectionAddresses.includes(item.grouping?.[0]?.group_value)
+        );
+
+        nfts = nfts.map((item) => ({
           mint: item.id,
           name: item.content?.metadata?.name,
           uri: item.content?.json_uri,
           interface: item.interface,
-          collection: item.grouping[0],
-          image:
+          collection: item.grouping?.[0],
+          image: 
             item.content?.links?.image ||
             item.links?.image ||
             item.content?.files?.[0]?.cdn_uri ||
@@ -176,15 +192,11 @@ class HolderController {
             null,
           ownership: item.ownership,
         }));
-        nfts = nfts.filter((item) =>
-          verifiedCollectionAddresses.includes(item.collection?.group_value)
-        );
-      } else {
-        nfts = [];
       }
 
+
       const responseData = {
-        total: result?.total || 0,
+        total: nfts.length || 0,
         nfts,
         timestamp: new Date().toISOString(),
       };

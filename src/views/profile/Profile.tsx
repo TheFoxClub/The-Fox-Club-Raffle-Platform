@@ -122,6 +122,7 @@ type AirdropReward = {
   claimedAt: string | null;
   tokenSymbol: string | null;
   tokenAddress: string | null;
+  imageUrl?: string | null;
   rewardType: number;
 };
 
@@ -1443,9 +1444,16 @@ const Profile = () => {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex items-start gap-4">
                         <div className="flex-shrink-0">
-                          <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center">
-                            <Gift className="h-8 w-8 text-accent" />
-                          </div>
+                          <img
+                            src={reward.imageUrl || "/uploads/token-placeholder.png"}
+                            alt={reward.tokenSymbol || "Airdrop token"}
+                            className="h-16 w-16 rounded-lg object-cover"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "/uploads/token-placeholder.png";
+                            }}
+                            loading="lazy"
+                          />
                         </div>
 
                         <div className="space-y-1">

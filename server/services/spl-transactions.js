@@ -10,6 +10,8 @@ const {
   SPL_TOKEN_SEND_TX_STATUS,
   SPL_TOKEN_SEND_TRANSACTION_TYPE,
   TOKEN_TYPE,
+  USER_AIRDROP_REWARD_STATUS,
+  AIRDROP_STATUS,
 } = require("../config/data");
 const { DEFAULT_COMMISSION } = require("../config/constants");
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
@@ -17,8 +19,7 @@ const logger = require("../util/logger");
 const SocketService = require("./socket.service");
 const { getFeeData } = require("../helpers/cache/system-fee");
 
-const USER_AIRDROP_STATUS = UserAirdropReward.STATUS;
-const AIRDROP_STATUS = AirdropDetail.STATUS;
+const USER_AIRDROP_STATUS = USER_AIRDROP_REWARD_STATUS;
 
 const getSplTokenSendTransactions = async () => {
   const now = Date.now();
