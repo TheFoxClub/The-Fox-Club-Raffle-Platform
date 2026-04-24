@@ -559,11 +559,14 @@ class AdminController {
       const asset = await umi.rpc.getAsset(publicKey(address.trim()));
       const name =
         asset?.content?.metadata?.name?.replace(/\0/g, "").trim() || null;
+      
+      logger.info(`Fetched collection name for ${address}: ${name}`);
       return respond(res, httpStatus.OK, "Collection metadata fetched", {
         name,
       });
     } catch (error) {
       // Address not found on-chain or invalid — return null name instead of error to allow manual entry
+      logger.error(`No on-chain metadata found for collection ${address}`);
       return respond(res, httpStatus.OK, "No on-chain metadata found", {
         name: null,
       });
@@ -638,6 +641,7 @@ class AdminController {
       );
     } catch (error) {
       console.error(error);
+      logger.error("Error fetching top raffle creators");
       return respond(res, httpStatus.INTERNAL_SERVER_ERROR, "Server error", {
         error: error.message,
       });
