@@ -1352,6 +1352,7 @@ const CreateRaffle = () => {
                                   e.currentTarget.src =
                                     "/uploads/nft-placeholder.svg";
                                 }}
+                                loading="lazy"
                               />
 
                               {/* Footer Overlay */}
@@ -1416,6 +1417,7 @@ const CreateRaffle = () => {
                               e.currentTarget.src =
                                 "/uploads/nft-placeholder.svg";
                             }}
+                            loading="lazy"
                           />
                           <div>
                             <p className="font-semibold wrap-break-word break-all">
