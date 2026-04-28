@@ -47,6 +47,12 @@ export const RaffleCard = ({
             src={image}
             alt={title}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+            onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/uploads/nft-placeholder.svg";
+              }
+            }
+            loading="lazy"
           />
           {isFeatured && (
             <div className="absolute top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
