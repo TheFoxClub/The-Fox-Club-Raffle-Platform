@@ -276,7 +276,7 @@ const getVolumeByTokenType = async (startDate, endDate) => {
       totalVolume: parseFloat(item.totalVolume || 0),
       percentage:
         totalVolume > 0
-          ? parseFloat(((item.totalVolume / totalVolume) * 100).toFixed(2))
+          ? parseFloat(((item.totalVolume / totalVolume) * 100).toFixed(8))
           : 0,
       commissionVolume: parseFloat(item.commissionVolume || 0),
       creatorVolume: parseFloat(item.creatorVolume || 0),
