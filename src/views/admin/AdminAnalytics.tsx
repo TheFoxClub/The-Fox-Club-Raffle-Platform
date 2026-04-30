@@ -59,6 +59,11 @@ const renderCustomizedLabel = ({
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
+  const truncate = (num: number, decimals: number) => {
+    const factor = Math.pow(10, decimals);
+    return (Math.floor(num * factor) / factor).toFixed(decimals);
+  };
+
   return (
     <text
       x={x}
@@ -68,7 +73,7 @@ const renderCustomizedLabel = ({
       dominantBaseline="central"
       fontSize={14}
     >
-      {`${name} ${(percent * 100).toFixed(0)}%`}
+      {`${name} ${(percent * 100) >= 1 ? (truncate(percent * 100, 2)) : (truncate(percent * 100, 6))}%`}
     </text>
   );
 };
