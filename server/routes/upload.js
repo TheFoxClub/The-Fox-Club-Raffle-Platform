@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const auth = require("../config/auth");
 const router = express.Router();
 
 const uploadDir = path.join(__dirname, "../../public/uploads");
@@ -40,7 +41,7 @@ const upload = multer({
   fileFilter: fileFilter,
 });
 
-router.post("/raffle-image", upload.single("file"), async (req, res) => {
+router.post("/raffle-image", auth.bearer, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -90,6 +91,7 @@ const profileUpload = multer({
 
 router.post(
   "/profile-image",
+  auth.bearer,
   profileUpload.single("file"),
   async (req, res) => {
     try {

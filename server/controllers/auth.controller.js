@@ -8,12 +8,13 @@ const bcrypt = require("bcryptjs");
 const { VERIFICATION_CODE_TYPES } = require("../config/data");
 const { QueryTypes, Model } = require("sequelize");
 const { default: base58 } = require("bs58");
+const crypto = require("crypto");
 
 // SOLANA
 const { ed25519 } = require("@noble/curves/ed25519");
 
 const auth = require("../config/auth");
-const { ADMIN_PUBKEY } = require("../config/credentials");
+const { ADMIN_PUBKEYS } = require("../config/credentials");
 const UserController = require("./user.controller");
 // const UserController = require("./user.controller");
 // const { getAllPendingCurrencyAmount } = require("../services/currency");
@@ -45,7 +46,63 @@ const handleError = async (res, err) => {
   respond(res, httpStatus.INTERNAL_SERVER_ERROR, parseSequelizeErrors(err));
 };
 
+const AUTH_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+const getPubkeyBase58 = (pubkeyHex) => {
+  const bytes = Buffer.from(pubkeyHex, "hex");
+  return base58.encode(bytes);
+};
+
+const issueAuthChallenge = (req, pubkeyBase58) => {
+  const nonce = crypto.randomBytes(16).toString("hex");
+
+  req.session.authChallenge = {
+    nonce,
+    pubkey: pubkeyBase58,
+    expiresAt: Date.now() + AUTH_CHALLENGE_TTL_MS,
+  };
+
+  return nonce;
+};
+
+const consumeAuthChallenge = (req, pubkeyBase58, nonce) => {
+  const challenge = req.session.authChallenge;
+
+  delete req.session.authChallenge;
+
+  if (!challenge) {
+    return false;
+  }
+
+  return (
+    challenge.pubkey === pubkeyBase58 &&
+    challenge.nonce === nonce &&
+    challenge.expiresAt > Date.now()
+  );
+};
+
 class AuthController {
+  static async challenge(req, res) {
+    const pubkey = req.body.pubkey;
+
+    if (!pubkey) {
+      return respond(res, httpStatus.BAD_REQUEST, "Wallet public key is required");
+    }
+
+    try {
+      const pubkeyBase58 = getPubkeyBase58(pubkey);
+      const nonce = issueAuthChallenge(req, pubkeyBase58);
+
+      return respond(res, httpStatus.OK, "Challenge created", {
+        nonce,
+        expiresInMs: AUTH_CHALLENGE_TTL_MS,
+      });
+    } catch (error) {
+      logger.error(error);
+      return respond(res, httpStatus.BAD_REQUEST, "Invalid wallet public key");
+    }
+  }
+
   static async authenticate(req, res) {
     const user = await User.findOne({
       raw: true,
@@ -64,7 +121,7 @@ class AuthController {
       user: {
         ...user,
         isAuthenticated: true,
-        isAdmin: ADMIN_PUBKEY.includes(user.pubkey),
+        isAdmin: ADMIN_PUBKEYS.includes(user.pubkey),
       },
     });
   }
@@ -72,9 +129,33 @@ class AuthController {
   static async login(req, res, next) {
     const pubkey = req.body.pubkey;
     const blockchainNetwork = req.query.blockchainNetwork;
-    //hex to base58
-    const bytes = Buffer.from(pubkey, "hex");
-    const pubkeyBase58 = base58.encode(bytes);
+
+    if (!pubkey || !req.body.signature || !req.body.nonce) {
+      return respond(res, httpStatus.BAD_REQUEST, "Missing login payload");
+    }
+
+    let pubkeyBase58;
+
+    try {
+      pubkeyBase58 = getPubkeyBase58(pubkey);
+    } catch (error) {
+      logger.error(error);
+      return respond(res, httpStatus.BAD_REQUEST, "Invalid wallet public key");
+    }
+
+    const hasValidChallenge = consumeAuthChallenge(
+      req,
+      pubkeyBase58,
+      req.body.nonce,
+    );
+
+    if (!hasValidChallenge) {
+      return respond(
+        res,
+        httpStatus.UNAUTHORIZED,
+        "Authentication challenge is missing, expired, or invalid",
+      );
+    }
 
     let isValid = false;
 
@@ -111,22 +192,22 @@ class AuthController {
       const authUser = auth.toAuthJSON({
         pubkey: pubkeyBase58,
         id: dbUser.id,
-        role: ADMIN_PUBKEY.includes(dbUser.pubkey) ? "admin" : "customer",
+        role: ADMIN_PUBKEYS.includes(dbUser.pubkey) ? "admin" : "customer",
       });
 
       const token = authUser.token;
 
       res.cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
         maxAge: 24 * 60 * 60 * 1000, // 1 day expiration for the cookie
-        // sameSite: "strict", // Helps mitigate CSRF attacks
       });
 
       return respond(res, httpStatus.OK, "Logged In!", {
         user: {
           ...authUser,
-          isAdmin: ADMIN_PUBKEY.includes(authUser.pubkey),
+          isAdmin: ADMIN_PUBKEYS.includes(authUser.pubkey),
         },
       });
     } catch (error) {
@@ -143,8 +224,8 @@ class AuthController {
     try {
       res.clearCookie("token", {
         httpOnly: true,
-        // secure: process.env.NODE_ENV === "production", // Uncomment in production
-        // sameSite: "strict", // Uncomment to help mitigate CSRF attacks
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
       });
 
       return respond(res, httpStatus.OK, "Logged out successfully!");

@@ -2,19 +2,31 @@ const express = require("express");
 const path = require("path");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
-const { ALLOWED_ORIGINS, SERVER_PORT } = require("./config/credentials");
+const {
+  ALLOWED_ORIGINS,
+  SERVER_PORT,
+  SESSION_SECRET,
+} = require("./config/credentials");
 const app = express();
 const httpServer = createServer(app);
 const port = SERVER_PORT;
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
 
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false },
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
   })
 );
 
@@ -24,7 +36,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: false }));
 
 app.use((req, res, next) => {
-  let accessControlAllowOrigin =
+  const accessControlAllowOrigin =
     ALLOWED_ORIGINS.includes(req.headers.origin) && req.headers.origin;
 
   res.setHeader("Access-Control-Allow-Origin", accessControlAllowOrigin);

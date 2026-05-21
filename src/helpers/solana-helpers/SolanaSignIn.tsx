@@ -2,9 +2,20 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { type RootState, useAppDispatch } from "../../redux/store";
-import { loginUser } from "../../redux/actions/userAction";
+import {
+  fetchAuthChallenge,
+  loginUser,
+} from "../../redux/actions/userAction";
 import { unwrapResult } from "@reduxjs/toolkit";
 import Button from "../../components/ui/Button";
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Signature rejected or login failed.";
+};
 
 const SolanaSignIn = () => {
   const dispatch = useAppDispatch();
@@ -17,19 +28,26 @@ const SolanaSignIn = () => {
       return;
     }
 
-    const nonce = Math.floor(Math.random() * 1000000);
-    const message = `Sign this message for authenticating with your wallet. Nonce: ${nonce}`;
-    const encodedMessage = new TextEncoder().encode(message);
-
     if (signMessage) {
       try {
+        const pubkey = Buffer.from(publicKey?.toBytes() || []).toString("hex");
+        const challengeResponse = await fetchAuthChallenge(pubkey);
+
+        if (!challengeResponse.success || !challengeResponse.data?.nonce) {
+          toast.error(challengeResponse.message || "Could not start sign-in.");
+          return;
+        }
+
+        const nonce = challengeResponse.data.nonce;
+        const message = `Sign this message for authenticating with your wallet. Nonce: ${nonce}`;
+        const encodedMessage = new TextEncoder().encode(message);
         const signature = await signMessage!(encodedMessage);
 
         const resultAction = await dispatch(
           loginUser({
             nonce,
             signature: Buffer.from(signature).toString("hex"),
-            pubkey: Buffer.from(publicKey?.toBytes() || []).toString("hex"),
+            pubkey,
           })
         );
 
@@ -42,9 +60,8 @@ const SolanaSignIn = () => {
             toast.error(result.message || "Login failed.");
           }
         }
-      } catch (err: any) {
-        // Handles rejected thunk (e.g., redlist or other backend error)
-        const msg = err?.message || "Signature rejected or login failed.";
+      } catch (error: unknown) {
+        const msg = getErrorMessage(error);
         if (msg.toLowerCase().includes("redlist")) {
           toast.error("Access Denied: Your wallet is redlisted.");
         } else {

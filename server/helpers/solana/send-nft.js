@@ -63,7 +63,6 @@ const {
   getAssetWithProof,
 } = require("@metaplex-foundation/mpl-bubblegum");
 
-const wallet = require("./wallet.json");
 const {
   getConnectionDas,
   getUmi,
@@ -800,7 +799,7 @@ const addNftSendTransaction = async ({
     });
 
     // Set up UMI with proper signer identity
-    const from = Keypair.fromSecretKey(new Uint8Array(wallet));
+    const from = Wallet.getSignerKeypair();
     const umi = createUmi(connection);
     const umiKeypair = fromWeb3JsKeypair(from);
 

@@ -39,7 +39,6 @@ const { publicKey } = require("@metaplex-foundation/umi");
 const { Wallet } = require("../helpers/solana/wallet");
 
 const { Keypair } = require("@solana/web3.js");
-const walletKeypair = require("../helpers/solana/wallet.json");
 
 const logger = require("../util/logger");
 const WinnerSelectionService = require("../services/raffles/winner-selection");
@@ -2098,9 +2097,7 @@ class RaffleController {
         // For VersionedTransaction (pNFT), we need to add platform signature
         logger.info("Adding platform signature to pNFT transaction...");
 
-        const platformSigner = Keypair.fromSecretKey(
-          new Uint8Array(walletKeypair),
-        );
+        const platformSigner = Wallet.getSignerKeypair();
 
         // Sign the versioned transaction with platform wallet
         userSignedTx.sign([platformSigner]);
@@ -2587,9 +2584,7 @@ class RaffleController {
         // For VersionedTransaction (pNFT), we need to add platform signature
         logger.info("Adding platform signature to pNFT transaction...");
 
-        const platformSigner = Keypair.fromSecretKey(
-          new Uint8Array(walletKeypair),
-        );
+        const platformSigner = Wallet.getSignerKeypair();
 
         // Sign the versioned transaction with platform wallet
         userSignedTx.sign([platformSigner]);

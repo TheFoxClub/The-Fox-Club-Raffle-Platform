@@ -1,5 +1,4 @@
 const { Keypair } = require("@solana/web3.js");
-const airdropWalletKeypair = require("./airdrop-wallet.json");
 const { getConnectionDas } = require("../../config/solana");
 const {
   createSignerFromKeypair,
@@ -10,23 +9,39 @@ const {
 } = require("@metaplex-foundation/umi-web3js-adapters");
 const logger = require("../../util/logger");
 
-const getConfiguredWalletPubkey = () => {
-  const keypair = Keypair.fromSecretKey(new Uint8Array(airdropWalletKeypair));
-  return keypair.publicKey.toString();
+const AIRDROP_WALLET_KEY = "AIRDROP_WALLET_SECRET_KEY";
+
+const loadAirdropWalletKeypair = () => {
+  const rawValue = process.env[AIRDROP_WALLET_KEY];
+
+  if (!rawValue) {
+    throw new Error(
+      `Airdrop wallet is not configured. Set ${AIRDROP_WALLET_KEY} in the environment.`,
+    );
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue);
+
+    if (!Array.isArray(parsedValue) || parsedValue.length === 0) {
+      throw new Error("Wallet secret key must be a non-empty JSON array");
+    }
+
+    return parsedValue;
+  } catch (error) {
+    throw new Error(
+      `Invalid ${AIRDROP_WALLET_KEY}. Expected a JSON array of secret key bytes.`,
+    );
+  }
 };
 
 class AirdropWallet {
   static #instance;
+  static #serializedKeypair;
   #wallet;
   #connection;
 
-  constructor() {
-    // Validate keypair before initializing
-    if (!airdropWalletKeypair) {
-      logger.error("Invalid airdrop wallet keypair. Please configure server/helpers/solana/airdrop-wallet.json");
-      throw new Error("Invalid airdrop wallet keypair configuration");
-    }
-
+  constructor(airdropWalletKeypair) {
     this.#wallet = Keypair.fromSecretKey(new Uint8Array(airdropWalletKeypair));
     this.#connection = getConnectionDas();
 
@@ -38,13 +53,14 @@ class AirdropWallet {
    * @returns {AirdropWallet} Singleton instance
    */
   static getInstance() {
-    if (!AirdropWallet.#instance) {
-      AirdropWallet.#instance = new AirdropWallet();
-    } else if (getConfiguredWalletPubkey() !== AirdropWallet.#instance.#wallet.publicKey.toString()) {
-      // Check for keypair change
-      logger.warn("Airdrop wallet keypair has changed. Reinitializing AirdropWallet instance.");
-      AirdropWallet.#instance = new AirdropWallet();
+    const airdropWalletKeypair = loadAirdropWalletKeypair();
+    const serializedKeypair = JSON.stringify(airdropWalletKeypair);
+
+    if (!AirdropWallet.#instance || AirdropWallet.#serializedKeypair !== serializedKeypair) {
+      AirdropWallet.#instance = new AirdropWallet(airdropWalletKeypair);
+      AirdropWallet.#serializedKeypair = serializedKeypair;
     }
+
     return AirdropWallet.#instance;
   }
 
@@ -126,4 +142,12 @@ class AirdropWallet {
   };
 }
 
-module.exports.AirdropWallet = AirdropWallet.getInstance();
+module.exports.AirdropWallet = {
+  signTransaction: (transaction) => AirdropWallet.getInstance().signTransaction(transaction),
+  partialSign: (transaction) => AirdropWallet.getInstance().partialSign(transaction),
+  getUmiWithSigner: (umi) => AirdropWallet.getInstance().getUmiWithSigner(umi),
+  signWithUmi: (transaction, umi) => AirdropWallet.getInstance().signWithUmi(transaction, umi),
+  sendRawTransaction: (transaction) => AirdropWallet.getInstance().sendRawTransaction(transaction),
+  getWalletPubkey: () => AirdropWallet.getInstance().getWalletPubkey(),
+  getWalletAddress: () => AirdropWallet.getInstance().getWalletAddress(),
+};

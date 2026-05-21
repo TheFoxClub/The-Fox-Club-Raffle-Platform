@@ -7,6 +7,7 @@
     "build:client": "vite build --mode development",
     "build": "vite build --mode production",
     "start": "concurrently \"npm run start:client\" \"npm run start:server\"",
+    "start:prod": "node server/index.js",
     "start:server": "nodemon server/index.js",
     "dev": "vite",
     "lint": "eslint .",
@@ -78,6 +79,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "sequelize-cli": "^6.6.5",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.3",
     "vite": "^7.2.2"
