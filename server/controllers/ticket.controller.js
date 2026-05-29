@@ -48,12 +48,10 @@ const NFTService = require("../services/nft.service");
 const SocketService = require("../services/socket.service");
 const TicketReservationService = require("../services/ticket-reservation.service");
 
-const dotenv = require("dotenv");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../config/constants");
 const { safeRound } = require("../util/util");
 const { solanaBalanceChecker, tokenBalanceChecker } = require("../util/balanceChecker");
-dotenv.config();
 
 class TicketController {
   static async buyTicket(req, res) {

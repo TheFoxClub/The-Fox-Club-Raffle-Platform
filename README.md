@@ -146,6 +146,219 @@ npm run build
 Creates optimized production build in `build/` directory.
 
 
+## Desktop Production Runbook (Windows)
+
+Use this when you want the app to run locally on your desktop as the production host.
+
+### 1. One-time setup
+
+```powershell
+npm install
+npm install -g pm2
+```
+
+Make sure services are running:
+
+- MySQL
+- Redis
+
+### 2. Environment file
+
+Create either `.env` or `env` in the repository root (both are supported).
+
+Required minimum values:
+
+- `NODE_ENV=production`
+- `SERVER_PORT=8080` (or your chosen port)
+- `ALLOWED_ORIGINS=https://your-domain.com`
+- `JWT_SECRET=...`
+- `SESSION_SECRET=...`
+- `CHECKSUM_SECRET_KEY=...`
+- `DB_*` and/or `PRODUCTION_DB_*`
+- `REDIS_*`
+- `PLATFORM_WALLET_SECRET_KEY=[...]`
+- `AIRDROP_WALLET_SECRET_KEY=[...]`
+
+### 3. Prepare database
+
+```powershell
+npm run migrate:prod
+```
+
+Optional (first deployment only):
+
+```powershell
+npm run seed:prod
+```
+
+### 4. Build frontend assets
+
+```powershell
+npm run build:prod
+```
+
+### 5. Start backend in production mode with PM2
+
+```powershell
+npm run pm2:start
+npm run pm2:save
+```
+
+Useful PM2 commands:
+
+```powershell
+npm run pm2:logs
+npm run pm2:restart
+npm run pm2:stop
+```
+
+### 6. Verify before live push
+
+1. Open `http://localhost:8080` and confirm the frontend loads.
+2. Confirm API calls succeed from the UI.
+3. Confirm logs are being written in `logs/`.
+4. Run `npm run migrate:status:prod` and ensure all migrations are up.
+5. Confirm wallet-dependent actions work in a safe test flow.
+
+### 7. Optional: auto-start PM2 on Windows boot
+
+Run once in elevated PowerShell:
+
+```powershell
+pm2 startup
+pm2 save
+```
+
+### 8. Auto-update + auto-redeploy (for scheduler)
+
+If you already have a scheduler script for your Discord bots, use the same pattern and run this command:
+
+```powershell
+npm run deploy:auto
+```
+
+What this script does:
+
+1. `git fetch --prune origin`
+2. Detects if there is a new upstream commit
+3. Runs `git pull --ff-only` (safe fast-forward only)
+4. Runs `npm install --ignore-scripts` only when `package.json` or `package-lock.json` changed
+5. Runs production migrations
+6. Runs production build
+7. Restarts PM2 app (`foxclub-raffle`) or starts it if missing
+8. Saves PM2 process list
+
+Safety rules built in:
+
+- If working tree has local changes, deploy is skipped
+- If branch diverges from upstream (local commits ahead), deploy is skipped
+- If no new commit exists, deploy is skipped
+
+Example with Windows Task Scheduler (every 5 minutes):
+
+- Program/script: `powershell.exe`
+- Add arguments:
+  `-ExecutionPolicy Bypass -NoProfile -File "C:\Users\joh_h\The-Fox-Club-Raffle-Platform\scripts\auto-deploy.ps1"`
+- Start in:
+  `C:\Users\joh_h\The-Fox-Club-Raffle-Platform`
+
+If you need to skip frontend build during maintenance:
+
+```powershell
+npm run deploy:auto:skip-build
+```
+
+If your scheduler is already running a .bat script for multiple projects, add this section to that same .bat file:
+
+```bat
+REM =========================
+REM Fox Club Raffle Platform
+REM =========================
+
+cd /d C:\Users\joh_h\The-Fox-Club-Raffle-Platform
+
+git fetch origin
+
+for /f %%i in ('git rev-parse HEAD') do set LOCAL_FOX=%%i
+for /f %%i in ('git rev-parse @{u}') do set REMOTE_FOX=%%i
+
+echo FoxClub Local: %LOCAL_FOX% >> C:\Users\joh_h\new-projects\scheduler-log.txt
+echo FoxClub Remote: %REMOTE_FOX% >> C:\Users\joh_h\new-projects\scheduler-log.txt
+
+if NOT "%LOCAL_FOX%"=="%REMOTE_FOX%" (
+echo Updating Fox Club... >> C:\Users\joh_h\new-projects\scheduler-log.txt
+call C:\Users\joh_h\The-Fox-Club-Raffle-Platform\scripts\auto-deploy.bat
+) else (
+echo No updates for Fox Club >> C:\Users\joh_h\new-projects\scheduler-log.txt
+)
+```
+
+Notes:
+
+- Keep your existing scheduler interval (for example every 5 minutes)
+- `auto-deploy.ps1` already handles migrations, build, PM2 restart/start, and safe skip rules
+- For manual testing, run `npm run deploy:auto:bat`
+
+### 9. Live domain checklist (step-by-step)
+
+1. Set production values in `.env`/`env`:
+
+- `NODE_ENV=production`
+- `VITE_MODE=production`
+- `VITE_CLIENT_URL=https://your-domain.com` (no trailing slash)
+- `ALLOWED_ORIGINS=https://your-domain.com` (no trailing slash)
+
+2. Run full preflight:
+
+```powershell
+npm run live:preflight
+```
+
+Optional DNS check in same script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\go-live-preflight.ps1 -Domain your-domain.com
+```
+
+3. Ensure MariaDB survives reboot:
+
+- Preferred (admin required): install MariaDB as a Windows service.
+- Non-admin fallback:
+
+```powershell
+npm run live:db:autostart
+```
+
+This creates a Startup launcher for the current user.
+
+4. Generate Caddy config for reverse proxy + TLS:
+
+```powershell
+npm run live:caddy:config -- -Domain your-domain.com
+```
+
+This writes `C:\caddy\Caddyfile` from `deploy/Caddyfile.template`.
+
+5. Start app process and save PM2 state:
+
+```powershell
+npm run pm2:start
+npm run pm2:save
+```
+
+6. Start Caddy (admin shell recommended for service setup):
+
+```powershell
+caddy run --config C:\caddy\Caddyfile
+```
+
+7. Final smoke test:
+
+- `http://localhost:8080/api/raffle/live` should return 200.
+- `https://your-domain.com` should load frontend.
+- `https://your-domain.com/api/raffle/live` should return 200.
+
+
 ## Project Structure
 
 ```

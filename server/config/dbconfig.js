@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("./loadEnv");
 
 module.exports = {
   development: {
@@ -24,7 +24,7 @@ module.exports = {
     username: process.env.PRODUCTION_DB_USERNAME || process.env.DB_USERNAME,
     password: process.env.PRODUCTION_DB_PASSWORD || process.env.DB_PASSWORD,
     host: process.env.PRODUCTION_DB_HOST || process.env.DB_HOST,
-    port: process.env.STAGING_DB_PORT || process.env.DB_PORT,
+    port: process.env.PRODUCTION_DB_PORT || process.env.DB_PORT,
     dialect: process.env.PRODUCTION_DB_DIALECT || process.env.DB_DIALECT,
     logging: false,
   },
