@@ -1807,12 +1807,27 @@ class RaffleController {
         );
       }
 
-      if (!raffle.platformWallet) {
+      const activePlatformWallet = Wallet.getWalletPubkey().toString();
+
+      if (!activePlatformWallet) {
         return respond(
           res,
           httpStatus.INTERNAL_SERVER_ERROR,
-          "Platform wallet not configured for this raffle",
+          "Platform wallet is not configured on the server",
         );
+      }
+
+      if (raffle.platformWallet !== activePlatformWallet) {
+        logger.warn(
+          `Raffle ${raffle.id} has stale platform wallet ${raffle.platformWallet}. Using active wallet ${activePlatformWallet} for claim.`,
+        );
+
+        await Raffle.update(
+          { platformWallet: activePlatformWallet },
+          { where: { id: raffle.id } },
+        );
+
+        raffle.platformWallet = activePlatformWallet;
       }
 
       // Prepare transfer from platform to winner
@@ -1863,7 +1878,7 @@ class RaffleController {
           type,
         },
         toAccount: user.pubkey,
-        fromAccount: raffle.platformWallet,
+        fromAccount: activePlatformWallet,
         feePayer: user.pubkey,
       });
 
@@ -2169,8 +2184,7 @@ class RaffleController {
         );
 
         const splTokenSendTxData = {
-          senderPubkey:
-            raffle.platformWallet || Wallet.getWalletPubkey().toString(),
+          senderPubkey: Wallet.getWalletPubkey().toString(),
           receiverPubkey: user.pubkey,
           type:
             reward.rewardType === RAFFLE_REWARD_TYPES.SOLANA
