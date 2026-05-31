@@ -30,6 +30,7 @@ const {
 const { validateChecksum } = require("../helpers/solana/checksum-validation");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { AirdropWallet } = require("../helpers/solana/airdrop-wallet");
+const { ADMIN_PUBKEYS } = require("../config/credentials");
 const redisClient = require("../util/redisClient");
 const {
   RAFFLE_REWARD_TYPES,
@@ -46,6 +47,19 @@ const REWARD_TYPE = AIRDROP_REWARD_TYPE;
 const USER_REWARD_STATUS = USER_AIRDROP_REWARD_STATUS;
 const TOKEN_IMAGE_PLACEHOLDER = "/uploads/token-placeholder.png";
 const METADATA_CACHE_TTL = parseInt(process.env.METADATA_CACHE_TTL, 10) || 3600;
+const DEFAULT_EXCLUDED_AIRDROP_WALLETS = [
+  "7FBYmr95j8qFpWRj1Xe95WiRfwiFf49G3CwHDshoCfiE",
+];
+const EXCLUDED_AIRDROP_WALLETS = new Set(
+  [...DEFAULT_EXCLUDED_AIRDROP_WALLETS, ...(ADMIN_PUBKEYS || [])]
+    .map((wallet) => String(wallet || "").trim())
+    .filter(Boolean),
+);
+
+const isExcludedAirdropWallet = (walletAddress) => {
+  const normalized = String(walletAddress || "").trim();
+  return normalized ? EXCLUDED_AIRDROP_WALLETS.has(normalized) : false;
+};
 
 const normalizeDateTimeInput = (value, boundary = "start") => {
   if (!value) return null;
@@ -214,24 +228,10 @@ const buildXpLeaderboardForRange = async ({
     raw: true,
   });
 
-  const totalParticipants = topEarners.length;
-  let paginatedEarners;
-  let totalPages;
-  let offset = 0;
-
-  if (parsedLimit === -1) {
-    paginatedEarners = topEarners;
-    totalPages = totalParticipants > 0 ? 1 : 0;
-  } else {
-    totalPages =
-      totalParticipants > 0 ? Math.ceil(totalParticipants / parsedLimit) : 0;
-    offset = (parsedPage - 1) * parsedLimit;
-    paginatedEarners = topEarners.slice(offset, offset + parsedLimit);
-  }
-
-  const leaderboard = await Promise.all(
-    paginatedEarners.map(async (earner, index) => {
-      const user = await User.findByPk(earner.userId, {
+  const userIds = topEarners.map((earner) => earner.userId);
+  const users = userIds.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: userIds } },
         attributes: ["id", "pubkey", "totalXp"],
         include: [
           {
@@ -240,20 +240,50 @@ const buildXpLeaderboardForRange = async ({
             required: false,
           },
         ],
-      });
+      })
+    : [];
+
+  const userById = new Map(users.map((user) => [user.id, user]));
+  const enrichedEarners = topEarners
+    .map((earner) => {
+      const user = userById.get(earner.userId);
+      const walletAddress = user?.pubkey || "Unknown";
 
       return {
-        rank: offset + index + 1,
         userId: earner.userId,
-        walletAddress: user?.pubkey || "Unknown",
+        walletAddress,
         username: user?.user_info?.username || null,
         periodXp: parseFloat(earner.periodXp || 0),
         periodUsdValue: parseFloat(earner.periodUsdValue || 0),
         transactionCount: parseInt(earner.transactionCount || 0, 10),
         allTimeXp: parseFloat(user?.totalXp || 0),
       };
-    }),
-  );
+    })
+    .filter(
+      (earner) =>
+        earner.walletAddress !== "Unknown" &&
+        !isExcludedAirdropWallet(earner.walletAddress),
+    );
+
+  const totalParticipants = enrichedEarners.length;
+  let paginatedEarners;
+  let totalPages;
+  let offset = 0;
+
+  if (parsedLimit === -1) {
+    paginatedEarners = enrichedEarners;
+    totalPages = totalParticipants > 0 ? 1 : 0;
+  } else {
+    totalPages =
+      totalParticipants > 0 ? Math.ceil(totalParticipants / parsedLimit) : 0;
+    offset = (parsedPage - 1) * parsedLimit;
+    paginatedEarners = enrichedEarners.slice(offset, offset + parsedLimit);
+  }
+
+  const leaderboard = paginatedEarners.map((earner, index) => ({
+    rank: offset + index + 1,
+    ...earner,
+  }));
 
   return {
     parsedPage,
@@ -357,6 +387,169 @@ const getTransactionSignature = (tx, isVersioned) => {
   }
 
   return bs58.encode(tx.signature);
+};
+
+const getSplTxTypeFromAirdropType = (airdropType) => {
+  switch (airdropType) {
+    case REWARD_TYPE.SPL_TOKEN:
+      return SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+    case REWARD_TYPE.SPL_TOKEN_2022:
+      return SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
+    case REWARD_TYPE.SOL:
+    default:
+      return SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+  }
+};
+
+const getRaffleRewardTypeFromAirdropType = (airdropType) => {
+  switch (airdropType) {
+    case REWARD_TYPE.SPL_TOKEN:
+      return RAFFLE_REWARD_TYPES.SPL_TOKEN;
+    case REWARD_TYPE.SPL_TOKEN_2022:
+      return RAFFLE_REWARD_TYPES.SPL_TOKEN_2022;
+    case REWARD_TYPE.SOL:
+    default:
+      return RAFFLE_REWARD_TYPES.SOLANA;
+  }
+};
+
+const processAirdropCancellationRefund = async ({
+  airdrop,
+  adminUserId,
+  transaction,
+}) => {
+  const fundingTx = await SplTokenSendTransaction.findByPk(
+    airdrop.splTokenSendTxId,
+    { transaction },
+  );
+
+  if (!fundingTx?.senderPubkey) {
+    throw new Error(
+      "Cannot cancel this airdrop because the funding wallet could not be resolved",
+    );
+  }
+
+  const pendingClaimsCount = await UserAirdropReward.count({
+    where: {
+      airdropRewardId: airdrop.id,
+      status: USER_REWARD_STATUS.PENDING,
+    },
+    transaction,
+  });
+
+  if (pendingClaimsCount > 0) {
+    throw new Error(
+      "Cannot cancel while claim transactions are pending confirmation",
+    );
+  }
+
+  const claimedAmountResult = await UserAirdropReward.findOne({
+    attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "claimedAmount"]],
+    where: {
+      airdropRewardId: airdrop.id,
+      status: USER_REWARD_STATUS.CLAIMED,
+    },
+    raw: true,
+    transaction,
+  });
+
+  const totalAmount = parseFloat(airdrop.totalAmount || 0);
+  const claimedAmount = parseFloat(claimedAmountResult?.claimedAmount || 0);
+  const refundableAmountRaw = Math.max(totalAmount - claimedAmount, 0);
+  const refundableAmount = parseFloat(refundableAmountRaw.toFixed(9));
+  const refundWallet = fundingTx.senderPubkey;
+
+  if (refundableAmount <= 0) {
+    return {
+      refundedAmount: 0,
+      refundWallet,
+      refundSignature: null,
+      refundTxRecordId: null,
+    };
+  }
+
+  const refundFromWallet = AirdropWallet.getWalletAddress();
+  const tokenMint =
+    airdrop.type === REWARD_TYPE.SOL
+      ? SPL_TOKEN_ADDRESS.SOLANA
+      : airdrop.tokenAddress;
+
+  const prepareRefundResponse = await sendMultipleSplTokenTx({
+    splTokenSendSummary: [
+      {
+        tokenAddress: tokenMint,
+        toAccount: refundWallet,
+        amount: refundableAmount,
+        type: getRaffleRewardTypeFromAirdropType(airdrop.type),
+        decimals: airdrop.tokenDecimals || 9,
+        metadata: {
+          purpose: "airdrop_refund",
+          airdropId: airdrop.id,
+        },
+      },
+    ],
+    solCommission: 0,
+    feePayer: refundFromWallet,
+    feeData: {},
+    fromAccount: refundFromWallet,
+    isUserToPlatform: false,
+    transferDirection: TRANSFER_DIRECTION.AIRDROP_TO_USER,
+  });
+
+  if (!prepareRefundResponse.success) {
+    throw new Error(
+      `Failed to prepare airdrop refund transaction: ${prepareRefundResponse.message}`,
+    );
+  }
+
+  const { tx: refundTx, isVersioned } = decodeSignedTransaction(
+    prepareRefundResponse.data.serializedTx,
+  );
+
+  if (isVersioned) {
+    throw new Error("Airdrop refund currently supports legacy transactions only");
+  }
+
+  const signedRefundTx = AirdropWallet.signTransaction(refundTx);
+  const signedRefundTxBase64 = signedRefundTx.serialize().toString("base64");
+  const submissionResult = await submitTransactionToBlockchain(signedRefundTxBase64);
+
+  if (!submissionResult.success || !submissionResult.signature) {
+    throw new Error(
+      `Failed to submit airdrop refund transaction: ${submissionResult.error || submissionResult.message || "unknown error"}`,
+    );
+  }
+
+  const decimals = airdrop.tokenDecimals || 9;
+  const refundUiAmount = Math.floor(refundableAmount * Math.pow(10, decimals));
+
+  const refundTxRecord = await SplTokenSendTransaction.create(
+    {
+      senderPubkey: refundFromWallet,
+      receiverPubkey: refundWallet,
+      type: getSplTxTypeFromAirdropType(airdrop.type),
+      txId: submissionResult.signature,
+      tokenAddress: airdrop.tokenAddress || null,
+      decimals,
+      uiAmount: String(refundUiAmount),
+      status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+      rewardTransferType: "airdrop_refund",
+      additionalJson: {
+        purpose: "airdrop_refund",
+        airdropId: airdrop.id,
+        fundingTxRecordId: fundingTx.id,
+        cancelledByUserId: adminUserId || null,
+      },
+    },
+    { transaction },
+  );
+
+  return {
+    refundedAmount: refundableAmount,
+    refundWallet,
+    refundSignature: submissionResult.signature,
+    refundTxRecordId: refundTxRecord.id,
+  };
 };
 
 const validateTransactionChecksum = (tx, isVersioned, checksum) => {
@@ -647,23 +840,28 @@ class AirdropController {
    * Update airdrop campaign status
    */
   static async updateAirdropStatus(req, res) {
+    const transaction = await sequelize.transaction();
+
     try {
       const { id } = req.params;
       const { status } = req.body;
 
-      const airdrop = await AirdropDetail.findByPk(id);
+      const airdrop = await AirdropDetail.findByPk(id, { transaction });
 
       if (!airdrop) {
+        await transaction.rollback();
         return respond(res, httpStatus.NOT_FOUND, "Airdrop not found");
       }
 
       if (status === undefined) {
+        await transaction.rollback();
         return respond(res, httpStatus.BAD_REQUEST, "status is required");
       }
 
       const parsedStatus = parseInt(status, 10);
 
       if (Number.isNaN(parsedStatus)) {
+        await transaction.rollback();
         return respond(
           res,
           httpStatus.BAD_REQUEST,
@@ -682,6 +880,7 @@ class AirdropController {
       };
 
       if (!validTransitions[airdrop.status]?.includes(parsedStatus)) {
+        await transaction.rollback();
         return respond(
           res,
           httpStatus.BAD_REQUEST,
@@ -690,15 +889,28 @@ class AirdropController {
       }
 
       const updateData = { status: parsedStatus };
+      let refundResult = null;
 
-      await airdrop.update(updateData);
+      if (parsedStatus === AIRDROP_STATUS.CANCELLED) {
+        refundResult = await processAirdropCancellationRefund({
+          airdrop,
+          adminUserId: req.payload?.id,
+          transaction,
+        });
+      }
+
+      await airdrop.update(updateData, { transaction });
+
+      await transaction.commit();
 
       logger.info(`Airdrop ${id} updated: ${JSON.stringify(updateData)}`);
 
       return respond(res, httpStatus.OK, "Airdrop updated successfully", {
         airdrop: airdrop.toJSON(),
+        refund: refundResult,
       });
     } catch (err) {
+      await transaction.rollback();
       logger.error("Error updating airdrop status:", err);
       return respond(
         res,
