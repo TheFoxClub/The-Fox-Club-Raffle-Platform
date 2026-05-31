@@ -58,7 +58,7 @@ const Leaderboard = () => {
             rank: host.rank,
             walletAddress: host.walletAddress,
             walletShort: shortenWallet(host.walletAddress),
-            revenue: host.totalRevenue,
+            revenue: host.totalRevenueXp,
             raffles: host.rafflesCount,
             tokenType: formatToken(host.tokenType),
             badge: host.rank === 1 ? "crown" : undefined,

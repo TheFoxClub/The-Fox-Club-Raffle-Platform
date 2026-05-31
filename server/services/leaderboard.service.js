@@ -12,7 +12,8 @@ const { getXpRates } = require("./xp.service");
 
 const getTopHosts = async (limit = 10, xpConfig) => {
   try {
-    // Get top hosts by revenue  from raffles table
+    // Get host raffle revenue records from non-draft raffles.
+    // Sort and limit are applied after USD normalization.
 
     const results2 = await sequelize.query(
       `
@@ -29,12 +30,10 @@ const getTopHosts = async (limit = 10, xpConfig) => {
   FROM users u
   INNER JOIN raffles r
     ON u.id = r.userId
+  WHERE r.status != 0
   GROUP BY u.id, u.pubkey
-  ORDER BY u.id DESC
-  LIMIT ?
   `,
       {
-        replacements: [parseInt(limit, 10)],
         type: sequelize.QueryTypes.SELECT,
       }
     );
@@ -56,7 +55,18 @@ const getTopHosts = async (limit = 10, xpConfig) => {
       const normalizedRaffles = [];
 
       for (const raffle of raffles) {
-        const price = await PriceService.getTokenUsdPrice(raffle.tokenAddress);
+        let tokenAddress = raffle.tokenAddress;
+
+        // Fallback token address when older raffle rows do not persist tokenAddress.
+        if (!tokenAddress) {
+          if (raffle.tokenType === TOKEN_TYPE.SOLANA) {
+            tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+          } else if (raffle.tokenType === TOKEN_TYPE.USDC) {
+            tokenAddress = SPL_TOKEN_ADDRESS.USDC;
+          }
+        }
+
+        const price = await PriceService.getTokenUsdPrice(tokenAddress);
 
         const revenueUsd = parseFloat(raffle.revenue || 0) * price;
 
@@ -64,7 +74,7 @@ const getTopHosts = async (limit = 10, xpConfig) => {
 
         normalizedRaffles.push({
           raffleId: raffle.raffleId,
-          tokenAddress: raffle.tokenAddress,
+          tokenAddress,
           revenue: parseFloat(raffle.revenue || 0),
           revenueUsd,
         });
@@ -80,12 +90,15 @@ const getTopHosts = async (limit = 10, xpConfig) => {
 
     normalized.sort((a, b) => b.totalRevenueUsd - a.totalRevenueUsd);
 
+    const requestedLimit = parseInt(limit, 10) || 10;
+    const limitedHosts = normalized.slice(0, requestedLimit);
+
     //converting each revenue to XP
-    const xpResults = normalized.map((host, index) => ({
+    const xpResults = limitedHosts.map((host, index) => ({
       rank: index + 1,
       walletAddress: host.walletAddress,
       totalRevenue: parseFloat(host.totalRevenueUsd) || 0, //usd
-      totalRevenueSol: host.totalRevenueUsd / solToUsdPrice,
+      totalRevenueSol: solToUsdPrice > 0 ? host.totalRevenueUsd / solToUsdPrice : 0,
       totalRevenueXp:
         parseFloat(host.totalRevenueUsd) / xpConfig.raffle_revenue_rate,
       rafflesCount: parseInt(host.raffleCount || 0, 10),

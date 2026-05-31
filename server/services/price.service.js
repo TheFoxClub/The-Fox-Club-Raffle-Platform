@@ -111,17 +111,10 @@ class PriceService {
    * @returns {boolean} True if devnet/testnet
    */
   static isDevnetEnvironment() {
-    // Check environment variables or other indicators
-    const nodeEnv = process.env.NODE_ENV;
-    const solanaCluster = process.env.SOLANA_CLUSTER;
+    // Only enable mock pricing when explicitly requested.
+    // This prevents accidental valuation drift from env defaults.
     const useMockPrices = process.env.USE_MOCK_PRICES;
-
-    return (
-      nodeEnv === "development" ||
-      solanaCluster === "devnet" ||
-      solanaCluster === "testnet" ||
-      useMockPrices === "true"
-    );
+    return useMockPrices === "true";
   }
 
   /**
