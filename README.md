@@ -171,6 +171,11 @@ Required minimum values:
 - `NODE_ENV=production`
 - `SERVER_PORT=8080` (or your chosen port)
 - `ALLOWED_ORIGINS=https://your-domain.com`
+- `PUBLIC_APP_URL=https://your-domain.com`
+- `DISCORD_RAFFLE_WEBHOOK_URL=https://discord.com/api/webhooks/...`
+- `DISCORD_RAFFLE_WEBHOOK_USERNAME=FoxClub Raffles` (optional)
+- `DISCORD_RAFFLE_WEBHOOK_AVATAR_URL=https://your-domain.com/path/to/avatar.png` (optional)
+- The same webhook is used for new-raffle embeds and the automatic 1-hour reminder embed before a raffle ends.
 - `JWT_SECRET=...`
 - `SESSION_SECRET=...`
 - `CHECKSUM_SECRET_KEY=...`
@@ -307,6 +312,8 @@ Notes:
 - `VITE_MODE=production`
 - `VITE_CLIENT_URL=https://your-domain.com` (no trailing slash)
 - `ALLOWED_ORIGINS=https://your-domain.com` (no trailing slash)
+- `PUBLIC_APP_URL=https://your-domain.com` (no trailing slash)
+- `DISCORD_RAFFLE_WEBHOOK_URL=https://discord.com/api/webhooks/...`
 
 2. Run full preflight:
 

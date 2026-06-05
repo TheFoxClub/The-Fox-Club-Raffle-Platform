@@ -49,9 +49,30 @@ const {
 } = require("../config/constants");
 const { FUND_RECEIVER_WALLET } = require("../config/credentials");
 const SocketService = require("../services/socket.service");
+const {
+  sendRaffleCreatedNotification,
+} = require("../services/discord.service");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { getRaffleRefundTransaction } = require("../services/raffles/refund");
 const { solanaBalanceChecker } = require("../util/balanceChecker");
+
+const notifyRaffleCreated = async ({ raffle, origin, creatorPubkey }) => {
+  if (!raffle || raffle.status === RAFFLE_STATUS.DRAFT || raffle.status === "DRAFT") {
+    return;
+  }
+
+  try {
+    await sendRaffleCreatedNotification({
+      raffle,
+      origin,
+      creatorPubkey,
+    });
+  } catch (error) {
+    logger.error(
+      `Failed to send Discord raffle webhook for raffle ${raffle.id}: ${error.message}`,
+    );
+  }
+};
 
 class RaffleController {
   static async getLiveRaffles(req, res) {
@@ -945,6 +966,12 @@ class RaffleController {
           )} (${correctStatus})`,
         );
 
+        await notifyRaffleCreated({
+          raffle: raffleDataResponse,
+          origin: req.headers.origin,
+          creatorPubkey: user.pubkey,
+        });
+
         return respond(
           res,
           httpStatus.OK,
@@ -1311,6 +1338,12 @@ class RaffleController {
       logger.info(
         `Raffle created successfully: ${raffle.id} by user ${user.pubkey}`,
       );
+
+      await notifyRaffleCreated({
+        raffle: raffleData,
+        origin: req.headers.origin,
+        creatorPubkey: user.pubkey,
+      });
 
       // Emit Socket.IO event for new raffle creation
       SocketService.emitGlobalUpdate("raffle-list-updated", {
@@ -1689,6 +1722,12 @@ class RaffleController {
       logger.info(
         `Reward transfer signature stored for raffle ${raffleId} by user ${user.pubkey}, signature: ${signature}`,
       );
+
+      await notifyRaffleCreated({
+        raffle: raffleDataResponse,
+        origin: req.headers.origin,
+        creatorPubkey: user.pubkey,
+      });
 
       // Award XP for raffle creation
       try {

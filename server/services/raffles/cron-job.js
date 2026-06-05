@@ -4,6 +4,19 @@ const { Raffle, RaffleDetail } = require("../../models");
 const logger = require("../../util/logger");
 const WinnerSelectionService = require("./winner-selection");
 const SocketService = require("../socket.service");
+const {
+  sendRaffleEndingSoonNotification,
+} = require("../discord.service");
+
+const RAFFLE_REMINDER_KEY = "discordOneHourReminderSentAt";
+
+const getDetailMetadata = (detail) => {
+  if (!detail?.additionalJson || typeof detail.additionalJson !== "object") {
+    return {};
+  }
+
+  return detail.additionalJson;
+};
 
 const checkRaffleAndFeaturedStatus = async () => {
   try {
@@ -52,6 +65,39 @@ const checkRaffleAndFeaturedStatus = async () => {
       } else {
         // Raffle is upcoming
         newStatus = RAFFLE_STATUS.UPCOMING;
+      }
+
+      if (
+        raffle.raffle_detail &&
+        newStatus === RAFFLE_STATUS.LIVE &&
+        raffle.endDate > currentDate
+      ) {
+        const reminderMeta = getDetailMetadata(raffle.raffle_detail);
+        const reminderSentAt = reminderMeta[RAFFLE_REMINDER_KEY];
+        const msUntilEnd = raffle.endDate.getTime() - currentDate.getTime();
+
+        if (!reminderSentAt && msUntilEnd <= 60 * 60 * 1000) {
+          const raffleData = raffle.get({ plain: true });
+
+          try {
+            const sent = await sendRaffleEndingSoonNotification({
+              raffle: raffleData,
+            });
+
+            if (sent) {
+              raffle.raffle_detail.additionalJson = {
+                ...reminderMeta,
+                [RAFFLE_REMINDER_KEY]: currentDate.toISOString(),
+              };
+              await raffle.raffle_detail.save();
+            }
+          } catch (error) {
+            logger.error(
+              `Failed to send raffle reminder for raffle ${raffle.id}:`,
+              error,
+            );
+          }
+        }
       }
 
       if (newStatus !== oldStatus && oldStatus !== RAFFLE_STATUS.DRAFT) {

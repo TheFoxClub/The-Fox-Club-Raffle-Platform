@@ -33,6 +33,17 @@ module.exports.ADMIN_PUBKEYS = process.env.ADMIN_PUBKEY
 
 module.exports.FUND_RECEIVER_WALLET = process.env.FUND_RECEIVER_WALLET;
 
+module.exports.PUBLIC_APP_URL = process.env.PUBLIC_APP_URL;
+
+module.exports.DISCORD_RAFFLE_WEBHOOK_URL =
+  process.env.DISCORD_RAFFLE_WEBHOOK_URL;
+
+module.exports.DISCORD_RAFFLE_WEBHOOK_USERNAME =
+  process.env.DISCORD_RAFFLE_WEBHOOK_USERNAME || "FoxClub Raffles";
+
+module.exports.DISCORD_RAFFLE_WEBHOOK_AVATAR_URL =
+  process.env.DISCORD_RAFFLE_WEBHOOK_AVATAR_URL;
+
 module.exports.JWT_SECRET = requireEnv("JWT_SECRET");
 
 module.exports.SESSION_SECRET = requireEnv("SESSION_SECRET");
