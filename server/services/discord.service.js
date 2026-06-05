@@ -1,4 +1,5 @@
 const { default: axios } = require("axios");
+const { VerifiedToken } = require("../models");
 const logger = require("../util/logger");
 const {
   DISCORD_RAFFLE_WEBHOOK_URL,
@@ -6,6 +7,7 @@ const {
   DISCORD_RAFFLE_WEBHOOK_AVATAR_URL,
   PUBLIC_APP_URL,
 } = require("../config/credentials");
+const { SPL_TOKEN_ADDRESS } = require("../config/data");
 
 const EMBED_COLOR = 0xf59e0b;
 const REMINDER_WINDOW_MS = 60 * 60 * 1000;
@@ -85,11 +87,68 @@ const formatRewardSummary = (rewards = []) => {
   return rewards.length > 4 ? `${summary}\n- +${rewards.length - 4} more` : summary;
 };
 
-const buildFields = (raffle, creatorPubkey) => {
+const formatDisplayNumber = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return "0";
+  }
+
+  const stringValue = String(value);
+
+  if (!stringValue.includes(".")) {
+    return stringValue;
+  }
+
+  return stringValue.replace(/\.0+$/, "").replace(/(\.\d*?[1-9])0+$/, "$1");
+};
+
+const getDefaultTokenLabel = (raffle) => {
+  if (raffle.tokenAddress === SPL_TOKEN_ADDRESS.SOLANA) {
+    return "SOL";
+  }
+
+  if (raffle.tokenType === "USDC") {
+    return "USDC";
+  }
+
+  if (raffle.tokenType === "SOLANA") {
+    return "SOL";
+  }
+
+  return "TOKEN";
+};
+
+const resolveTokenLabel = async (raffle) => {
+  if (!raffle?.tokenAddress) {
+    return getDefaultTokenLabel(raffle);
+  }
+
+  try {
+    const token = await VerifiedToken.findOne({
+      where: {
+        address: raffle.tokenAddress,
+        isVerified: true,
+      },
+      attributes: ["symbol"],
+    });
+
+    if (token?.symbol) {
+      return token.symbol;
+    }
+  } catch (error) {
+    logger.warn(
+      `Failed to resolve token symbol for raffle ${raffle.id}: ${error.message}`,
+    );
+  }
+
+  return getDefaultTokenLabel(raffle);
+};
+
+const buildFields = async (raffle, creatorPubkey, raffleUrl) => {
+  const tokenLabel = await resolveTokenLabel(raffle);
   const fields = [
     {
       name: "Ticket Price",
-      value: `${raffle.ticketPrice} ${raffle.tokenType || "SOLANA"}`,
+      value: `${formatDisplayNumber(raffle.ticketPrice)} ${tokenLabel}`,
       inline: true,
     },
     {
@@ -132,10 +191,18 @@ const buildFields = (raffle, creatorPubkey) => {
     });
   }
 
+  if (raffleUrl) {
+    fields.push({
+      name: "Raffle Link",
+      value: truncate(raffleUrl, 1024),
+      inline: false,
+    });
+  }
+
   return fields;
 };
 
-const buildEmbed = ({
+const buildEmbed = async ({
   raffle,
   origin,
   creatorPubkey,
@@ -153,7 +220,7 @@ const buildEmbed = ({
     url: raffleUrl,
     description: truncate(description, 4096),
     color: EMBED_COLOR,
-    fields: buildFields(raffle, creatorPubkey),
+    fields: await buildFields(raffle, creatorPubkey, raffleUrl),
     image: imageUrl ? { url: imageUrl } : undefined,
     footer: {
       text: FOOTER_TEXT,
@@ -186,7 +253,7 @@ async function sendRaffleCreatedNotification({ raffle, origin, creatorPubkey }) 
   }
 
   await sendDiscordWebhook(
-    buildEmbed({
+    await buildEmbed({
       raffle,
       origin,
       creatorPubkey,
@@ -214,7 +281,7 @@ async function sendRaffleEndingSoonNotification({
   }
 
   await sendDiscordWebhook(
-    buildEmbed({
+    await buildEmbed({
       raffle,
       origin,
       creatorPubkey,
