@@ -261,17 +261,24 @@ const CreateRaffle = () => {
             let image: string | undefined = undefined;
             if (nftItem.image === null || nftItem.image === undefined) {
               try {
-                const metaRes = await fetch(nftItem.uri);
+                const normalizedUri = normalizeIpfs(nftItem.uri);
+                const metaRes = normalizedUri ? await fetch(normalizedUri) : null;
                 if (metaRes.ok) {
                   const meta = await metaRes.json();
-                  if (meta.image) image = meta.image;
+                  image =
+                    normalizeIpfs(
+                      meta.image ||
+                        meta.image_url ||
+                        meta.logoURI ||
+                        meta.properties?.files?.[0]?.uri
+                    ) || undefined;
                   if (meta.name) name = meta.name;
                 }
               } catch (err) {
                 image = "/uploads/nft-placeholder.svg";
               }
             } else {
-              image = nftItem.image;
+              image = normalizeIpfs(nftItem.image) || undefined;
             }
 
             return {
@@ -557,7 +564,6 @@ const CreateRaffle = () => {
     });
 
     if (!title.trim()) newErrors.title = "Title is required";
-    if (!description.trim()) newErrors.description = "Description is required";
     if (!ticketPrice || Number(ticketPrice) <= 0) {
       newErrors.ticketPrice = "Ticket price must be greater than 0";
     } else {

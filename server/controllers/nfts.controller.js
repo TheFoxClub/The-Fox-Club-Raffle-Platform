@@ -16,6 +16,44 @@ const CACHE_TTL = process.env.REDIS_TTL || 300;
 const { VerifiedCollection } = require("../models");
 const { COLLECTION_ISVERIFIED } = require("../config/data");
 
+const normalizeIpfsUri = (value) => {
+  if (!value) return null;
+
+  const uri = String(value).trim();
+  if (!uri) return null;
+
+  if (!uri.startsWith("ipfs://")) {
+    return uri;
+  }
+
+  let path = uri.slice(7);
+  if (path.startsWith("ipfs/")) {
+    path = path.slice(5);
+  }
+
+  return `https://gateway.pinata.cloud/ipfs/${path}`;
+};
+
+const getAssetImage = (item) => {
+  const fileImage = item?.content?.files?.find((file) => {
+    const uri = file?.cdn_uri || file?.uri;
+    const mime = String(file?.mime || "").toLowerCase();
+    return uri && (!mime || mime.startsWith("image/"));
+  });
+
+  return (
+    normalizeIpfsUri(item?.content?.links?.image) ||
+    normalizeIpfsUri(item?.links?.image) ||
+    normalizeIpfsUri(item?.content?.metadata?.image) ||
+    normalizeIpfsUri(item?.content?.json?.image) ||
+    normalizeIpfsUri(item?.content?.json?.image_url) ||
+    normalizeIpfsUri(item?.content?.json?.properties?.files?.[0]?.uri) ||
+    normalizeIpfsUri(fileImage?.cdn_uri) ||
+    normalizeIpfsUri(fileImage?.uri) ||
+    null
+  );
+};
+
 class HolderController {
   static async getUserNftsFromCollection(req, res) {
     try {
@@ -39,7 +77,7 @@ class HolderController {
 
       const collectionAddresses = verifiedCollections.map((c) => c.address);
 
-      const cacheKey = `nfts:collection:${pubkey}:${collectionAddresses.join(
+      const cacheKey = `nfts:collection:v2:${pubkey}:${collectionAddresses.join(
         ","
       )}`;
 
@@ -80,7 +118,8 @@ class HolderController {
       const nfts = Array.from(uniqueNftsMap.values()).map((item) => ({
         mint: item.id,
         name: item.content?.metadata?.name,
-        uri: item.content?.json_uri,
+        uri: normalizeIpfsUri(item.content?.json_uri),
+        image: getAssetImage(item),
         interface: item.interface,
         grouping: item.grouping,
         ownership: item.ownership,
@@ -129,7 +168,7 @@ class HolderController {
         (item) => item.address
       );
 
-      const cacheKey = `nfts:all:${pubkey}`;
+      const cacheKey = `nfts:all:v2:${pubkey}`;
 
       let cachedData = await redisClient.get(cacheKey);
 
@@ -181,15 +220,10 @@ class HolderController {
         nfts = nfts.map((item) => ({
           mint: item.id,
           name: item.content?.metadata?.name,
-          uri: item.content?.json_uri,
+          uri: normalizeIpfsUri(item.content?.json_uri),
           interface: item.interface,
           collection: item.grouping?.[0],
-          image: 
-            item.content?.links?.image ||
-            item.links?.image ||
-            item.content?.files?.[0]?.cdn_uri ||
-            item.content?.files?.[0]?.uri ||
-            null,
+          image: getAssetImage(item),
           ownership: item.ownership,
         }));
       }
