@@ -69,6 +69,20 @@ const formatDate = (value) => {
   }).format(date);
 };
 
+const formatDiscordRelativeTime = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return `<t:${Math.floor(date.getTime() / 1000)}:R>`;
+};
+
 const formatRewardSummary = (rewards = []) => {
   if (!Array.isArray(rewards) || rewards.length === 0) {
     return "No rewards listed";
@@ -143,8 +157,9 @@ const resolveTokenLabel = async (raffle) => {
   return getDefaultTokenLabel(raffle);
 };
 
-const buildFields = async (raffle, creatorPubkey, raffleUrl) => {
+const buildFields = async (raffle, creatorPubkey, raffleUrl, options = {}) => {
   const tokenLabel = await resolveTokenLabel(raffle);
+  const endsValue = options.endsValue || formatDate(raffle.endDate);
   const fields = [
     {
       name: "Ticket Price",
@@ -168,7 +183,7 @@ const buildFields = async (raffle, creatorPubkey, raffleUrl) => {
     },
     {
       name: "Ends",
-      value: formatDate(raffle.endDate),
+      value: endsValue,
       inline: true,
     },
     {
@@ -207,6 +222,8 @@ const buildEmbed = async ({
   origin,
   creatorPubkey,
   description,
+  title,
+  fieldOptions,
 }) => {
   const baseUrl = normalizeBaseUrl(origin) || normalizeBaseUrl(PUBLIC_APP_URL);
   const raffleUrl = baseUrl ? `${baseUrl}/raffle/raffle-${raffle.id}` : undefined;
@@ -216,11 +233,11 @@ const buildEmbed = async ({
   );
 
   return {
-    title: truncate(raffle.title || `Raffle #${raffle.id}`, 256),
+    title: truncate(title || raffle.title || `Raffle #${raffle.id}`, 256),
     url: raffleUrl,
     description: truncate(description, 4096),
     color: EMBED_COLOR,
-    fields: await buildFields(raffle, creatorPubkey, raffleUrl),
+    fields: await buildFields(raffle, creatorPubkey, raffleUrl, fieldOptions),
     image: imageUrl ? { url: imageUrl } : undefined,
     footer: {
       text: FOOTER_TEXT,
@@ -285,9 +302,13 @@ async function sendRaffleEndingSoonNotification({
       raffle,
       origin,
       creatorPubkey,
+      title: `Raffle Reminder! ${raffle.title || `#${raffle.id}`}`,
       description:
         raffle.description ||
         "Reminder: this raffle is ending in about 1 hour on FoxClub.",
+      fieldOptions: {
+        endsValue: formatDiscordRelativeTime(raffle.endDate),
+      },
     }),
   );
 
