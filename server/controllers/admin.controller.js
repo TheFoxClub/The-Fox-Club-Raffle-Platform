@@ -1,6 +1,7 @@
 const {
   Raffle,
   RaffleDetail,
+  RaffleReward,
   User,
   UserInfo,
   VerifiedCollection,
@@ -32,6 +33,9 @@ const XpService = require("../services/xp.service");
 const { publicKey } = require("@metaplex-foundation/umi");
 const { getUmi } = require("../config/solana");
 const PriceService = require("../services/price.service");
+const {
+  sendRaffleEndingSoonNotification,
+} = require("../services/discord.service");
 
 class AdminController {
   static async getAllRaffles(req, res) {
@@ -231,6 +235,53 @@ class AdminController {
       );
     } catch (err) {
       logger.error(err);
+      return respond(
+        res,
+        httpStatus.INTERNAL_SERVER_ERROR,
+        parseSequelizeErrors(err)
+      );
+    }
+  }
+
+  static async sendRaffleReminder(req, res) {
+    try {
+      const { id } = req.params;
+
+      const raffle = await Raffle.findOne({
+        where: { id },
+        include: [
+          {
+            model: RaffleDetail,
+            required: false,
+          },
+          {
+            model: RaffleReward,
+            required: false,
+          },
+          {
+            model: User,
+            attributes: ["id", "pubkey"],
+            required: false,
+          },
+        ],
+      });
+
+      if (!raffle) {
+        return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
+      }
+
+      await sendRaffleEndingSoonNotification({
+        raffle: raffle.get({ plain: true }),
+        origin: req.headers.origin,
+        creatorPubkey: raffle.User?.pubkey,
+        force: true,
+      });
+
+      return respond(res, httpStatus.OK, "Raffle reminder sent", {
+        raffleId: raffle.id,
+      });
+    } catch (err) {
+      logger.error("Error sending manual raffle reminder:", err);
       return respond(
         res,
         httpStatus.INTERNAL_SERVER_ERROR,

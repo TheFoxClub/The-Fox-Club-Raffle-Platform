@@ -294,6 +294,7 @@ async function sendRaffleEndingSoonNotification({
   raffle,
   origin,
   creatorPubkey,
+  force = false,
 }) {
   if (!DISCORD_RAFFLE_WEBHOOK_URL || !raffle || !raffle.endDate) {
     return false;
@@ -301,7 +302,7 @@ async function sendRaffleEndingSoonNotification({
 
   const msUntilEnd = new Date(raffle.endDate).getTime() - Date.now();
 
-  if (msUntilEnd <= 0 || msUntilEnd > REMINDER_WINDOW_MS) {
+  if (!force && (msUntilEnd <= 0 || msUntilEnd > REMINDER_WINDOW_MS)) {
     return false;
   }
 

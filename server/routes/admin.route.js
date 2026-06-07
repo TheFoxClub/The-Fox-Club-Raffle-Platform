@@ -25,6 +25,14 @@ router.put(
   AdminController.toggleSuspendStatus,
 );
 
+// Send manual raffle reminder embed
+router.post(
+  "/raffles/:id/send-reminder",
+  auth.bearer,
+  isAdmin,
+  AdminController.sendRaffleReminder,
+);
+
 // Upload Verified Collection via CSV
 router.post(
   "/verified-collection/bulk-upload",

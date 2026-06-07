@@ -8,6 +8,7 @@ import {
   Copy,
   Unlock,
   RefreshCw,
+  Bell,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -336,6 +337,16 @@ export default function AdminRaffles() {
     }
   };
 
+  const handleSendReminder = async (raffleId: number) => {
+    try {
+      await server.post(`/admin/raffles/${raffleId}/send-reminder`);
+      toast.success("Raffle reminder sent");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to send raffle reminder");
+    }
+  };
+
   // Helper to highlight search term matches (for server-side search results)
   const highlightText = (text: string, highlight: string) => {
     if (!highlight || !highlight.trim()) return text;
@@ -540,6 +551,14 @@ export default function AdminRaffles() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSendReminder(raffle.id)}
+                          title="Send reminder"
+                        >
+                          <Bell className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
