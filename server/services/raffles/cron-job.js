@@ -11,7 +11,22 @@ const {
 const RAFFLE_REMINDER_KEY = "discordOneHourReminderSentAt";
 
 const getDetailMetadata = (detail) => {
-  if (!detail?.additionalJson || typeof detail.additionalJson !== "object") {
+  if (!detail?.additionalJson) {
+    return {};
+  }
+
+  if (typeof detail.additionalJson === "string") {
+    try {
+      return JSON.parse(detail.additionalJson);
+    } catch (error) {
+      logger.warn(
+        `Failed to parse raffle_detail.additionalJson for raffle detail ${detail.id}: ${error.message}`,
+      );
+      return {};
+    }
+  }
+
+  if (typeof detail.additionalJson !== "object") {
     return {};
   }
 

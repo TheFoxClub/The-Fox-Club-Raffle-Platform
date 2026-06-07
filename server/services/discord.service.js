@@ -7,7 +7,7 @@ const {
   DISCORD_RAFFLE_WEBHOOK_AVATAR_URL,
   PUBLIC_APP_URL,
 } = require("../config/credentials");
-const { SPL_TOKEN_ADDRESS } = require("../config/data");
+const { SPL_TOKEN_ADDRESS, RAFFLE_STATUS, mapEnumValue } = require("../config/data");
 
 const EMBED_COLOR = 0xf59e0b;
 const REMINDER_WINDOW_MS = 60 * 60 * 1000;
@@ -157,6 +157,14 @@ const resolveTokenLabel = async (raffle) => {
   return getDefaultTokenLabel(raffle);
 };
 
+const formatStatusLabel = (status) => {
+  if (typeof status === "number") {
+    return mapEnumValue(RAFFLE_STATUS, status);
+  }
+
+  return String(status || "UPCOMING");
+};
+
 const buildFields = async (raffle, creatorPubkey, raffleUrl, options = {}) => {
   const tokenLabel = await resolveTokenLabel(raffle);
   const endsValue = options.endsValue || formatDate(raffle.endDate);
@@ -188,7 +196,7 @@ const buildFields = async (raffle, creatorPubkey, raffleUrl, options = {}) => {
     },
     {
       name: "Status",
-      value: String(raffle.status || "UPCOMING"),
+      value: formatStatusLabel(raffle.status),
       inline: true,
     },
     {
