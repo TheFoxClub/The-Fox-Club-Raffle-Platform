@@ -1,6 +1,6 @@
 const { Op } = require("sequelize");
 const { RAFFLE_STATUS } = require("../../config/data");
-const { Raffle, RaffleDetail } = require("../../models");
+const { Raffle, RaffleDetail, RaffleReward, User } = require("../../models");
 const logger = require("../../util/logger");
 const WinnerSelectionService = require("./winner-selection");
 const SocketService = require("../socket.service");
@@ -18,6 +18,33 @@ const getDetailMetadata = (detail) => {
   return detail.additionalJson;
 };
 
+const claimReminderDispatch = async (detail, timestamp) => {
+  const reminderMeta = getDetailMetadata(detail);
+  const nextAdditionalJson = {
+    ...reminderMeta,
+    [RAFFLE_REMINDER_KEY]: timestamp,
+  };
+
+  const [updatedRows] = await RaffleDetail.update(
+    {
+      additionalJson: nextAdditionalJson,
+    },
+    {
+      where: {
+        id: detail.id,
+        updatedAt: detail.updatedAt,
+      },
+    },
+  );
+
+  if (updatedRows === 1) {
+    detail.additionalJson = nextAdditionalJson;
+    return true;
+  }
+
+  return false;
+};
+
 const checkRaffleAndFeaturedStatus = async () => {
   try {
     const currentDate = new Date();
@@ -30,6 +57,15 @@ const checkRaffleAndFeaturedStatus = async () => {
         {
           model: RaffleDetail,
           required: false,
+        },
+        {
+          model: RaffleReward,
+          required: false,
+        },
+        {
+          model: User,
+          required: false,
+          attributes: ["pubkey"],
         },
       ],
       where: {
@@ -78,19 +114,20 @@ const checkRaffleAndFeaturedStatus = async () => {
 
         if (!reminderSentAt && msUntilEnd <= 60 * 60 * 1000) {
           const raffleData = raffle.get({ plain: true });
+          const claimed = await claimReminderDispatch(
+            raffle.raffle_detail,
+            currentDate.toISOString(),
+          );
+
+          if (!claimed) {
+            continue;
+          }
 
           try {
-            const sent = await sendRaffleEndingSoonNotification({
+            await sendRaffleEndingSoonNotification({
               raffle: raffleData,
+              creatorPubkey: raffle.User?.pubkey,
             });
-
-            if (sent) {
-              raffle.raffle_detail.additionalJson = {
-                ...reminderMeta,
-                [RAFFLE_REMINDER_KEY]: currentDate.toISOString(),
-              };
-              await raffle.raffle_detail.save();
-            }
           } catch (error) {
             logger.error(
               `Failed to send raffle reminder for raffle ${raffle.id}:`,
