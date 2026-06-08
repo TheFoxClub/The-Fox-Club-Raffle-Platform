@@ -43,6 +43,20 @@ const normalizeRewardType = (rewardType: any) => {
   return null;
 };
 
+const normalizeDecimalInput = (value: string) =>
+  value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+
+const parseDecimalInput = (value: string) => {
+  const normalized = normalizeDecimalInput(value);
+
+  if (!normalized || normalized === ".") {
+    return null;
+  }
+
+  const numericValue = Number(normalized);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
 const CreateRaffle = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
@@ -83,7 +97,7 @@ const CreateRaffle = () => {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [ticketPrice, setTicketPrice] = useState<number | "">("");
+  const [ticketPrice, setTicketPrice] = useState("");
   const [totalTickets, setTotalTickets] = useState<number | "">("");
   // const [numberOfWinners, setNumberOfWinners] = useState(1);
   const [numberOfWinners, setNumberOfWinners] = useState<number | "">(1);
@@ -564,11 +578,13 @@ const CreateRaffle = () => {
     });
 
     if (!title.trim()) newErrors.title = "Title is required";
-    if (!ticketPrice || Number(ticketPrice) <= 0) {
+    const parsedTicketPrice = parseDecimalInput(ticketPrice);
+
+    if (parsedTicketPrice === null || parsedTicketPrice <= 0) {
       newErrors.ticketPrice = "Ticket price must be greater than 0";
     } else {
       // Check for max 3 decimal places
-      const decimalPart = ticketPrice.toString().split(".")[1];
+      const decimalPart = normalizeDecimalInput(ticketPrice).split(".")[1];
       if (decimalPart && decimalPart.length > 3) {
         newErrors.ticketPrice =
           "Ticket price cannot have more than 3 decimal places";
@@ -750,7 +766,7 @@ const CreateRaffle = () => {
         title: title.trim(),
         description: description.trim(),
         totalTickets,
-        ticketPrice,
+        ticketPrice: normalizeDecimalInput(ticketPrice),
         tokenType: selectedTokenType?.tokenType || 0,
         tokenAddress: selectedTokenType?.value || null,
         numberOfWinners,
@@ -1047,7 +1063,7 @@ const CreateRaffle = () => {
       // setTicketPrice(draft.ticketPrice ?? "");
       setTicketPrice(
         draft.ticketPrice !== undefined && draft.ticketPrice !== null
-          ? Number(formatPrice(draft.ticketPrice))
+          ? String(formatPrice(draft.ticketPrice))
           : ""
       );
       setTotalTickets(draft.totalTickets ?? "");
@@ -1638,17 +1654,26 @@ const CreateRaffle = () => {
               <label className="text-sm font-medium">Ticket Price *</label>
               <div>
                 <Input
-                  type="number"
+                  type="text"
                   value={ticketPrice}
                   onChange={(e) => {
-                    setTicketPrice(Number(e.target.value));
+                    const nextValue = e.target.value;
+                    const normalizedValue = normalizeDecimalInput(nextValue);
+                    const parts = normalizedValue.split(".");
+
+                    if (parts.length > 2) {
+                      return;
+                    }
+
+                    setTicketPrice(normalizedValue);
                     setErrors((prev) => ({
                       ...prev,
                       ticketPrice: undefined,
                     }));
                   }}
                   placeholder="0.5"
-                  step="0.01"
+                  inputMode="decimal"
+                  autoComplete="off"
                   className="mt-2 w-full text-base md:text-sm bg-background/50 outline-none"
                 />
 
