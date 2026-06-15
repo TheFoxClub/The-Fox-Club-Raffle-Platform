@@ -26,7 +26,7 @@ const {
   TokenAccountNotFoundError,
 } = require("@solana/spl-token");
 
-const { getUmi } = require("../config/solana");
+const { getUmi, getConnection } = require("../config/solana");
 const { FUND_RECEIVER_WALLET } = require("../config/credentials");
 const { Wallet } = require("../helpers/solana/wallet");
 const { status: httpStatus } = require("http-status");
@@ -41,6 +41,7 @@ const {
   mapEnumValue,
   RAFFLE_STATUS,
   COMMISSION_RATES,
+  TICKET_RESERVATION_STATUS,
 } = require("../config/data");
 
 const { addCommissionToTransaction } = require("../services/commissions");
@@ -466,7 +467,6 @@ class TicketController {
         signature,
         pubkey,
         type,
-        entryToken,
         reservationId,
         tokenDecimals = 9,
       } = req.body;
@@ -479,306 +479,329 @@ class TicketController {
       const commissionAmount = parseFloat(req.body.commissionAmount);
       const isNFTHolder = req.body.isNFTHolder ?? false;
 
-      // CRITICAL: Validate reservation before processing
-      if (!reservationId) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Reservation ID is required",
-        );
+      if (!signature || !pubkey || !raffleId || !ticketCount || !reservationId) {
+        return respond(res, httpStatus.BAD_REQUEST, "Insufficient data provided");
       }
 
-      // Confirm the reservation with the transaction signature
-      const confirmationResult =
-        await TicketReservationService.confirmReservation(
-          reservationId,
-          signature,
-        );
-
-      if (!confirmationResult.success) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          confirmationResult.message,
-          { error: confirmationResult.error },
-        );
-      }
-
-      const reservation = confirmationResult.reservation;
-
-      // Validate that the reservation matches the request
-      if (
-        reservation.raffleId !== raffleId ||
-        reservation.ticketCount !== ticketCount ||
-        reservation.walletAddress !== pubkey
-      ) {
-        return respond(
-          res,
-          httpStatus.BAD_REQUEST,
-          "Reservation details do not match request",
-        );
-      }
-
-      // Fetch raffle data to get correct token information
-      const raffleData = await Raffle.findOne({ where: { id: raffleId } });
-      if (!raffleData) {
-        return respond(res, httpStatus.NOT_FOUND, "Raffle not found");
-      }
-
-      const signatureToStore = signature;
-
-      let senderPubkey, receiverPubkey;
-
-      switch (type) {
-        case "load":
-          senderPubkey = pubkey;
-          receiverPubkey = FUND_RECEIVER_WALLET;
-          break;
-        default:
-          break;
-      }
-
-      // Determine correct token information based on raffle's tokenType
-      let tokenType, tokenAddress, decimals;
-
-      if (raffleData.tokenType === TOKEN_TYPE.SOLANA) {
-        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
-        tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
-        decimals = 9;
-      } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN) {
-        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
-        tokenAddress = raffleData.tokenAddress;
-
-        try {
-          const { getTokenDetail } = require("../helpers/solana/token-program");
-          const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
-          decimals = tokenDetail.decimals || 9;
-        } catch (error) {
-          logger.warn(
-            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
-          );
-          decimals = tokenDecimals || 9;
-        }
-      } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN_2022) {
-        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
-        tokenAddress = raffleData.tokenAddress;
-
-        try {
-          const { getTokenDetail } = require("../helpers/solana/token-program");
-          const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
-          decimals = tokenDetail.decimals || 9;
-        } catch (error) {
-          logger.warn(
-            `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
-          );
-          decimals = tokenDecimals || 9;
-        }
-      } else if (raffleData.tokenType === TOKEN_TYPE.USDC) {
-        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
-        tokenAddress = raffleData.tokenAddress || SPL_TOKEN_ADDRESS.USDC;
-        decimals = 6;
-      } else {
-        // Fallback to Solana
-        tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
-        tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
-        decimals = 9;
-      }
-
-      const splTokenSendTxData = {
-        senderPubkey,
-        receiverPubkey,
-        type: tokenType,
-        txId: signatureToStore,
-        tokenAddress: tokenAddress,
-        decimals: decimals,
-        uiAmount: Math.round(Number(lamports)),
-        status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
-        commissionRate,
-        creatorAmount,
-        commissionAmount,
-        isNFTHolder,
-        raffleId: raffleId,
-        rewardTransferType: "ticket_purchase", // Mark as ticket purchase for XP processing
-      };
-
-      const splTokenSendTxDb =
-        await SplTokenSendTransaction.create(splTokenSendTxData);
-
-      if (raffleId && ticketCount) {
-        try {
-          // Fetch current raffle data to properly handle string fields
-          const currentRaffle = await Raffle.findOne({
-            where: { id: raffleId },
+      try {
+        const signatureStatus = await getConnection().getSignatureStatus(signature, {
+          searchTransactionHistory: true,
+        });
+        if (signatureStatus?.value?.err) {
+          return respond(res, httpStatus.BAD_REQUEST, "Transaction failed on-chain", {
+            error: signatureStatus.value.err,
           });
+        }
+      } catch (statusError) {
+        logger.warn(
+          `Could not verify signature status for ${signature}: ${statusError?.message || statusError}`,
+        );
+      }
 
-          const revenueToAdd = lamports / Math.pow(10, decimals);
-          const updatedTotalCommission = (
-            parseFloat(currentRaffle.totalCommission || 0) +
-            parseFloat(commissionAmount)
-          ).toString();
-          const updatedClaimableAmount = (
-            parseFloat(currentRaffle.claimableAmount || 0) +
-            parseFloat(creatorAmount)
-          ).toString();
-          const updatedTotalRevenue = (
-            parseFloat(currentRaffle.totalRevenue || 0) + revenueToAdd
-          ).toString();
-          const updatedPlatformRevenue = (
-            parseFloat(currentRaffle.platformRevenue || 0) +
-            parseFloat(commissionAmount)
-          ).toString();
+      let updatedRaffle;
+      let createdTicketNumbers = [];
 
-          await Raffle.update(
-            {
-              ticketsSold: currentRaffle.ticketsSold + ticketCount,
-              totalCommission: updatedTotalCommission,
-              claimableAmount: updatedClaimableAmount,
-              totalRevenue: updatedTotalRevenue,
-              platformRevenue: updatedPlatformRevenue,
-            },
-            {
-              where: { id: raffleId },
-            },
+      await sequelize.transaction(async (dbTransaction) => {
+        const reservation = await TicketReservation.findOne({
+          where: { reservationId },
+          lock: dbTransaction.LOCK.UPDATE,
+          transaction: dbTransaction,
+        });
+
+        if (!reservation) {
+          throw new Error("Reservation not found");
+        }
+
+        if (
+          reservation.raffleId !== raffleId ||
+          reservation.ticketCount !== ticketCount ||
+          reservation.walletAddress !== pubkey
+        ) {
+          throw new Error("Reservation details do not match request");
+        }
+
+        if (new Date() > reservation.expiresAt) {
+          await reservation.update(
+            { status: TICKET_RESERVATION_STATUS.EXPIRED },
+            { transaction: dbTransaction },
           );
+          throw new Error("Reservation has expired");
+        }
 
-          const user = await User.findOne({ where: { pubkey: pubkey } });
+        if (
+          reservation.status === TICKET_RESERVATION_STATUS.CONFIRMED &&
+          reservation.transactionSignature &&
+          reservation.transactionSignature !== signature
+        ) {
+          throw new Error("Reservation already confirmed with another transaction");
+        }
 
-          if (user) {
-            const maxTicket = await RaffleTicket.findOne({
-              where: { raffleId: raffleId },
-              order: [["ticketNumber", "DESC"]],
-              attributes: ["ticketNumber"],
-            });
+        const raffleData = await Raffle.findOne({
+          where: { id: raffleId },
+          lock: dbTransaction.LOCK.UPDATE,
+          transaction: dbTransaction,
+        });
 
-            let nextTicketNumber = 1;
-            if (maxTicket && maxTicket.ticketNumber) {
-              nextTicketNumber = maxTicket.ticketNumber + 1;
-            }
+        if (!raffleData) {
+          throw new Error("Raffle not found");
+        }
 
-            const tickets = [];
-            for (let i = 0; i < ticketCount; i++) {
-              tickets.push({
-                raffleId: raffleId,
-                userId: user.id,
-                splTokenSendTxId: splTokenSendTxDb.id,
-                ticketNumber: nextTicketNumber + i,
-                transactionSignature: signatureToStore,
-                isWinner: false,
-                commissionRate,
-                creatorAmount,
-              });
-            }
+        const user = await User.findOne({
+          where: { id: reservation.userId, pubkey },
+          transaction: dbTransaction,
+        });
 
-            if (tickets.length > 0) {
-              await RaffleTicket.bulkCreate(tickets);
-            }
+        if (!user) {
+          throw new Error("User not found for reservation");
+        }
 
-            const updatedRaffle = await Raffle.findOne({
-              where: { id: raffleId },
-            });
+        let tokenType;
+        let tokenAddress;
+        let decimals;
 
-            const responseData = {
-              message: "Tickets purchased successfully!",
-              signature: signatureToStore,
-              ticketCount: ticketCount,
-              ticketsCreated: tickets.length,
-              ticketNumbers: tickets.map((t) => t.ticketNumber),
-              reservationId: reservationId,
-              raffle: {
-                id: updatedRaffle.id,
-                ticketsSold: updatedRaffle.ticketsSold,
-                ticketsLeft:
-                  updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
-                totalCommission: updatedRaffle.totalCommission || 0,
-                claimableAmount: updatedRaffle.claimableAmount || 0,
+        if (raffleData.tokenType === TOKEN_TYPE.SOLANA) {
+          tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+          tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+          decimals = 9;
+        } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN) {
+          tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+          tokenAddress = raffleData.tokenAddress;
+          try {
+            const { getTokenDetail } = require("../helpers/solana/token-program");
+            const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
+            decimals = tokenDetail.decimals || 9;
+          } catch (error) {
+            logger.warn(
+              `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
+            );
+            decimals = Number(tokenDecimals) || 9;
+          }
+        } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN_2022) {
+          tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
+          tokenAddress = raffleData.tokenAddress;
+          try {
+            const { getTokenDetail } = require("../helpers/solana/token-program");
+            const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
+            decimals = tokenDetail.decimals || 9;
+          } catch (error) {
+            logger.warn(
+              `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
+            );
+            decimals = Number(tokenDecimals) || 9;
+          }
+        } else if (raffleData.tokenType === TOKEN_TYPE.USDC) {
+          tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
+          tokenAddress = raffleData.tokenAddress || SPL_TOKEN_ADDRESS.USDC;
+          decimals = 6;
+        } else {
+          tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
+          tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
+          decimals = 9;
+        }
+
+        const senderPubkey = pubkey;
+        const receiverPubkey = FUND_RECEIVER_WALLET;
+
+        let splTokenSendTxDb = await SplTokenSendTransaction.findOne({
+          where: { txId: signature, raffleId },
+          transaction: dbTransaction,
+        });
+
+        if (!splTokenSendTxDb) {
+          splTokenSendTxDb = await SplTokenSendTransaction.create(
+            {
+              senderPubkey,
+              receiverPubkey,
+              type: tokenType,
+              txId: signature,
+              tokenAddress,
+              decimals,
+              uiAmount: Math.round(Number(lamports)),
+              status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+              commissionRate,
+              creatorAmount,
+              commissionAmount,
+              isNFTHolder,
+              raffleId,
+              rewardTransferType: "ticket_purchase",
+            },
+            { transaction: dbTransaction },
+          );
+        }
+
+        const existingTickets = await RaffleTicket.findAll({
+          where: {
+            raffleId,
+            userId: user.id,
+            splTokenSendTxId: splTokenSendTxDb.id,
+          },
+          attributes: ["ticketNumber"],
+          order: [["ticketNumber", "ASC"]],
+          transaction: dbTransaction,
+        });
+
+        if (existingTickets.length > 0) {
+          createdTicketNumbers = existingTickets.map((ticket) => ticket.ticketNumber);
+          if (reservation.status !== TICKET_RESERVATION_STATUS.CONFIRMED) {
+            await reservation.update(
+              {
+                status: TICKET_RESERVATION_STATUS.CONFIRMED,
+                transactionSignature: signature,
               },
-              commissionInfo: {
-                rate: commissionRate,
-                amount: commissionAmount,
-                creatorAmount: creatorAmount,
-                isNFTHolder: isNFTHolder,
-              },
-            };
-
-            // Emit Socket.IO events for real-time updates
-            SocketService.emitTicketPurchase(raffleId, {
-              ticketCount: ticketCount,
-              ticketsSold: updatedRaffle.ticketsSold,
-              ticketsLeft:
-                updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
-              totalTickets: updatedRaffle.totalTickets,
-              buyerPubkey: pubkey,
-              ticketNumbers: tickets.map((t) => t.ticketNumber),
-              signature: signatureToStore,
-            });
-
-            // Emit raffle update for live data
-            SocketService.emitRaffleUpdate(raffleId, {
-              ticketsSold: updatedRaffle.ticketsSold,
-              ticketsLeft:
-                updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
-              totalRevenue: updatedRaffle.totalRevenue,
-              progressPercentage: (
-                (updatedRaffle.ticketsSold / updatedRaffle.totalTickets) *
-                100
-              ).toFixed(2),
-            });
-
-            // Emit global raffle list update for home page
-            SocketService.emitGlobalUpdate("raffle-list-updated", {
-              raffleId: raffleId,
-              ticketsSold: updatedRaffle.ticketsSold,
-              totalTickets: updatedRaffle.totalTickets,
-              ticketsLeft:
-                updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
-              progressPercentage: (
-                (updatedRaffle.ticketsSold / updatedRaffle.totalTickets) *
-                100
-              ).toFixed(2),
-              updateType: "ticket_purchase",
-            });
-
-            // Check if raffle is sold out and emit event
-            if (updatedRaffle.ticketsSold >= updatedRaffle.totalTickets) {
-              SocketService.emitRaffleStatusChange(raffleId, "LIVE", "ENDED", {
-                reason: "sold_out",
-                finalTicketsSold: updatedRaffle.ticketsSold,
-                totalTickets: updatedRaffle.totalTickets,
-              });
-            }
-
-            return respond(
-              res,
-              httpStatus.OK,
-              "Tickets purchased successfully!",
-              responseData,
+              { transaction: dbTransaction },
             );
           }
-        } catch (ticketError) {
-          logger.error("Error creating tickets:", ticketError);
-          return respond(
-            res,
-            httpStatus.OK,
-            "Transaction stored but ticket creation failed",
-            {
-              message: "Transaction stored successfully",
-              signature: signatureToStore,
-              error: "Ticket creation failed",
-            },
-          );
+          updatedRaffle = raffleData;
+          return;
         }
+
+        if (reservation.status !== TICKET_RESERVATION_STATUS.RESERVED) {
+          throw new Error("Reservation not available for confirmation");
+        }
+
+        const revenueToAdd = Number(lamports) / Math.pow(10, decimals);
+        const updatedTotalCommission = (
+          parseFloat(raffleData.totalCommission || 0) +
+          parseFloat(commissionAmount)
+        ).toString();
+        const updatedClaimableAmount = (
+          parseFloat(raffleData.claimableAmount || 0) +
+          parseFloat(creatorAmount)
+        ).toString();
+        const updatedTotalRevenue = (
+          parseFloat(raffleData.totalRevenue || 0) + revenueToAdd
+        ).toString();
+        const updatedPlatformRevenue = (
+          parseFloat(raffleData.platformRevenue || 0) +
+          parseFloat(commissionAmount)
+        ).toString();
+
+        await raffleData.update(
+          {
+            ticketsSold: raffleData.ticketsSold + ticketCount,
+            totalCommission: updatedTotalCommission,
+            claimableAmount: updatedClaimableAmount,
+            totalRevenue: updatedTotalRevenue,
+            platformRevenue: updatedPlatformRevenue,
+          },
+          { transaction: dbTransaction },
+        );
+
+        const maxTicket = await RaffleTicket.findOne({
+          where: { raffleId },
+          order: [["ticketNumber", "DESC"]],
+          attributes: ["ticketNumber"],
+          transaction: dbTransaction,
+        });
+
+        let nextTicketNumber = 1;
+        if (maxTicket && maxTicket.ticketNumber) {
+          nextTicketNumber = maxTicket.ticketNumber + 1;
+        }
+
+        const tickets = [];
+        for (let i = 0; i < ticketCount; i++) {
+          tickets.push({
+            raffleId,
+            userId: user.id,
+            splTokenSendTxId: splTokenSendTxDb.id,
+            ticketNumber: nextTicketNumber + i,
+            transactionSignature: signature,
+            isWinner: false,
+            commissionRate,
+            creatorAmount,
+          });
+        }
+
+        if (tickets.length > 0) {
+          await RaffleTicket.bulkCreate(tickets, { transaction: dbTransaction });
+          createdTicketNumbers = tickets.map((ticket) => ticket.ticketNumber);
+        }
+
+        await reservation.update(
+          {
+            status: TICKET_RESERVATION_STATUS.CONFIRMED,
+            transactionSignature: signature,
+          },
+          { transaction: dbTransaction },
+        );
+
+        updatedRaffle = raffleData;
+      });
+
+      const responseData = {
+        message: "Tickets purchased successfully!",
+        signature,
+        ticketCount,
+        ticketsCreated: createdTicketNumbers.length || ticketCount,
+        ticketNumbers: createdTicketNumbers,
+        reservationId,
+        raffle: {
+          id: updatedRaffle.id,
+          ticketsSold: updatedRaffle.ticketsSold,
+          ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+          totalCommission: updatedRaffle.totalCommission || 0,
+          claimableAmount: updatedRaffle.claimableAmount || 0,
+        },
+        commissionInfo: {
+          rate: commissionRate,
+          amount: commissionAmount,
+          creatorAmount,
+          isNFTHolder,
+        },
+      };
+
+      SocketService.emitTicketPurchase(raffleId, {
+        ticketCount,
+        ticketsSold: updatedRaffle.ticketsSold,
+        ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+        totalTickets: updatedRaffle.totalTickets,
+        buyerPubkey: pubkey,
+        ticketNumbers: createdTicketNumbers,
+        signature,
+      });
+
+      SocketService.emitRaffleUpdate(raffleId, {
+        ticketsSold: updatedRaffle.ticketsSold,
+        ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+        totalRevenue: updatedRaffle.totalRevenue,
+        progressPercentage: (
+          (updatedRaffle.ticketsSold / updatedRaffle.totalTickets) * 100
+        ).toFixed(2),
+      });
+
+      SocketService.emitGlobalUpdate("raffle-list-updated", {
+        raffleId,
+        ticketsSold: updatedRaffle.ticketsSold,
+        totalTickets: updatedRaffle.totalTickets,
+        ticketsLeft: updatedRaffle.totalTickets - updatedRaffle.ticketsSold,
+        progressPercentage: (
+          (updatedRaffle.ticketsSold / updatedRaffle.totalTickets) * 100
+        ).toFixed(2),
+        updateType: "ticket_purchase",
+      });
+
+      if (updatedRaffle.ticketsSold >= updatedRaffle.totalTickets) {
+        SocketService.emitRaffleStatusChange(raffleId, "LIVE", "ENDED", {
+          reason: "sold_out",
+          finalTicketsSold: updatedRaffle.ticketsSold,
+          totalTickets: updatedRaffle.totalTickets,
+        });
       }
 
-      const resData = {
-        message: "Transaction stored successfully",
-        signature: signatureToStore,
-        commissionRate: commissionRate,
-        isNFTHolder: isNFTHolder,
-      };
-      return respond(res, httpStatus.OK, "Success", resData);
+      return respond(
+        res,
+        httpStatus.OK,
+        "Tickets purchased successfully!",
+        responseData,
+      );
     } catch (error) {
       logger.error(error);
-      return respond(res, httpStatus.BAD_REQUEST, parseSequelizeErrors(error));
+      return respond(
+        res,
+        httpStatus.BAD_REQUEST,
+        parseSequelizeErrors(error) || error.message || "Failed to store signature",
+      );
     }
   }
 
@@ -800,7 +823,6 @@ class TicketController {
           },
         ],
         order: [
-          // [{ model: Raffle }, "endDate", "DESC"],
           [{ model: Raffle }, "createdAt", "DESC"],
           ["ticketNumber", "ASC"],
         ],
@@ -848,7 +870,7 @@ class TicketController {
           ticketCount: group.totalTickets,
           totalSpent: group.totalSpent,
           tokenType: tokenType,
-          tokenAddress: raffle.tokenAddress, // for proper symbol mapping
+          tokenAddress: raffle.tokenAddress,
           endDate: raffle.endDate,
           ticketsSold: raffle.ticketsSold,
           totalTickets: raffle.totalTickets,

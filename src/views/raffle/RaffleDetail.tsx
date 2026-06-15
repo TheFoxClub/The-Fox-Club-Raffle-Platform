@@ -398,7 +398,6 @@ const RaffleDetail = () => {
         ticketCount,
         raffle.id,
         reservationId, // Pass reservation ID
-        reservationId, // Pass reservation ID
       );
 
       if (confirmResponse.success) {
