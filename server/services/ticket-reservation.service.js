@@ -141,10 +141,8 @@ class TicketReservationService {
 
     try {
       const reservation = await TicketReservation.findOne({
-        where: { 
-          reservationId,
-          status: TICKET_RESERVATION_STATUS.RESERVED
-        },
+        where: { reservationId },
+        lock: transaction.LOCK.UPDATE,
         transaction
       });
 
@@ -153,6 +151,32 @@ class TicketReservationService {
         return {
           success: false,
           error: 'RESERVATION_NOT_FOUND',
+          message: 'Reservation not found or already processed'
+        };
+      }
+
+      if (reservation.status === TICKET_RESERVATION_STATUS.CONFIRMED) {
+        if (reservation.transactionSignature === transactionSignature) {
+          await transaction.commit();
+          return {
+            success: true,
+            reservation,
+          };
+        }
+
+        await transaction.rollback();
+        return {
+          success: false,
+          error: 'RESERVATION_ALREADY_PROCESSED',
+          message: 'Reservation already processed with a different transaction',
+        };
+      }
+
+      if (reservation.status !== TICKET_RESERVATION_STATUS.RESERVED) {
+        await transaction.rollback();
+        return {
+          success: false,
+          error: 'RESERVATION_NOT_AVAILABLE',
           message: 'Reservation not found or already processed'
         };
       }
