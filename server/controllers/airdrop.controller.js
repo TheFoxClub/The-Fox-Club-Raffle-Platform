@@ -41,6 +41,7 @@ const {
   AIRDROP_REWARD_TYPE,
   USER_AIRDROP_REWARD_STATUS,
 } = require("../config/data");
+const { shouldWaivePlatformFees } = require("../util/platformFee");
 
 const connection = getConnection();
 const REWARD_TYPE = AIRDROP_REWARD_TYPE;
@@ -1624,6 +1625,7 @@ class AirdropController {
         },
         toAccount: userWallet,
         feePayer: userWallet,
+        waivePlatformFees: shouldWaivePlatformFees(req.payload),
       });
 
       if (!claimResult.success) {

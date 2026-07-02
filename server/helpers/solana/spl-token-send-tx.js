@@ -42,6 +42,10 @@ const { FUND_RECEIVER_WALLET } = require("../../config/credentials.js");
 const { getFeeData } = require("../cache/system-fee.js");
 const { default: bs58 } = require("bs58");
 const {safeRound} = require("../../util/util.js")
+const {
+  getTransactionFeeAmount,
+  getFeaturedRaffleFeeAmount,
+} = require("../../util/platformFee.js");
 
 const umi = getUmi();
 
@@ -75,6 +79,7 @@ const sendMultipleSplTokenTx = async ({
   fromAccount,
   isUserToPlatform = true,
   transferDirection = null, // Optional: explicit direction like user_to_airdrop/admin_to_airdrop
+  waivePlatformFees = false,
 }) => {
   try {
     // Determine the effective direction
@@ -103,26 +108,34 @@ const sendMultipleSplTokenTx = async ({
 
     //transaction fee - only for user-initiated transfers
     if (shouldChargeTransactionFee) {
-      const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: new PublicKey(feePayer),
-          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
-          lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-        })
-      );
+      const transactionFee = getTransactionFeeAmount(feeData, {
+        waivePlatformFees,
+      });
+      if (transactionFee > 0) {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: new PublicKey(feePayer),
+            toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+            lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+          })
+        );
+      }
     }
 
     //featured transaction fee
     if (isFeatured === true) {
-      const featuredFee = feeData.featured_raffle_fee || DEFAULT_COMMISSION;
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: new PublicKey(feePayer),
-          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
-          lamports: BigInt(featuredFee * LAMPORTS_PER_SOL),
-        })
-      );
+      const featuredFee = getFeaturedRaffleFeeAmount(feeData, {
+        waivePlatformFees,
+      });
+      if (featuredFee > 0) {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: new PublicKey(feePayer),
+            toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+            lamports: BigInt(featuredFee * LAMPORTS_PER_SOL),
+          })
+        );
+      }
     }
 
     let signatures = [];
@@ -403,6 +416,7 @@ const createClaimTransaction = async ({
   toAccount,
   fromAccount,
   feePayer,
+  waivePlatformFees = false,
 }) => {
   try {
     const { generateChecksum } = require("./checksum-validation.js");
@@ -424,15 +438,18 @@ const createClaimTransaction = async ({
 
     //transaction fee
     const feeData = await getFeeData();
-    const transactionFee =
-      Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: new PublicKey(feePayer),
-        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
-        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-      })
-    );
+    const transactionFee = getTransactionFeeAmount(feeData, {
+      waivePlatformFees,
+    });
+    if (transactionFee > 0) {
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(feePayer),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+          lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+        })
+      );
+    }
 
     const { tokenAddress, amount, type } = reward;
 
@@ -472,6 +489,7 @@ const createClaimTransaction = async ({
           toAccountAddress: toAccount,
           fromAccountAddress: fromAccount,
           direction: "platform_to_user",
+          waivePlatformFees,
         });
 
         return {
@@ -505,6 +523,7 @@ const createClaimTransaction = async ({
             toAccountAddress: toAccount,
             fromAccountAddress: fromAccount,
             direction: "platform_to_user",
+            waivePlatformFees,
           });
 
           return {
@@ -661,6 +680,7 @@ const createPayoutTransaction = async ({
   feePayer,
   tokenType = 0, // Default to SOLANA (0)
   tokenAddress = null, // Token address for SPL tokens
+  waivePlatformFees = false,
 }) => {
   try {
     const { Wallet } = require("./wallet.js");
@@ -682,15 +702,18 @@ const createPayoutTransaction = async ({
 
     //transaction fee
     const feeData = await getFeeData();
-    const transactionFee =
-      Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: new PublicKey(feePayer),
-        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
-        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-      })
-    );
+    const transactionFee = getTransactionFeeAmount(feeData, {
+      waivePlatformFees,
+    });
+    if (transactionFee > 0) {
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(feePayer),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+          lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+        })
+      );
+    }
 
     if (tokenType === TOKEN_TYPE.SOLANA) {
       // SOL transfer from platform to user
@@ -955,6 +978,7 @@ const createAirdropClaimTransaction = async ({
   reward,
   toAccount,
   feePayer,
+  waivePlatformFees = false,
 }) => {
   try {
     const fromAccount = AirdropWallet.getWalletAddress();
@@ -976,14 +1000,18 @@ const createAirdropClaimTransaction = async ({
 
     // Transaction fee - user pays
     const feeData = await getFeeData();
-    const transactionFee = Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
-    transaction.add(
-      SystemProgram.transfer({
-        fromPubkey: new PublicKey(feePayer),
-        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
-        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-      })
-    );
+    const transactionFee = getTransactionFeeAmount(feeData, {
+      waivePlatformFees,
+    });
+    if (transactionFee > 0) {
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(feePayer),
+          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+          lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+        })
+      );
+    }
 
     const { tokenAddress, amount, type } = reward;
 

@@ -77,6 +77,7 @@ const { default: bs58 } = require("bs58");
 const { FUND_RECEIVER_WALLET } = require("../../config/credentials");
 const { getFeeData } = require("../cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../../config/constants");
+const { getTransactionFeeAmount } = require("../../util/platformFee");
 
 const connection = getConnectionDas();
 const MPL_CORE_PROGRAM_ID = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
@@ -236,13 +237,16 @@ const handlePNFT = async ({
   fromAccountAddress,
   direction = "user_to_platform",
   returnInstructionsOnly = false,
+  waivePlatformFees = false,
 }) => {
   try {
     logger.info(
       `Processing pNFT transfer (${direction}): ${fromAccountAddress} → ${toAccountAddress}`
     );
     const feeData = await getFeeData();
-    const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
+    const transactionFee = getTransactionFeeAmount(feeData, {
+      waivePlatformFees,
+    });
 
     const umiTo = publicKey(toAccountAddress);
     const umiFrom = publicKey(fromAccountAddress);
@@ -313,7 +317,7 @@ const handlePNFT = async ({
 
       // Only add fee instruction for standalone transactions.
       // In batch mode the outer transaction already carries the fee.
-      if (!returnInstructionsOnly) {
+      if (!returnInstructionsOnly && transactionFee > 0) {
         txBuilder = txBuilder.add({
           instruction: fromWeb3JsInstruction(solTransferIx),
         });
@@ -459,13 +463,16 @@ const handleMPLCore = async ({
   direction,
   frontEndSigner,
   returnInstructionsOnly = false,
+  waivePlatformFees = false,
 }) => {
   try {
     logger.info(
       `Processing MPL Core NFT transfer ${direction}: ${fromAccountAddress} → ${toAccountAddress}`
     );
     const feeData = await getFeeData();
-    const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
+    const transactionFee = getTransactionFeeAmount(feeData, {
+      waivePlatformFees,
+    });
     // Use the existing UMI instance with platform signer for fetching asset data
     const coreAsset = await fetchAsset(umi, publicKey(mint.toBase58()));
     logger.info(`MPL Core asset fetched:`, {
@@ -508,7 +515,7 @@ const handleMPLCore = async ({
 
       // Only add fee instruction when building a standalone transaction.
       // In batch mode the outer transaction already carries the fee.
-      if (!returnInstructionsOnly) {
+      if (!returnInstructionsOnly && transactionFee > 0) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(toAccountAddress),
           toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
@@ -553,7 +560,7 @@ const handleMPLCore = async ({
         newOwner: publicKey(toAccountAddress), // Transfer to platform wallet
       });
 
-      if (!returnInstructionsOnly) {
+      if (!returnInstructionsOnly && transactionFee > 0) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(fromAccountAddress),
           toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
@@ -627,6 +634,7 @@ const handleCNFT = async ({
   fromAccountAddress,
   direction,
   returnInstructionsOnly = false,
+  waivePlatformFees = false,
 }) => {
   try {
     logger.info(
@@ -645,7 +653,9 @@ const handleCNFT = async ({
     let builtTx;
 
     const feeData = await getFeeData();
-    const transactionFee = feeData.transaction_fee || DEFAULT_COMMISSION;
+    const transactionFee = getTransactionFeeAmount(feeData, {
+      waivePlatformFees,
+    });
     if (direction === "platform_to_user") {
       let cnftP2UBuilder = cnftTransferBuilder.setFeePayer(
         createNoopSigner(publicKey(toAccountAddress))
@@ -653,7 +663,7 @@ const handleCNFT = async ({
 
       // Only add fee instruction for standalone transactions.
       // In batch mode the outer transaction already carries the fee.
-      if (!returnInstructionsOnly) {
+      if (!returnInstructionsOnly && transactionFee > 0) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(toAccountAddress),
           toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
@@ -686,7 +696,7 @@ const handleCNFT = async ({
         createNoopSigner(publicKey(fromAccountAddress))
       );
 
-      if (!returnInstructionsOnly) {
+      if (!returnInstructionsOnly && transactionFee > 0) {
         const solTransferIx = SystemProgram.transfer({
           fromPubkey: new PublicKey(fromAccountAddress),
           toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
@@ -789,6 +799,7 @@ const addNftSendTransaction = async ({
   toAccountAddress,
   fromAccountAddress,
   direction = "user_to_platform",
+  waivePlatformFees = false,
 }) => {
   try {
     logger.info(`Starting NFT transfer process:`, {
@@ -845,6 +856,7 @@ const addNftSendTransaction = async ({
             toAccountAddress,
             fromAccountAddress,
             direction,
+            waivePlatformFees,
           });
 
         case "mplcore":
@@ -855,6 +867,7 @@ const addNftSendTransaction = async ({
             toAccountAddress,
             fromAccountAddress,
             direction,
+            waivePlatformFees,
           });
 
         case "cnft":
@@ -865,6 +878,7 @@ const addNftSendTransaction = async ({
             toAccountAddress,
             fromAccountAddress,
             direction,
+            waivePlatformFees,
           });
 
         default:
@@ -927,6 +941,7 @@ const addNftSendTransaction = async ({
             fromAccountAddress,
             direction,
             returnInstructionsOnly: true,
+            waivePlatformFees,
           });
           break;
 
@@ -939,6 +954,7 @@ const addNftSendTransaction = async ({
             fromAccountAddress,
             direction,
             returnInstructionsOnly: true,
+            waivePlatformFees,
           });
           break;
 
@@ -951,6 +967,7 @@ const addNftSendTransaction = async ({
             fromAccountAddress,
             direction,
             returnInstructionsOnly: true,
+            waivePlatformFees,
           });
           break;
 

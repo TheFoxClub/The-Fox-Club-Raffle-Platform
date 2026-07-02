@@ -55,6 +55,10 @@ const {
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { getRaffleRefundTransaction } = require("../services/raffles/refund");
 const { solanaBalanceChecker } = require("../util/balanceChecker");
+const {
+  shouldWaivePlatformFees,
+  getTransactionFeeAmount,
+} = require("../util/platformFee");
 
 const notifyRaffleCreated = async ({ raffle, origin, creatorPubkey }) => {
   if (!raffle || raffle.status === RAFFLE_STATUS.DRAFT || raffle.status === "DRAFT") {
@@ -547,6 +551,7 @@ class RaffleController {
 
       //transaction fee
       const allFee = await getFeeData();
+      const waivePlatformFees = shouldWaivePlatformFees(req.payload);
 
       // Create transaction for user to sign (but don't execute it yet)
       const transferResponse = await sendMultipleSplTokenTx({
@@ -557,6 +562,7 @@ class RaffleController {
         feeData: allFee,
         fromAccount: fromAddress,
         isUserToPlatform: true,
+        waivePlatformFees,
       });
 
       if (!transferResponse.success) {
@@ -1789,11 +1795,18 @@ class RaffleController {
         );
       }
 
+      const waivePlatformFees = shouldWaivePlatformFees(req.payload);
+
       //transaction fee check
-      const fee = await getFeeData();
-      const hasEnoughBalance = await solanaBalanceChecker(user.pubkey, Number(fee.transaction_fee || DEFAULT_COMMISSION));
-      if (hasEnoughBalance.success === false) {
-        return respond(res, httpStatus.BAD_REQUEST, hasEnoughBalance.message)
+      if (!waivePlatformFees) {
+        const fee = await getFeeData();
+        const hasEnoughBalance = await solanaBalanceChecker(
+          user.pubkey,
+          getTransactionFeeAmount(fee),
+        );
+        if (hasEnoughBalance.success === false) {
+          return respond(res, httpStatus.BAD_REQUEST, hasEnoughBalance.message);
+        }
       }
 
       const raffle = await Raffle.findOne({
@@ -1919,6 +1932,7 @@ class RaffleController {
         toAccount: user.pubkey,
         fromAccount: activePlatformWallet,
         feePayer: user.pubkey,
+        waivePlatformFees,
       });
 
       if (!transferResponse.success) {
@@ -2478,7 +2492,11 @@ class RaffleController {
         );
       }
 
-      const txResult = await getRaffleRefundTransaction(raffle, userPubkey);
+      const waivePlatformFees = shouldWaivePlatformFees(req.payload);
+
+      const txResult = await getRaffleRefundTransaction(raffle, userPubkey, {
+        waivePlatformFees,
+      });
 
       if (!txResult.success) {
         return respond(
@@ -3407,14 +3425,21 @@ class RaffleController {
         );
       }
 
+      const waivePlatformFees = shouldWaivePlatformFees(req.payload);
+
       //transaction fee check
-      const fee = await getFeeData();
-      const hasEnoughBalance = await solanaBalanceChecker(user.pubkey, Number(fee.transaction_fee || DEFAULT_COMMISSION));
-      if (hasEnoughBalance.success === false) {
-        if (transaction && !transaction.finished) {
-          await transaction.rollback();
+      if (!waivePlatformFees) {
+        const fee = await getFeeData();
+        const hasEnoughBalance = await solanaBalanceChecker(
+          user.pubkey,
+          getTransactionFeeAmount(fee),
+        );
+        if (hasEnoughBalance.success === false) {
+          if (transaction && !transaction.finished) {
+            await transaction.rollback();
+          }
+          return respond(res, httpStatus.BAD_REQUEST, hasEnoughBalance.message);
         }
-        return respond(res, httpStatus.BAD_REQUEST, hasEnoughBalance.message)
       }
 
       // Get raffle with row-level locking to prevent race conditions
@@ -3528,6 +3553,7 @@ class RaffleController {
         feePayer: user.pubkey, // User pays transaction fees
         tokenType: raffle.tokenType,
         tokenAddress: raffle.tokenAddress,
+        waivePlatformFees,
       });
 
       if (!payoutResponse.success) {

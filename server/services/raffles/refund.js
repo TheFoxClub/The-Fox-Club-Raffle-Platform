@@ -27,10 +27,15 @@ const {
 } = require("../../helpers/solana/checksum-validation");
 const { publicKey } = require("@metaplex-foundation/umi");
 const { getConnection } = require("../../config/solana");
+const { getTransactionFeeAmount } = require("../../util/platformFee");
 
 const connection = getConnection();
 
-const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
+const getRaffleRefundTransaction = async (
+  raffle,
+  raffleCreatorPubkey,
+  { waivePlatformFees = false } = {},
+) => {
   const feeData = await getFeeData();
   //find all raffle rewards
   const raffleRewards = await RaffleReward.findAll({
@@ -67,14 +72,18 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
   );
 
   //transaction fee
-  const transactionFee = Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
-  transaction.add(
-    SystemProgram.transfer({
-      fromPubkey: new PublicKey(toAccount),
-      toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
-      lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-    })
-  );
+  const transactionFee = getTransactionFeeAmount(feeData, {
+    waivePlatformFees,
+  });
+  if (transactionFee > 0) {
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(toAccount),
+        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+      })
+    );
+  }
   // NFT refund — handles both single and multiple NFT rewards in one batched transaction
   const allAreNFTs = raffleRewards.every(
     (r) => r.rewardType === RAFFLE_REWARD_TYPES.NFT
@@ -91,6 +100,7 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
       toAccountAddress: toAccount,
       fromAccountAddress: fromAccount,
       direction: "platform_to_user",
+      waivePlatformFees,
     });
 
     return {
@@ -131,6 +141,7 @@ const getRaffleRefundTransaction = async (raffle, raffleCreatorPubkey) => {
         toAccountAddress: toAccount,
         fromAccountAddress: fromAccount,
         direction: "platform_to_user",
+        waivePlatformFees,
       });
 
       return {

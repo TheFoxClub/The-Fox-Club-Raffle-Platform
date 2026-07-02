@@ -7,6 +7,7 @@ const {
   getAssociatedTokenAddressSync,
 } = require("@solana/spl-token");
 const { getFeeData } = require("../helpers/cache/system-fee");
+const { getTransactionFeeAmount } = require("./platformFee");
 
 const solanaBalanceChecker = async (pubkey, requiredSolBalance) => {
   try {
@@ -34,6 +35,7 @@ const tokenBalanceChecker = async (
   pubkey,
   mintAddress,
   requiredTokenBalance,
+  { waivePlatformFees = false } = {},
 ) => {
   try {
     const buyerAta = getAssociatedTokenAddressSync(
@@ -52,7 +54,10 @@ const tokenBalanceChecker = async (
     }
 
     const fee = await getFeeData();
-    const hasEnoughSolBalance = await solanaBalanceChecker(pubkey, Number(fee.transaction_fee || 0.001))
+    const hasEnoughSolBalance = await solanaBalanceChecker(
+      pubkey,
+      getTransactionFeeAmount(fee, { waivePlatformFees }),
+    )
     if(hasEnoughSolBalance.success === false){
         return hasEnoughSolBalance
     }

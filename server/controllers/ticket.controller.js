@@ -53,6 +53,11 @@ const { getFeeData } = require("../helpers/cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../config/constants");
 const { safeRound } = require("../util/util");
 const { solanaBalanceChecker, tokenBalanceChecker } = require("../util/balanceChecker");
+const {
+  shouldWaivePlatformFees,
+  getTransactionFeeAmount,
+  getParticipantCommissionRate,
+} = require("../util/platformFee");
 
 class TicketController {
   static async buyTicket(req, res) {
@@ -145,7 +150,7 @@ class TicketController {
         userId: existingUser.id,
         walletAddress: senderPubkey,
         ticketCount,
-        reservationTimeoutSeconds: 60, // 60 second reservation window
+        reservationTimeoutSeconds: 180, // 3 minute reservation window
       });
 
       if (!reservationResult.success) {
@@ -161,11 +166,14 @@ class TicketController {
         await NFTService.checkNFTCollectionHolder(RaffleCreatorUserData.pubkey);
       const isNFTHolder = nftHolderInfo.isHolder;
       const feeData = await getFeeData();
+      const waivePlatformFees = shouldWaivePlatformFees(req.payload);
 
-      const commissionRate = isNFTHolder
-        ? feeData.holder_participant_fee / 100 || COMMISSION_RATES.HOLDER
-        : feeData.non_holder_participant_fee / 100 ||
-          COMMISSION_RATES.NON_HOLDER;
+      const commissionRate = getParticipantCommissionRate(
+        feeData,
+        isNFTHolder,
+        COMMISSION_RATES,
+        { waivePlatformFees },
+      );
 
       const ticketPrice = raffleData.ticketPrice;
       const totalSolAmount = ticketPrice * ticketCount;
@@ -249,21 +257,26 @@ class TicketController {
       );
 
       //transaction fee
-      const transactionFee =
-        Number(feeData.transaction_fee) || DEFAULT_COMMISSION;
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: new PublicKey(senderPubkey),
-          toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
-          lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
-        }),
-      );
+      const transactionFee = getTransactionFeeAmount(feeData, {
+        waivePlatformFees,
+      });
+      if (transactionFee > 0) {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: new PublicKey(senderPubkey),
+            toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+            lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+          }),
+        );
+      }
 
       switch (type) {
         case "solana":
           //solana balance checker
-          const feeData = await getFeeData();
-          const hasEnoughSolBalance = await solanaBalanceChecker(senderPubkey, totalSolAmount + Number(feeData.transaction_fee || 0.001));
+          const hasEnoughSolBalance = await solanaBalanceChecker(
+            senderPubkey,
+            totalSolAmount + transactionFee,
+          );
 
           if(hasEnoughSolBalance.success === false){
             await TicketReservationService.cancelReservation(
@@ -294,7 +307,12 @@ class TicketController {
         default: {
 
           //token balance checker
-          const hasEnoughTokenBalance = await tokenBalanceChecker(senderPubkey,tokenAddress,totalSolAmount * Math.pow(10, tokenDecimals));
+          const hasEnoughTokenBalance = await tokenBalanceChecker(
+            senderPubkey,
+            tokenAddress,
+            totalSolAmount * Math.pow(10, tokenDecimals),
+            { waivePlatformFees },
+          );
           if(hasEnoughTokenBalance.success === false){
             await TicketReservationService.cancelReservation(
             reservationResult.reservation.reservationId,
