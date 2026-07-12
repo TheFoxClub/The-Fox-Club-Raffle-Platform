@@ -160,10 +160,8 @@ class TicketController {
         });
       }
 
-      const RaffleCreatorUserData = await User.findOne({ where: { id: raffleData.userId } });
-
       const nftHolderInfo =
-        await NFTService.checkNFTCollectionHolder(RaffleCreatorUserData.pubkey);
+        await NFTService.checkNFTCollectionHolder(existingUser.pubkey);
       const isNFTHolder = nftHolderInfo.isHolder;
       const feeData = await getFeeData();
       const waivePlatformFees = shouldWaivePlatformFees(req.payload);
@@ -492,11 +490,6 @@ class TicketController {
       const lamports = Number(req.body.lamports);
       const ticketCount = Number(req.body.ticketCount);
       const raffleId = req.body.raffleId;
-      const commissionRate = parseFloat(req.body.commissionRate);
-      const creatorAmount = parseFloat(req.body.creatorAmount);
-      const commissionAmount = parseFloat(req.body.commissionAmount);
-      const isNFTHolder = req.body.isNFTHolder ?? false;
-
       if (!signature || !pubkey || !raffleId || !ticketCount || !reservationId) {
         return respond(res, httpStatus.BAD_REQUEST, "Insufficient data provided");
       }
@@ -615,6 +608,34 @@ class TicketController {
           tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
           tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
           decimals = 9;
+        }
+
+        const nftHolderInfo = await NFTService.checkNFTCollectionHolder(pubkey);
+        const isNFTHolder = nftHolderInfo.isHolder;
+        const feeData = await getFeeData();
+        const waivePlatformFees = shouldWaivePlatformFees(req.payload);
+        const commissionRate = getParticipantCommissionRate(
+          feeData,
+          isNFTHolder,
+          COMMISSION_RATES,
+          { waivePlatformFees },
+        );
+
+        const ticketPrice = Number(raffleData.ticketPrice || 0);
+        const totalAmount = ticketPrice * ticketCount;
+
+        let commissionAmount = safeRound(totalAmount * commissionRate);
+        let creatorAmount = safeRound(totalAmount - commissionAmount);
+
+        if (raffleData.tokenType !== TOKEN_TYPE.SOLANA) {
+          const totalBaseUnits = Math.round(totalAmount * Math.pow(10, decimals));
+          const commissionBaseUnits = Math.ceil(
+            commissionAmount * Math.pow(10, decimals),
+          );
+          const creatorBaseUnits = totalBaseUnits - commissionBaseUnits;
+
+          commissionAmount = commissionBaseUnits / Math.pow(10, decimals);
+          creatorAmount = creatorBaseUnits / Math.pow(10, decimals);
         }
 
         const senderPubkey = pubkey;

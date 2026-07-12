@@ -3528,9 +3528,11 @@ class RaffleController {
         );
       }
 
-      // Check if platform wallet has sufficient balance (basic validation)
-      const platformWallet = Wallet.getWalletPubkey().toString();
-      if (!platformWallet) {
+      // Always reconcile payouts against the active platform wallet keypair.
+      // Ticket purchases route creator proceeds to the active wallet, so stale raffle rows
+      // need to be updated before building a payout transaction.
+      const activePlatformWallet = Wallet.getWalletPubkey().toString();
+      if (!activePlatformWallet) {
         if (transaction && !transaction.finished) {
           await transaction.rollback();
         }
@@ -3541,6 +3543,22 @@ class RaffleController {
         );
       }
 
+      if (raffle.platformWallet !== activePlatformWallet) {
+        logger.warn(
+          `Raffle ${raffleIdNum} has stale platform wallet ${raffle.platformWallet}. Using active wallet ${activePlatformWallet} for payout.`,
+        );
+
+        await Raffle.update(
+          { platformWallet: activePlatformWallet },
+          {
+            where: { id: raffleIdNum },
+            transaction,
+          },
+        );
+
+        raffle.platformWallet = activePlatformWallet;
+      }
+
       logger.info(
         `Creating payout transaction for raffle ${raffleIdNum} to creator ${user.pubkey}, amount: ${unclaimedAmount}`,
       );
@@ -3549,7 +3567,7 @@ class RaffleController {
       const payoutResponse = await createPayoutTransaction({
         amount: unclaimedAmount,
         toAccount: user.pubkey,
-        fromAccount: platformWallet,
+        fromAccount: activePlatformWallet,
         feePayer: user.pubkey, // User pays transaction fees
         tokenType: raffle.tokenType,
         tokenAddress: raffle.tokenAddress,
@@ -3637,7 +3655,7 @@ class RaffleController {
         isReusingExistingRecord = true;
       } else {
         const splTokenSendTxData = {
-          senderPubkey: platformWallet,
+          senderPubkey: activePlatformWallet,
           receiverPubkey: user.pubkey,
           type: transactionType,
           txId: null,
