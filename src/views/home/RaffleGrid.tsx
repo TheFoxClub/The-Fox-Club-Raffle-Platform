@@ -83,9 +83,15 @@ const sortRafflesList = (
     );
   }
 
-  if (sortBy === "price") {
+  if (sortBy === "price-asc") {
     return nextRaffles.sort(
       (a, b) => Number(a.ticketPrice || 0) - Number(b.ticketPrice || 0),
+    );
+  }
+
+  if (sortBy === "price-desc") {
+    return nextRaffles.sort(
+      (a, b) => Number(b.ticketPrice || 0) - Number(a.ticketPrice || 0),
     );
   }
 

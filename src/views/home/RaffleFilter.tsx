@@ -1,9 +1,11 @@
+import { ArrowDown, ArrowUp } from "lucide-react";
 import Select from "../../components/ui/Select";
 export type RaffleSortOption =
   | ""
   | "most-recent"
   | "ending-soon"
-  | "price"
+  | "price-desc"
+  | "price-asc"
   | "tickets-sold";
 
 export default function RaffleFilter({
@@ -17,7 +19,24 @@ export default function RaffleFilter({
     { value: "", label: "Default" },
     { value: "most-recent", label: "Most recent" },
     { value: "ending-soon", label: "Ending soon" },
-    { value: "price", label: "Price" },
+    {
+      value: "price-desc",
+      label: (
+        <span className="inline-flex items-center gap-2">
+          <span>Price</span>
+          <ArrowDown className="h-4 w-4" />
+        </span>
+      ),
+    },
+    {
+      value: "price-asc",
+      label: (
+        <span className="inline-flex items-center gap-2">
+          <span>Price</span>
+          <ArrowUp className="h-4 w-4" />
+        </span>
+      ),
+    },
     { value: "tickets-sold", label: "Tickets sold" },
   ];
 
