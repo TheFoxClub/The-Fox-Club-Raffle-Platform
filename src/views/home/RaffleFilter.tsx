@@ -1,4 +1,3 @@
-import { ArrowUpDown } from "lucide-react";
 import Select from "../../components/ui/Select";
 export type RaffleSortOption =
   | ""
@@ -23,7 +22,7 @@ export default function RaffleFilter({
   ];
 
   return (
-    <div className="mt-10 flex justify-end">
+    <div className="mt-10 flex justify-start">
       <div className="w-full sm:w-56">
         <Select
           options={sortOptions}
@@ -32,9 +31,6 @@ export default function RaffleFilter({
           placeholder="Sort by"
           className="border border-border/60 bg-card/70 backdrop-blur-xl"
         />
-      </div>
-      <div className="pointer-events-none absolute opacity-0 sm:opacity-100" aria-hidden>
-        <ArrowUpDown className="h-4 w-4" />
       </div>
     </div>
   );
