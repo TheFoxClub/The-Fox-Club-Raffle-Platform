@@ -62,6 +62,40 @@ const isExcludedAirdropWallet = (walletAddress) => {
   return normalized ? EXCLUDED_AIRDROP_WALLETS.has(normalized) : false;
 };
 
+const parseBooleanFlag = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+
+  return Boolean(value);
+};
+
+const normalizeActivationConfig = (activationConfig) => {
+  if (!activationConfig) return {};
+
+  let parsedConfig = activationConfig;
+
+  if (typeof activationConfig === "string") {
+    try {
+      parsedConfig = JSON.parse(activationConfig);
+    } catch (error) {
+      logger.warn(
+        `Failed to parse airdrop activationConfig JSON: ${error.message}`,
+      );
+      return {};
+    }
+  }
+
+  if (!parsedConfig || typeof parsedConfig !== "object") {
+    return {};
+  }
+
+  return parsedConfig;
+};
+
 const normalizeDateTimeInput = (value, boundary = "start") => {
   if (!value) return null;
 
@@ -303,8 +337,8 @@ const getMakeClaimablePlan = async ({ airdrop }) => {
     throw new Error("Airdrop can only be made claimable after endDate is reached");
   }
 
-  const config = airdrop.activationConfig || {};
-  const hasLeaderboardLimit = Boolean(config.hasLeaderboardLimit);
+  const config = normalizeActivationConfig(airdrop.activationConfig);
+  const hasLeaderboardLimit = parseBooleanFlag(config.hasLeaderboardLimit);
   const configuredLimit = parseInt(config.leaderboardLimit, 10);
   const limit =
     hasLeaderboardLimit && !Number.isNaN(configuredLimit)
@@ -1210,7 +1244,7 @@ class AirdropController {
 
       const airdropWalletAddress = AirdropWallet.getWalletAddress();
       const parsedTotalAmount = parseFloat(totalAmount);
-      const shouldApplyLimit = Boolean(hasLeaderboardLimit);
+      const shouldApplyLimit = parseBooleanFlag(hasLeaderboardLimit);
       const parsedLeaderboardLimit = parseInt(leaderboardLimit, 10);
 
       if (

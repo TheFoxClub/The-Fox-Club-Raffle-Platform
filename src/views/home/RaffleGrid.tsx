@@ -13,6 +13,7 @@ import server from "../../config/server";
 import { toast } from "react-toastify";
 import socketService from "../../services/socket.service";
 import { getTokenSymbol } from "../../utils/tokenUtils";
+import type { RaffleSortOption } from "./RaffleFilter";
 
 interface RaffleData {
   id: number;
@@ -34,6 +35,15 @@ interface RaffleData {
   };
 }
 
+type RaffleRealtimeUpdate = {
+  raffleId?: number;
+  action?: string;
+  status?: string;
+  newStatus?: string;
+  ticketsSold?: number;
+  totalTickets?: number;
+};
+
 function formatCountdown(endDate: string) {
   const end = new Date(endDate).getTime();
   const now = Date.now();
@@ -50,15 +60,54 @@ function formatCountdown(endDate: string) {
   return `${days}d ${hours}h`;
 }
 
-type FilterParams = {
-  page?: number;
-  limit?: number;
-  tokenType?: string;
-  search?: string;
-  status?: string;
+const getTimestamp = (value: string) => {
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
 };
 
-export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
+const sortRafflesList = (
+  raffles: RaffleData[],
+  sortBy: RaffleSortOption = "",
+) => {
+  const nextRaffles = [...raffles];
+
+  if (sortBy === "most-recent") {
+    return nextRaffles.sort(
+      (a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt),
+    );
+  }
+
+  if (sortBy === "ending-soon") {
+    return nextRaffles.sort(
+      (a, b) => getTimestamp(a.endDate) - getTimestamp(b.endDate),
+    );
+  }
+
+  if (sortBy === "price") {
+    return nextRaffles.sort(
+      (a, b) => Number(a.ticketPrice || 0) - Number(b.ticketPrice || 0),
+    );
+  }
+
+  if (sortBy === "tickets-sold") {
+    return nextRaffles.sort(
+      (a, b) => Number(b.ticketsSold || 0) - Number(a.ticketsSold || 0),
+    );
+  }
+
+  return nextRaffles.sort((a, b) => {
+    const aFeatured = Boolean(a.raffle_detail?.isFeatured);
+    const bFeatured = Boolean(b.raffle_detail?.isFeatured);
+
+    if (aFeatured !== bFeatured) {
+      return aFeatured ? -1 : 1;
+    }
+
+    return getTimestamp(b.createdAt) - getTimestamp(a.createdAt);
+  });
+};
+
+export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
   const [raffles, SetRaffles] = useState<RaffleData[]>([]);
   const [endedRaffles, setEndedRaffles] = useState<RaffleData[]>([]);
   const [upcomingRaffles, setUpcomingRaffles] = useState<RaffleData[]>([]);
@@ -69,24 +118,13 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
   const fetchRafflesForTab = useCallback(
     async (tabStatus: string) => {
       try {
-        let response;
-
-        if (!filters) {
-          // Use original endpoints when no filters
-          const endpoint =
-            tabStatus === "live"
-              ? "/raffle/live"
-              : tabStatus === "ended"
-                ? "/raffle/ended"
-                : "/raffle/upcoming";
-          response = await server.get(endpoint);
-        } else {
-          // Use filter endpoint with status
-          const filterParams = { ...filters, status: tabStatus };
-          response = await server.get("/raffle/filter", {
-            params: filterParams,
-          });
-        }
+        const endpoint =
+          tabStatus === "live"
+            ? "/raffle/live"
+            : tabStatus === "ended"
+              ? "/raffle/ended"
+              : "/raffle/upcoming";
+        const response = await server.get(endpoint);
 
         const data = Array.isArray(response.data.data?.formattedRaffles)
           ? response.data.data.formattedRaffles
@@ -114,7 +152,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
         toast.error(errorMessage);
       }
     },
-    [filters],
+    [],
   );
 
   // Initial load - fetch all tabs
@@ -126,13 +164,17 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
     };
 
     fetchInitial();
-  }, [filters]);
+  }, [activeTab, fetchRafflesForTab]);
+
+  const liveRaffles = sortRafflesList(raffles, sortBy);
+  const endedRaffleList = sortRafflesList(endedRaffles, sortBy);
+  const upcomingRaffleList = sortRafflesList(upcomingRaffles, sortBy);
 
   // Socket.IO integration for real-time updates (separate useEffect to avoid dependency issues)
   useEffect(() => {
     const updateRaffleInList = (
       raffleId: number,
-      updateData: any,
+      updateData: RaffleRealtimeUpdate,
       setTargetList: React.Dispatch<React.SetStateAction<RaffleData[]>>,
     ) => {
       setTargetList((prevRaffles) => {
@@ -155,7 +197,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       });
     };
 
-    const handleRaffleListUpdate = (data: any) => {
+    const handleRaffleListUpdate = (data: RaffleRealtimeUpdate) => {
       if (data.raffleId) {
         // Handle new raffle creation
         if (data.action === "raffle_created") {
@@ -174,7 +216,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       }
     };
 
-    const handleTicketPurchase = (data: any) => {
+    const handleTicketPurchase = (data: RaffleRealtimeUpdate) => {
       // console.log("Raffle grid - ticket purchase received:", data);
 
       if (data.raffleId) {
@@ -185,7 +227,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
       }
     };
 
-    const handleRaffleStatusChange = (data: any) => {
+    const handleRaffleStatusChange = (data: RaffleRealtimeUpdate) => {
       // console.log("Raffle grid - raffle status change received:", data);
 
       // if (data.raffleId) {
@@ -271,7 +313,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
             </div>
             {Array.isArray(raffles) && raffles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {raffles.map((raffle) => {
+                {liveRaffles.map((raffle) => {
                   const mappedRaffle = {
                     id: raffle.id,
                     title: raffle.title,
@@ -326,7 +368,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
             </div>
             {Array.isArray(endedRaffles) && endedRaffles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ">
-                {endedRaffles.map((raffle) => {
+                {endedRaffleList.map((raffle) => {
                   const mappedRaffle = {
                     id: raffle.id,
                     title: raffle.title,
@@ -381,7 +423,7 @@ export const RaffleGrid = ({ filters }: { filters?: FilterParams }) => {
             </div>
             {Array.isArray(upcomingRaffles) && upcomingRaffles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {upcomingRaffles.map((raffle) => {
+                {upcomingRaffleList.map((raffle) => {
                   const mappedRaffle = {
                     id: raffle.id,
                     title: raffle.title,

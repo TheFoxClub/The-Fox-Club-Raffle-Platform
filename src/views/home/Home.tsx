@@ -3,16 +3,17 @@ import RaffleCarousel from "./RaffleCarousel";
 import RaffleFilter from "./RaffleFilter";
 import { RaffleGrid } from "./RaffleGrid";
 import { useState } from "react";
+import type { RaffleSortOption } from "./RaffleFilter";
 
 const Home = () => {
-  const [filters, setFilters] = useState<any | undefined>(undefined);
+  const [sortBy, setSortBy] = useState<RaffleSortOption>("");
 
   return (
     <div className="px-4">
       <HeroSection />
       <RaffleCarousel />
-      <RaffleFilter onApplyFilters={(p) => setFilters(p)} />
-      <RaffleGrid filters={filters} />
+      <RaffleFilter sortBy={sortBy} onSortChange={setSortBy} />
+      <RaffleGrid sortBy={sortBy} />
     </div>
   );
 };
