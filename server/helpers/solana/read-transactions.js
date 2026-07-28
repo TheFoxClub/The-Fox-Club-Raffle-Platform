@@ -13,6 +13,7 @@ const {
 const connection = getConnectionDas();
 
 const PARSED_TX_BATCH_SIZE = 20;
+const MISSING_TRANSACTION_TIMEOUT_MS = 5 * 60 * 1000;
 
 const chunkArray = (items, size) => {
   const chunks = [];
@@ -28,6 +29,7 @@ const readTransactions = async (txs) => {
   try {
     let outputData = [];
     let failedTransactions = [];
+    const missingTransactionIds = new Set();
     const txIds = txs.map((tx) => tx.txId);
 
     let data = [];
@@ -40,7 +42,13 @@ const readTransactions = async (txs) => {
           maxSupportedTransactionVersion: 0,
         });
 
-        data.push(...(chunkData?.filter(Boolean) || []));
+        chunkData?.forEach((transaction, index) => {
+          if (transaction) {
+            data.push(transaction);
+          } else {
+            missingTransactionIds.add(txChunk[index]);
+          }
+        });
       } catch (error) {
         logger.error(
           `Failed to fetch parsed transactions for a batch of ${txChunk.length} signatures:`,
@@ -56,6 +64,8 @@ const readTransactions = async (txs) => {
 
             if (txData) {
               data.push(txData);
+            } else {
+              missingTransactionIds.add(txId);
             }
           } catch (singleError) {
             logger.error(
@@ -201,6 +211,22 @@ const readTransactions = async (txs) => {
         logger.error(`Error: `, op);
       }
     }
+
+    const now = Date.now();
+    const expiredMissingTransactions = txs
+      .filter(
+        (tx) =>
+          missingTransactionIds.has(tx.txId) &&
+          tx.createdAt &&
+          now - new Date(tx.createdAt).getTime() >=
+            MISSING_TRANSACTION_TIMEOUT_MS,
+      )
+      .map((tx) => tx.txId);
+
+    failedTransactions = [
+      ...new Set([...failedTransactions, ...expiredMissingTransactions]),
+    ];
+
     return { outputData, failedTransactions };
   } catch (e) {
     throw new Error(e);

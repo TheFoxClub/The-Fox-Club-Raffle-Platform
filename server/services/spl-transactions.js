@@ -117,7 +117,11 @@ const getSplTokenSendTransactions = async () => {
   }
 
   return allRows.map((row) => {
-    return { txId: row.txId, txType: row.type };
+    return {
+      txId: row.txId,
+      txType: row.type,
+      createdAt: row.createdAt,
+    };
   });
 };
 
