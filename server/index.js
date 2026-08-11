@@ -74,6 +74,7 @@ app.use("/api", require("./api"));
 app.use("/", express.static("build"));
 
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
+app.use("/api/assets", require("./routes/asset.route"));
 app.use("/api/upload", require("./routes/upload"));
 
 if (process.env.NODE_ENV === "production") {

@@ -28,6 +28,7 @@ import server, { getRequest } from "../../config/server";
 import { toast } from "react-toastify";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
+import { getAssetUrl } from "../../helpers/assetUrl";
 import { storeSignature, cancelReservation } from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
@@ -800,7 +801,7 @@ const RaffleDetail = () => {
               return (
                 <div className="relative">
                   <img
-                    src={heroImages[heroIndex] || raffle.image}
+                    src={getAssetUrl(heroImages[heroIndex] || raffle.image)}
                     alt={raffle.title}
                     className=" w-full h-full object-contain"
                   />

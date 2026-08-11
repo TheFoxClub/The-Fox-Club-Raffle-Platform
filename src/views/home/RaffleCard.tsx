@@ -2,6 +2,7 @@ import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
 import { CheckCircle, Clock, Ticket, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getAssetUrl } from "../../helpers/assetUrl";
 import { formatPrice } from "../../helpers/formatPrice";
 import { useTokenSymbol } from "../../hooks/useTokenDisplay";
 
@@ -44,7 +45,7 @@ export const RaffleCard = ({
       <Card className="glass-card group hover:border-primary-50 transition-all duration-300 hover:glow-primary overflow-hidden border-primary/30">
         <div className="relative aspect-video overflow-hidden">
           <img
-            src={image}
+            src={getAssetUrl(image)}
             alt={title}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
             onError={(e) => {

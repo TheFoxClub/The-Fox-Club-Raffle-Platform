@@ -11,6 +11,7 @@ import {
 import server from "../../config/server";
 import { useNavigate } from "react-router-dom";
 import socketService from "../../services/socket.service";
+import { getAssetUrl } from "../../helpers/assetUrl";
 // import { featuredRaffles } from "../../dummydata/featuredRaffles";
 import { formatPrice } from "../../helpers/formatPrice";
 import { useTokenSymbol } from "../../hooks/useTokenDisplay";
@@ -59,7 +60,7 @@ function RaffleCard({
     >
       <div className="relative aspect-[16/8] overflow-hidden">
         <img
-          src={raffle.image}
+          src={getAssetUrl(raffle.image)}
           alt={raffle.title}
           className="w-full h-full object-cover"
         />
