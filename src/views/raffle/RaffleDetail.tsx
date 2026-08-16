@@ -29,7 +29,11 @@ import { toast } from "react-toastify";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
 import { getAssetUrl } from "../../helpers/assetUrl";
-import { storeSignature, cancelReservation } from "./api";
+import {
+  storeSignature,
+  cancelReservation,
+  getReservationStatus,
+} from "./api";
 import { SOLANA_RPC_HOST } from "../../helpers/solana-helpers/config";
 import WinnerModal from "../../components/ui/WinnerModal";
 import { shortenPubkey } from "../../helpers/utils";
@@ -340,6 +344,37 @@ const RaffleDetail = () => {
 
     setIsBuying(true);
     let reservationId: string | null = null;
+    const applyConfirmedPurchase = (
+      signature: string,
+      confirmedTicketsSold?: number,
+    ) => {
+      processedPurchaseSignatures.current.add(signature);
+      setRaffle((currentRaffle) =>
+        currentRaffle
+          ? {
+              ...currentRaffle,
+              sold: Math.min(
+                confirmedTicketsSold || currentRaffle.sold + ticketCount,
+                currentRaffle.total,
+              ),
+            }
+          : currentRaffle,
+      );
+      toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
+      void fetchTicketPurchasers();
+      void fetchRaffle();
+    };
+
+    const reservationWasConfirmed = async () => {
+      if (!reservationId) return false;
+
+      const reservationStatus = await getReservationStatus(reservationId);
+      return (
+        reservationStatus.success &&
+        reservationStatus.data?.status === "CONFIRMED"
+      );
+    };
+
     try {
       toast.info("Reserving tickets. Please wait...");
       // Step 1: Reserve tickets (this prevents race conditions)
@@ -405,22 +440,12 @@ const RaffleDetail = () => {
       );
 
       if (confirmResponse.success) {
-        processedPurchaseSignatures.current.add(signature);
-        setRaffle((currentRaffle) =>
-          currentRaffle
-            ? {
-                ...currentRaffle,
-                sold: Math.min(
-                  Number(confirmResponse.data?.raffle?.ticketsSold) ||
-                    currentRaffle.sold + ticketCount,
-                  currentRaffle.total,
-                ),
-              }
-            : currentRaffle,
+        applyConfirmedPurchase(
+          signature,
+          Number(confirmResponse.data?.raffle?.ticketsSold),
         );
-        toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
-        void fetchTicketPurchasers();
-        void fetchRaffle();
+      } else if (await reservationWasConfirmed()) {
+        applyConfirmedPurchase(signature);
       } else {
         throw new Error(
           confirmResponse.message || "Failed to confirm purchase",
@@ -432,6 +457,13 @@ const RaffleDetail = () => {
       // Cancel reservation if transaction failed
       if (reservationId) {
         try {
+          if (await reservationWasConfirmed()) {
+            toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
+            void fetchTicketPurchasers();
+            void fetchRaffle();
+            return;
+          }
+
           await cancelReservation(reservationId);
         } catch (cancelError) {
           console.error("Failed to cancel reservation:", cancelError);
