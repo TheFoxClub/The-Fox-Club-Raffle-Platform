@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
@@ -218,6 +218,7 @@ const RaffleDetail = () => {
   );
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<TPagination | null>(null);
+  const processedPurchaseSignatures = useRef(new Set<string>());
 
   const extractErrorMessage = (error: any): string => {
     if (!error) return "";
@@ -237,25 +238,27 @@ const RaffleDetail = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchTicketPurchasers = async () => {
-      try {
-        const res = await server.get(`/ticket/purchasers/${raffleId}/${page}`);
-        if (res?.data?.success) {
-          setTicketPurchasers(res.data.data.buyers || []);
-          setPagination(res.data.data.pagination);
-        } else {
-          setTicketPurchasers([]);
-          toast.error(res.data.message || "Error fetching purchased tickets");
-        }
-      } catch (error) {
-        setTicketPurchasers([]);
-        toast.error("Error fetching ticket purchasers");
-      }
-    };
+  const fetchTicketPurchasers = useCallback(async () => {
+    if (!raffleId) return;
 
-    fetchTicketPurchasers();
+    try {
+      const res = await server.get(`/ticket/purchasers/${raffleId}/${page}`);
+      if (res?.data?.success) {
+        setTicketPurchasers(res.data.data.buyers || []);
+        setPagination(res.data.data.pagination);
+      } else {
+        setTicketPurchasers([]);
+        toast.error(res.data.message || "Error fetching purchased tickets");
+      }
+    } catch (error) {
+      setTicketPurchasers([]);
+      toast.error("Error fetching ticket purchasers");
+    }
   }, [raffleId, page]);
+
+  useEffect(() => {
+    void fetchTicketPurchasers();
+  }, [fetchTicketPurchasers]);
 
   const getRewardImage = (reward: RaffleReward) => {
     if (reward.imageUrl) return reward.imageUrl;
@@ -402,22 +405,25 @@ const RaffleDetail = () => {
       );
 
       if (confirmResponse.success) {
+        processedPurchaseSignatures.current.add(signature);
         setRaffle((currentRaffle) =>
           currentRaffle
             ? {
                 ...currentRaffle,
                 sold: Math.min(
-                  currentRaffle.sold + ticketCount,
+                  Number(confirmResponse.data?.raffle?.ticketsSold) ||
+                    currentRaffle.sold + ticketCount,
                   currentRaffle.total,
                 ),
               }
             : currentRaffle,
         );
         toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
+        void fetchTicketPurchasers();
         void fetchRaffle();
       } else {
         throw new Error(
-          confirmResponse.data.message || "Failed to confirm purchase",
+          confirmResponse.message || "Failed to confirm purchase",
         );
       }
     } catch (error: any) {
@@ -432,28 +438,23 @@ const RaffleDetail = () => {
         }
       }
 
-      if (error.message.includes("rejected")) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Transaction failed. Please try again.";
+
+      if (errorMessage.toLowerCase().includes("rejected")) {
         toast.error("Transaction was rejected by wallet");
-      } else if (error.message.includes("blockhash")) {
+      } else if (errorMessage.toLowerCase().includes("blockhash")) {
         toast.error("Transaction Expired. Please try again.");
-      } else if (error.message.includes("insufficient") || error.response.data.message) {
-        toast.error(error?.response?.data?.message || "Insufficient balance");
-      } else if (error.message.includes("EXISTING_RESERVATION")) {
+      } else if (errorMessage.includes("EXISTING_RESERVATION")) {
         toast.error("You already have an active reservation for this raffle");
-
-        if (isInsufficientFundsError(error)) {
-          toast.error(
-            "Insufficient balance. Please add funds to your wallet and try again.",
-          );
-          return;
-        }
-
-        if (error?.response?.data?.message) {
-          toast.error(error.response.data.message);
-          return;
-        }
-
-        toast.error("Transaction failed. Please try again.");
+      } else if (isInsufficientFundsError(error)) {
+        toast.error(
+          "Insufficient balance. Please add funds to your wallet and try again.",
+        );
+      } else {
+        toast.error(errorMessage);
       }
     } finally {
       setIsBuying(false);
@@ -466,6 +467,7 @@ const RaffleDetail = () => {
     connected,
     isBuying,
     user.isAuthenticated,
+    fetchTicketPurchasers,
   ]);
 
   const fetchRaffle = useCallback(async () => {
@@ -631,6 +633,14 @@ const RaffleDetail = () => {
 
     const handleTicketPurchase = (data: any) => {
       if (data.raffleId === raffleIdNum) {
+        const isNewPurchase =
+          !data.signature ||
+          !processedPurchaseSignatures.current.has(data.signature);
+
+        if (data.signature) {
+          processedPurchaseSignatures.current.add(data.signature);
+        }
+
         setRaffle((prev) => {
           if (!prev) return prev;
           return {
@@ -639,11 +649,17 @@ const RaffleDetail = () => {
             total: data.totalTickets || prev.total,
           };
         });
-        // Show toast for other users (not the buyer)
-        if (publicKey && data.buyerPubkey !== publicKey.toBase58()) {
-          toast.info(
-            `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`,
-          );
+
+        if (isNewPurchase) {
+          void fetchTicketPurchasers();
+
+          if (publicKey && data.buyerPubkey === publicKey.toBase58()) {
+            toast.success(`Successfully purchased ${data.ticketCount} ticket(s)!`);
+          } else {
+            toast.info(
+              `${data.ticketCount} ticket(s) purchased! ${data.ticketsLeft} left`,
+            );
+          }
         }
       }
     };
@@ -699,7 +715,7 @@ const RaffleDetail = () => {
       socketService.offRaffleStatusChanged(handleRaffleStatusChange);
       socketService.offWinnersSelected(handleWinnersSelected);
     };
-  }, [raffleId, publicKey, fetchRaffle]);
+  }, [raffleId, publicKey, fetchRaffle, fetchTicketPurchasers]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
