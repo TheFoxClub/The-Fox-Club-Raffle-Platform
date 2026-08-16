@@ -5,6 +5,7 @@ class SocketService {
   private isConnected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  private raffleRooms = new Set<number>();
 
   connect(userId?: number, userPubkey?: string) {
     if (this.socket?.connected) {
@@ -49,6 +50,9 @@ class SocketService {
     this.socket.on("connect", () => {
       this.isConnected = true;
       this.reconnectAttempts = 0;
+      this.raffleRooms.forEach((raffleId) => {
+        this.socket?.emit("join-raffle", { raffleId });
+      });
     });
 
     this.socket.on("disconnect", (reason) => {
@@ -86,12 +90,14 @@ class SocketService {
 
   // Room management
   joinRaffle(raffleId: number) {
+    this.raffleRooms.add(raffleId);
     if (this.socket?.connected) {
       this.socket.emit("join-raffle", { raffleId });
     }
   }
 
   leaveRaffle(raffleId: number) {
+    this.raffleRooms.delete(raffleId);
     if (this.socket?.connected) {
       this.socket.emit("leave-raffle", { raffleId });
     }
