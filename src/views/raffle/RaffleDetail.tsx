@@ -402,8 +402,19 @@ const RaffleDetail = () => {
       );
 
       if (confirmResponse.success) {
+        setRaffle((currentRaffle) =>
+          currentRaffle
+            ? {
+                ...currentRaffle,
+                sold: Math.min(
+                  currentRaffle.sold + ticketCount,
+                  currentRaffle.total,
+                ),
+              }
+            : currentRaffle,
+        );
         toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
-        await fetchRaffle();
+        void fetchRaffle();
       } else {
         throw new Error(
           confirmResponse.data.message || "Failed to confirm purchase",
@@ -867,9 +878,11 @@ const RaffleDetail = () => {
           {/* Raffle Info */}
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-4 sm:p-6 space-y-3 sm:space-y-4">
             <div>
-              <div className="top-3 left-3 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white mb-3">
-                Featured Raffle
-              </div>
+              {raffle.isFeatured && (
+                <div className="top-3 left-3 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white mb-3">
+                  Featured Raffle
+                </div>
+              )}
               <h1 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 text-gradient break-words">
                 {raffle.title}
               </h1>
