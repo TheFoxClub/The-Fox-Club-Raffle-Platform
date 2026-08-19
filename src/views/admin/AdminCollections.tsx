@@ -12,6 +12,7 @@ import {
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Label } from "../../components/ui/Label";
+import { Select } from "../../components/ui/Select";
 import { Switch } from "../../components/ui/Switch";
 import {
   Dialog,
@@ -20,6 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../../components/ui/Dialog";
+import { isAxiosError } from "axios";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 
@@ -27,8 +29,30 @@ interface Collection {
   id: number;
   name: string;
   address: string;
+  matchType: "collection" | "creator";
   verified: boolean;
 }
+
+interface CollectionApiItem {
+  id: number;
+  name: string;
+  address: string;
+  matchType?: string;
+  isVerified: boolean;
+}
+
+const matchTypeOptions = [
+  { value: "collection", label: "Collection Address" },
+  { value: "creator", label: "Creator Address" },
+];
+
+const getRequestErrorMessage = (error: unknown, fallback: string) => {
+  if (isAxiosError(error)) {
+    return error.response?.data?.message || fallback;
+  }
+
+  return fallback;
+};
 
 export default function AdminCollections() {
   const [open, setOpen] = useState(false);
@@ -37,6 +61,9 @@ export default function AdminCollections() {
   const [uploading, setUploading] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionAddress, setNewCollectionAddress] = useState("");
+  const [newCollectionMatchType, setNewCollectionMatchType] = useState<
+    "collection" | "creator"
+  >("collection");
   const [saving, setSaving] = useState(false);
   const [fetchingName, setFetchingName] = useState(false);
   const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,6 +85,11 @@ export default function AdminCollections() {
     setNewCollectionAddress(value);
 
     if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+
+    if (newCollectionMatchType !== "collection") {
+      setFetchingName(false);
+      return;
+    }
 
     if (value.trim().length < 32) {
       setFetchingName(false);
@@ -87,10 +119,11 @@ export default function AdminCollections() {
       const res = await server.get("/admin/verified-collection");
       setCollections(
         Array.isArray(res.data?.data?.collections)
-          ? res.data.data.collections.map((c: any) => ({
+          ? res.data.data.collections.map((c: CollectionApiItem) => ({
               id: c.id,
               name: c.name,
               address: c.address,
+              matchType: c.matchType === "creator" ? "creator" : "collection",
               verified: c.isVerified,
             }))
           : []
@@ -107,6 +140,23 @@ export default function AdminCollections() {
     fetchCollections();
   }, []);
 
+  useEffect(() => {
+    if (newCollectionMatchType === "collection") {
+      return;
+    }
+
+    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+    setFetchingName(false);
+  }, [newCollectionMatchType]);
+
+  const identifierLabel =
+    newCollectionMatchType === "creator"
+      ? "Verified Creator Address"
+      : "Collection Address";
+
+  const identifierPlaceholder =
+    newCollectionMatchType === "creator" ? "93rd...ycPP" : "FoxC...xyz1";
+
   const handleAddCollection = async () => {
     if (!newCollectionName.trim() || !newCollectionAddress.trim()) {
       toast.error("Collection name and address are required");
@@ -117,6 +167,7 @@ export default function AdminCollections() {
       const res = await server.post("/admin/verified-collection", {
         address: newCollectionAddress,
         name: newCollectionName,
+        matchType: newCollectionMatchType,
       });
       if (res.data?.data?.collection) {
         toast.success("Collection added successfully!");
@@ -124,12 +175,13 @@ export default function AdminCollections() {
         setOpen(false);
         setNewCollectionName("");
         setNewCollectionAddress("");
+        setNewCollectionMatchType("collection");
       } else {
         toast.error(res.data?.message || "Failed to add collection");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding collection:", error);
-      toast.error(error.response?.data?.message || "Error adding collection");
+      toast.error(getRequestErrorMessage(error, "Error adding collection"));
     } finally {
       setSaving(false);
     }
@@ -159,9 +211,9 @@ export default function AdminCollections() {
       } else {
         toast.error(res.data?.message || "CSV upload failed");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("CSV upload error:", err);
-      toast.error(err.response?.data?.message || "CSV upload failed");
+      toast.error(getRequestErrorMessage(err, "CSV upload failed"));
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -271,9 +323,9 @@ export default function AdminCollections() {
       } else {
         toast.error(res.data?.message || "Failed to update collection");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Edit collection error:", err);
-      toast.error(err.response?.data?.message || "Failed to update collection");
+      toast.error(getRequestErrorMessage(err, "Failed to update collection"));
     } finally {
       setSavingEdit(false);
     }
@@ -337,6 +389,16 @@ export default function AdminCollections() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
+                  <Label>Match Type</Label>
+                  <Select
+                    value={newCollectionMatchType}
+                    onValueChange={(value) =>
+                      setNewCollectionMatchType(value as "collection" | "creator")
+                    }
+                    options={matchTypeOptions}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label>Collection Name</Label>
                   <Input
                     placeholder={fetchingName ? "Looking up on-chain..." : "Fox Club Genesis"}
@@ -346,9 +408,9 @@ export default function AdminCollections() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Mint Address</Label>
+                  <Label>{identifierLabel}</Label>
                   <Input
-                    placeholder="FoxC...xyz1"
+                    placeholder={identifierPlaceholder}
                     value={newCollectionAddress}
                     maxLength={50}
                     onChange={handleAddressChange}
@@ -473,11 +535,20 @@ export default function AdminCollections() {
               <h3 className="font-semibold text-base mb-2 line-clamp-2 overflow-hidden text-ellipsis break-all">
                 {collection.name}
               </h3>
+              <p className="text-xs uppercase tracking-wide text-primary/80 mb-1">
+                {collection.matchType === "creator"
+                  ? "Creator-based match"
+                  : "Collection-based match"}
+              </p>
               <p
                 className="text-xs text-muted-foreground break-all mb-3 cursor-pointer hover:text-primary"
                 onClick={() => {
                   navigator.clipboard.writeText(collection.address);
-                  toast.success("Mint address copied!");
+                  toast.success(
+                    collection.matchType === "creator"
+                      ? "Creator address copied!"
+                      : "Collection address copied!"
+                  );
                 }}
                 title="Click to copy"
               >

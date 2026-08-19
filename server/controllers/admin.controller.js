@@ -37,6 +37,21 @@ const {
   sendRaffleEndingSoonNotification,
 } = require("../services/discord.service");
 
+const VERIFIED_COLLECTION_MATCH_TYPES = {
+  COLLECTION: "collection",
+  CREATOR: "creator",
+};
+
+const isValidVerifiedCollectionMatchType = (value) =>
+  Object.values(VERIFIED_COLLECTION_MATCH_TYPES).includes(value);
+
+const clearVerifiedCollectionCaches = async () => {
+  await Promise.all([
+    redisClient.deleteByPattern("nfts:all:*"),
+    redisClient.deleteByPattern("nfts:collection:*"),
+  ]);
+};
+
 class AdminController {
   static async getAllRaffles(req, res) {
     try {
@@ -328,10 +343,18 @@ class AdminController {
 
   static async createVerifiedCollection(req, res) {
     try {
-      const { address, name } = req.body;
+      const address = String(req.body.address || "").trim();
+      const name = req.body.name ? String(req.body.name).trim() : null;
+      const matchType = String(
+        req.body.matchType || VERIFIED_COLLECTION_MATCH_TYPES.COLLECTION
+      ).trim();
 
       if (!address) {
         return respond(res, httpStatus.BAD_REQUEST, "Address is required");
+      }
+
+      if (!isValidVerifiedCollectionMatchType(matchType)) {
+        return respond(res, httpStatus.BAD_REQUEST, "Invalid match type");
       }
 
       const existingCollection = await VerifiedCollection.findOne({
@@ -348,9 +371,12 @@ class AdminController {
 
       const collection = await VerifiedCollection.create({
         address,
-        name: name || null,
+        name,
+        matchType,
         isVerified: false,
       });
+
+      await clearVerifiedCollectionCaches();
 
       return respond(
         res,
@@ -371,12 +397,27 @@ class AdminController {
   static async updateVerifiedCollection(req, res) {
     try {
       const { id } = req.params;
-      const { address, name, isVerified } = req.body;
+      const address = req.body.address
+        ? String(req.body.address).trim()
+        : undefined;
+      const name =
+        req.body.name !== undefined ? String(req.body.name).trim() : undefined;
+      const isVerified = req.body.isVerified;
+      const matchType = req.body.matchType
+        ? String(req.body.matchType).trim()
+        : undefined;
 
       const collection = await VerifiedCollection.findByPk(id);
 
       if (!collection) {
         return respond(res, httpStatus.NOT_FOUND, "Collection not found");
+      }
+
+      if (
+        matchType !== undefined &&
+        !isValidVerifiedCollectionMatchType(matchType)
+      ) {
+        return respond(res, httpStatus.BAD_REQUEST, "Invalid match type");
       }
 
       // Check if address is being updated and if it already exists
@@ -397,9 +438,12 @@ class AdminController {
       await collection.update({
         address: address || collection.address,
         name: name !== undefined ? name : collection.name,
+        matchType: matchType || collection.matchType,
         isVerified:
           isVerified !== undefined ? isVerified : collection.isVerified,
       });
+
+      await clearVerifiedCollectionCaches();
 
       return respond(res, httpStatus.OK, "Collection updated successfully", {
         collection,
@@ -426,10 +470,8 @@ class AdminController {
 
       await collection.destroy();
 
-      //delete user cache
-      const key = "nfts:all:*";
-      await redisClient.deleteByPattern(key);
-      logger.info("Deleted User NFTs cache after updating collection status");
+      await clearVerifiedCollectionCaches();
+      logger.info("Deleted user NFT caches after deleting collection");
 
       return respond(res, httpStatus.OK, "Collection deleted successfully");
     } catch (error) {
@@ -479,10 +521,8 @@ class AdminController {
         isVerified: !collection.isVerified,
       });
 
-      //delete user cache
-      const key = "nfts:all:*";
-      await redisClient.deleteByPattern(key);
-      logger.info("Deleted User NFTs cache after updating collection status");
+      await clearVerifiedCollectionCaches();
+      logger.info("Deleted user NFT caches after updating collection status");
 
       return respond(
         res,
@@ -529,9 +569,21 @@ class AdminController {
 
         const address = columns[0];
         const name = columns[1] || null;
+        const matchType = (
+          columns[2] || VERIFIED_COLLECTION_MATCH_TYPES.COLLECTION
+        ).toLowerCase();
 
         if (!address) {
           results.failed.push({ row: i + 1, error: "Address is required" });
+          continue;
+        }
+
+        if (!isValidVerifiedCollectionMatchType(matchType)) {
+          results.failed.push({
+            row: i + 1,
+            address,
+            error: `Invalid match type: ${matchType}`,
+          });
           continue;
         }
 
@@ -549,6 +601,7 @@ class AdminController {
           const collection = await VerifiedCollection.create({
             address,
             name,
+            matchType,
             isVerified: false,
           });
 
@@ -557,6 +610,8 @@ class AdminController {
           results.failed.push({ row: i + 1, address, error: error.message });
         }
       }
+
+      await clearVerifiedCollectionCaches();
 
       return respond(res, httpStatus.OK, "CSV upload processed", { results });
     } catch (error) {
@@ -580,6 +635,8 @@ class AdminController {
       const deletedCount = await VerifiedCollection.destroy({
         where: { id: ids },
       });
+
+      await clearVerifiedCollectionCaches();
 
       return respond(
         res,

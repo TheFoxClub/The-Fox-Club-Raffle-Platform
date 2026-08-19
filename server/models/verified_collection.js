@@ -15,6 +15,11 @@ module.exports = (sequelize, DataTypes) => {
     {
       address: DataTypes.STRING,
       name: DataTypes.STRING,
+      matchType: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "collection",
+      },
       isVerified: DataTypes.BOOLEAN,
     },
     {

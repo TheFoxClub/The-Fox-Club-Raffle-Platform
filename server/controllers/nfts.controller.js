@@ -15,6 +15,10 @@ const { getUmi } = require("../config/solana");
 const CACHE_TTL = process.env.REDIS_TTL || 300;
 const { VerifiedCollection } = require("../models");
 const { COLLECTION_ISVERIFIED } = require("../config/data");
+const VERIFIED_COLLECTION_MATCH_TYPES = {
+  COLLECTION: "collection",
+  CREATOR: "creator",
+};
 
 const normalizeIpfsUri = (value) => {
   if (!value) return null;
@@ -54,6 +58,87 @@ const getAssetImage = (item) => {
   );
 };
 
+const normalizeMatchType = (value) => {
+  return value === VERIFIED_COLLECTION_MATCH_TYPES.CREATOR
+    ? VERIFIED_COLLECTION_MATCH_TYPES.CREATOR
+    : VERIFIED_COLLECTION_MATCH_TYPES.COLLECTION;
+};
+
+const getCollectionGroupValues = (item) => {
+  return (Array.isArray(item?.grouping) ? item.grouping : [])
+    .filter((group) => group?.group_key === "collection" && group?.group_value)
+    .map((group) => group.group_value);
+};
+
+const getVerifiedCreatorAddresses = (item) => {
+  return (Array.isArray(item?.creators) ? item.creators : [])
+    .filter((creator) => creator?.address && creator?.verified)
+    .map((creator) => creator.address);
+};
+
+const toVerifiedCollectionSets = (collections) => {
+  const grouped = {
+    collection: new Set(),
+    creator: new Set(),
+  };
+
+  for (const collection of collections) {
+    if (!collection?.address) {
+      continue;
+    }
+
+    grouped[normalizeMatchType(collection.matchType)].add(collection.address);
+  }
+
+  return grouped;
+};
+
+const matchesVerifiedCollection = (item, verifiedSets) => {
+  const collectionGroups = getCollectionGroupValues(item);
+  if (collectionGroups.some((address) => verifiedSets.collection.has(address))) {
+    return true;
+  }
+
+  const creatorAddresses = getVerifiedCreatorAddresses(item);
+  return creatorAddresses.some((address) => verifiedSets.creator.has(address));
+};
+
+const mapAssetForResponse = (item) => ({
+  mint: item.id,
+  name: item.content?.metadata?.name,
+  uri: normalizeIpfsUri(item.content?.json_uri),
+  image: getAssetImage(item),
+  interface: item.interface,
+  grouping: item.grouping,
+  collection: getCollectionGroupValues(item)[0] || null,
+  creators: getVerifiedCreatorAddresses(item),
+  ownership: item.ownership,
+});
+
+const fetchAllAssetsByOwner = async (owner) => {
+  const items = [];
+  let page = 1;
+
+  while (true) {
+    const assets = await getUmi().rpc.searchAssets({
+      owner: publicKey(owner),
+      burnt: false,
+      page,
+    });
+
+    items.push(...(assets?.items || []));
+
+    if ((assets?.items || []).length < 1000) {
+      break;
+    }
+
+    page += 1;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  return items;
+};
+
 class HolderController {
   static async getUserNftsFromCollection(req, res) {
     try {
@@ -64,7 +149,7 @@ class HolderController {
 
       const verifiedCollections = await VerifiedCollection.findAll({
         where: { isVerified: COLLECTION_ISVERIFIED.TRUE },
-        attributes: ["address", "name"],
+        attributes: ["address", "name", "matchType"],
         raw: true,
       });
 
@@ -75,9 +160,15 @@ class HolderController {
         });
       }
 
-      const collectionAddresses = verifiedCollections.map((c) => c.address);
+      const verifiedSets = toVerifiedCollectionSets(verifiedCollections);
+      const cacheTokens = verifiedCollections
+        .map(
+          (collection) =>
+            `${normalizeMatchType(collection.matchType)}:${collection.address}`
+        )
+        .sort();
 
-      const cacheKey = `nfts:collection:v2:${pubkey}:${collectionAddresses.join(
+      const cacheKey = `nfts:collection:v3:${pubkey}:${cacheTokens.join(
         ","
       )}`;
 
@@ -97,33 +188,16 @@ class HolderController {
 
       logger.info(`Cache miss for key: ${cacheKey}, fetching from blockchain`);
 
-      let allItems = [];
-
-      for (const collection of collectionAddresses) {
-        const result = await getUmi().rpc.searchAssets({
-          owner: publicKey(pubkey),
-          grouping: ["collection", collection],
-        });
-
-        if (result?.items?.length) {
-          allItems.push(...result.items);
-        }
-      }
+      const allItems = await fetchAllAssetsByOwner(pubkey);
 
       const uniqueNftsMap = new Map();
-      for (const item of allItems) {
+      for (const item of allItems.filter((asset) =>
+        matchesVerifiedCollection(asset, verifiedSets)
+      )) {
         uniqueNftsMap.set(item.id, item);
       }
 
-      const nfts = Array.from(uniqueNftsMap.values()).map((item) => ({
-        mint: item.id,
-        name: item.content?.metadata?.name,
-        uri: normalizeIpfsUri(item.content?.json_uri),
-        image: getAssetImage(item),
-        interface: item.interface,
-        grouping: item.grouping,
-        ownership: item.ownership,
-      }));
+      const nfts = Array.from(uniqueNftsMap.values()).map(mapAssetForResponse);
 
       const responseData = {
         total: nfts.length,
@@ -164,11 +238,9 @@ class HolderController {
           isVerified: true,
         },
       });
-      const verifiedCollectionAddresses = allVerifiedCollections.map(
-        (item) => item.address
-      );
+      const verifiedSets = toVerifiedCollectionSets(allVerifiedCollections);
 
-      const cacheKey = `nfts:all:v2:${pubkey}`;
+      const cacheKey = `nfts:all:v3:${pubkey}`;
 
       let cachedData = await redisClient.get(cacheKey);
 
@@ -189,44 +261,10 @@ class HolderController {
 
       logger.info(`Cache miss for key: ${cacheKey}, fetching from blockchain`);
 
-      const searchParams = {
-        owner: publicKey(pubkey),
-        burnt: false,
-      };
-
-      let nfts = [];
-      let page = 1;
-
-      
-      while(true){
-        const assets = await getUmi().rpc.searchAssets({
-          ...searchParams,
-          page: page
-        })
-        nfts = nfts.concat(assets.items);
-
-        if(assets?.items?.length < 1000){
-          break
-        }
-        page++;
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      if(verifiedCollectionAddresses.length > 0) {
-        nfts = nfts.filter((item) => 
-          verifiedCollectionAddresses.includes(item.grouping?.[0]?.group_value)
-        );
-
-        nfts = nfts.map((item) => ({
-          mint: item.id,
-          name: item.content?.metadata?.name,
-          uri: normalizeIpfsUri(item.content?.json_uri),
-          interface: item.interface,
-          collection: item.grouping?.[0],
-          image: getAssetImage(item),
-          ownership: item.ownership,
-        }));
-      }
+      const assets = await fetchAllAssetsByOwner(pubkey);
+      const nfts = assets
+        .filter((item) => matchesVerifiedCollection(item, verifiedSets))
+        .map(mapAssetForResponse);
 
 
       const responseData = {
