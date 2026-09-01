@@ -22,6 +22,7 @@ import server from "../../config/server";
 import XPLeaderboard from "./XPLeaderboard";
 import PeriodicLeaderboard from "./PeriodicLeaderboard";
 import { toast } from "react-toastify";
+import { formatXp } from "../../utils/formatXp";
 
 interface TXpConfig {
   ticket_purchase_rate: number;
@@ -202,7 +203,7 @@ const Leaderboard = () => {
                             <p className="font-bold text-xl">{host.revenue}</p> */}
                             <Star className="h- w-6 text-primary" />
                             <span className="text-lg font-bold text-primary">
-                              {host.revenue.toLocaleString()} XP
+                              {formatXp(host.revenue)} XP
                             </span>
                           </div>
                           {/* <p className="text-sm text-muted-foreground">
@@ -276,7 +277,7 @@ const Leaderboard = () => {
                             <p className="font-bold text-xl">{host.revenue}</p> */}
                               <Star className="h- w-6 text-primary" />
                               <span className="text-lg font-bold text-primary">
-                                {buyer.spent.toLocaleString()} XP
+                                {formatXp(buyer.spent)} XP
                               </span>
                             </div>
                           </div>

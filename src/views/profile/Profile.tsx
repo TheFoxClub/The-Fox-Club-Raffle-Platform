@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Trash2,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import {
   Tabs,
@@ -35,6 +36,7 @@ import { formatRewardType } from "../../utils/rewardTypeUtils";
 import { setNotificationsCount } from "../../redux/userSlice";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
+import Pagination from "../../components/ui/Pagination";
 
 type HostedRaffle = {
   id: number;
@@ -140,6 +142,8 @@ const USER_AIRDROP_STATUS = {
   PENDING: 2,
 };
 
+const PROFILE_PAGE_SIZE = 10;
+
 const Profile = () => {
   const { publicKey, signTransaction } = useWallet();
   const dispatch = useDispatch<AppDispatch>();
@@ -155,6 +159,11 @@ const Profile = () => {
   );
 
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
+  const [ticketsPage, setTicketsPage] = useState(1);
+  const [hostedHistoryPage, setHostedHistoryPage] = useState(1);
+  const [winsPage, setWinsPage] = useState(1);
+  const [showPurchasedTickets, setShowPurchasedTickets] = useState(false);
+  const [showHostedHistory, setShowHostedHistory] = useState(false);
   //const reversedPurchasedTickets = [...purchasedTickets].reverse();
 
   const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>(
@@ -185,6 +194,29 @@ const Profile = () => {
     (raffle) =>
       raffle.payoutInfo?.canClaim && raffle.payoutInfo?.unclaimedAmount > 0
   ).length;
+  const activeOrPendingHostedRaffles = hostedRafflesData.filter(
+    (raffle) =>
+      raffle.status === RAFFLE_STATUS.LIVE ||
+      (raffle.payoutInfo?.canClaim && raffle.payoutInfo.unclaimedAmount > 0)
+  );
+  const hostedRaffleHistory = hostedRafflesData.filter(
+    (raffle) => !activeOrPendingHostedRaffles.includes(raffle)
+  );
+  const paginatedPurchasedTickets = purchasedTickets.slice(
+    (ticketsPage - 1) * PROFILE_PAGE_SIZE,
+    ticketsPage * PROFILE_PAGE_SIZE
+  );
+  const paginatedHostedHistory = hostedRaffleHistory.slice(
+    (hostedHistoryPage - 1) * PROFILE_PAGE_SIZE,
+    hostedHistoryPage * PROFILE_PAGE_SIZE
+  );
+  const paginatedWins = wins.slice(
+    (winsPage - 1) * PROFILE_PAGE_SIZE,
+    winsPage * PROFILE_PAGE_SIZE
+  );
+  const visibleHostedRaffles = showHostedHistory
+    ? [...activeOrPendingHostedRaffles, ...paginatedHostedHistory]
+    : activeOrPendingHostedRaffles;
 
   const formatEndDate = (dateString: string) => {
     if (!dateString) return "N/A";
@@ -865,7 +897,29 @@ const Profile = () => {
                 </p>
               </Card>
             ) : (
-              purchasedTickets.map((ticket) => (
+              <>
+                <div className="rounded-lg border border-border/50 bg-muted/20">
+                  <button
+                    type="button"
+                    onClick={() => setShowPurchasedTickets((current) => !current)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold"
+                    aria-expanded={showPurchasedTickets}
+                  >
+                    <span>
+                      {showPurchasedTickets
+                        ? "Hide purchased tickets"
+                        : `Show purchased tickets (${purchasedTickets.length})`}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        showPurchasedTickets ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+                {showPurchasedTickets && (
+                  <>
+                    {paginatedPurchasedTickets.map((ticket) => (
                 <Card
                   key={ticket.id}
                   className="bg-card/50 backdrop-blur-xl p-6 border border-border/50"
@@ -914,7 +968,17 @@ const Profile = () => {
                     </Link>
                   </div>
                 </Card>
-              ))
+                    ))}
+                    <Pagination
+                      currentPage={ticketsPage}
+                      totalPages={Math.ceil(purchasedTickets.length / PROFILE_PAGE_SIZE)}
+                      onPageChange={setTicketsPage}
+                      totalItems={purchasedTickets.length}
+                      itemsPerPage={PROFILE_PAGE_SIZE}
+                    />
+                  </>
+                )}
+              </>
             )}
           </TabsContent>
 
@@ -924,7 +988,29 @@ const Profile = () => {
                 No raffles hosted yet.
               </p>
             ) : (
-              hostedRafflesData.map((raffle) => (
+              <>
+                {hostedRaffleHistory.length > 0 && (
+                  <div className="rounded-lg border border-border/50 bg-muted/20">
+                    <button
+                      type="button"
+                      onClick={() => setShowHostedHistory((current) => !current)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold"
+                      aria-expanded={showHostedHistory}
+                    >
+                      <span>
+                        {showHostedHistory
+                          ? "Hide raffle history"
+                          : `Show raffle history (${hostedRaffleHistory.length})`}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${
+                          showHostedHistory ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )}
+                {visibleHostedRaffles.map((raffle) => (
                 <Card
                   key={raffle.id}
                   className="bg-card/50 backdrop-blur-xl border border-border/50 p-6"
@@ -1274,7 +1360,19 @@ const Profile = () => {
                     )}
                   </div>
                 </Card>
-              ))
+                ))}
+                {showHostedHistory && hostedRaffleHistory.length > 0 && (
+                  <Pagination
+                    currentPage={hostedHistoryPage}
+                    totalPages={Math.ceil(
+                      hostedRaffleHistory.length / PROFILE_PAGE_SIZE
+                    )}
+                    onPageChange={setHostedHistoryPage}
+                    totalItems={hostedRaffleHistory.length}
+                    itemsPerPage={PROFILE_PAGE_SIZE}
+                  />
+                )}
+              </>
             )}
           </TabsContent>
 
@@ -1292,7 +1390,8 @@ const Profile = () => {
                 </p>
               </Card>
             ) : (
-              wins.map((win) => (
+              <>
+                {paginatedWins.map((win) => (
                 <Card
                   key={win.id}
                   className="bg-card/50 backdrop-blur-xl border border-border/50 p-6"
@@ -1414,7 +1513,15 @@ const Profile = () => {
                     </div>
                   </div>
                 </Card>
-              ))
+                ))}
+                <Pagination
+                  currentPage={winsPage}
+                  totalPages={Math.ceil(wins.length / PROFILE_PAGE_SIZE)}
+                  onPageChange={setWinsPage}
+                  totalItems={wins.length}
+                  itemsPerPage={PROFILE_PAGE_SIZE}
+                />
+              </>
             )}
           </TabsContent>
 

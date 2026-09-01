@@ -3879,15 +3879,45 @@ class RaffleController {
 
       const signature = submissionResult.signature;
 
-      await SplTokenSendTransaction.update(
-        {
-          txId: signature,
-          status: nextTxStatus,
-        },
-        {
-          where: { id: transactionId },
-        },
-      );
+      await sequelize.transaction(async (transaction) => {
+        await SplTokenSendTransaction.update(
+          {
+            txId: signature,
+            status: nextTxStatus,
+          },
+          {
+            where: { id: transactionId },
+            transaction,
+          },
+        );
+
+        if (nextTxStatus === SPL_TOKEN_SEND_TX_STATUS.SUCCESS) {
+          const lockedRaffle = await Raffle.findByPk(raffleId, {
+            lock: transaction.LOCK.UPDATE,
+            transaction,
+          });
+
+          if (!lockedRaffle) {
+            throw new Error("Raffle not found while confirming payout");
+          }
+
+          const payoutAmount =
+            Number(splTokenTx.uiAmount) /
+            Math.pow(10, Number(splTokenTx.decimals) || 0);
+          const claimedAmount = parseFloat(lockedRaffle.claimedAmount || 0);
+          const claimableAmount = parseFloat(lockedRaffle.claimableAmount || 0);
+
+          await lockedRaffle.update(
+            {
+              claimedAmount: Math.min(
+                claimableAmount,
+                claimedAmount + payoutAmount,
+              ).toString(),
+            },
+            { transaction },
+          );
+        }
+      });
 
       logger.info(
         `Payout transaction signature submitted for transaction ${transactionId}, signature: ${signature}`,

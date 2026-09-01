@@ -4,6 +4,7 @@ import Button from "../ui/Button";
 import server from "../../config/server";
 import { toast } from "react-toastify";
 import { getSourceConfig, getActivityLabel } from "../../config/xpSources";
+import { formatXp } from "../../utils/formatXp";
 
 interface XPSummary {
   user: {
@@ -103,7 +104,7 @@ export function UserXPCard({ className = "" }: UserXPCardProps) {
       {/* Total XP */}
       <div className="text-center mb-6 p-4 rounded-lg bg-gradient-primary/5 border border-primary/20">
         <div className="text-3xl font-bold text-gradient mb-1">
-          {Number(xpData.totalXp).toLocaleString()}
+          {formatXp(xpData.totalXp)}
         </div>
         <div className="text-sm text-muted-foreground">Total XP Earned</div>
       </div>
@@ -134,7 +135,7 @@ export function UserXPCard({ className = "" }: UserXPCardProps) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-primary">
-                    +{parseFloat(source.totalXp).toLocaleString()} XP
+                    +{formatXp(source.totalXp)} XP
                   </p>
                 </div>
               </div>

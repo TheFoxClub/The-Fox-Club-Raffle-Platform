@@ -43,7 +43,7 @@ export const RaffleCard = ({
   return (
     <Link to={`/raffle/raffle-${id}`}>
       <Card className="glass-card group hover:border-primary-50 transition-all duration-300 hover:glow-primary overflow-hidden border-primary/30">
-        <div className="relative aspect-video overflow-hidden">
+        <div className="relative aspect-square overflow-hidden">
           <img
             src={getAssetUrl(image)}
             alt={title}

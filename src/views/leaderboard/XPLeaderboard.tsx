@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { formatXp } from "../../utils/formatXp";
 
 interface LeaderboardUser {
   id: number;
@@ -195,7 +196,7 @@ export default function XPLeaderboard() {
                         <div className="flex items-center justify-center gap-1">
                           <Star className="h-5 w-5 text-primary" />
                           <span className="text-xl font-bold text-primary">
-                            {user.totalXp.toLocaleString()} XP
+                            {formatXp(user.totalXp)} XP
                           </span>
                         </div>
                         <div
@@ -269,7 +270,7 @@ export default function XPLeaderboard() {
                     <div className="flex items-center gap-2">
                       <Star className="h-5 w-5 text-primary" />
                       <span className="text-lg font-semibold sm:font-bold text-primary">
-                        {user.totalXp.toLocaleString()} XP
+                        {formatXp(user.totalXp)} XP
                       </span>
                     </div>
                   </div>

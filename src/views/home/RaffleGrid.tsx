@@ -318,7 +318,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
               </span>
             </div>
             {Array.isArray(raffles) && raffles.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {liveRaffles.map((raffle) => {
                   const mappedRaffle = {
                     id: raffle.id,
@@ -373,7 +373,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
               </span>
             </div>
             {Array.isArray(endedRaffles) && endedRaffles.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {endedRaffleList.map((raffle) => {
                   const mappedRaffle = {
                     id: raffle.id,
@@ -428,7 +428,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
               </span>
             </div>
             {Array.isArray(upcomingRaffles) && upcomingRaffles.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {upcomingRaffleList.map((raffle) => {
                   const mappedRaffle = {
                     id: raffle.id,

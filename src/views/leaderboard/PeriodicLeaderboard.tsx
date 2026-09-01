@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import server from "../../config/server";
 import { toast } from "react-toastify";
+import { formatXp } from "../../utils/formatXp";
 
 interface PeriodicLeaderboardUser {
   rank: number;
@@ -297,7 +298,7 @@ export default function PeriodicLeaderboard() {
                     <div className="flex items-center justify-end gap-2">
                       <Star className="h-5 w-5 text-primary" />
                       <span className="text-lg font-semibold sm:font-bold text-primary">
-                        {user.periodXp.toLocaleString()} XP
+                        {formatXp(user.periodXp)} XP
                       </span>
                     </div>
                   </div>
