@@ -100,7 +100,7 @@ const getTopHosts = async (limit = 10, xpConfig) => {
       totalRevenue: parseFloat(host.totalRevenueUsd) || 0, //usd
       totalRevenueSol: solToUsdPrice > 0 ? host.totalRevenueUsd / solToUsdPrice : 0,
       totalRevenueXp:
-        parseFloat(host.totalRevenueUsd) / xpConfig.raffle_revenue_rate,
+        parseFloat(host.totalRevenueUsd) * xpConfig.raffle_revenue_rate,
       rafflesCount: parseInt(host.raffleCount || 0, 10),
       raffles: host.raffles,
       // tokenType: mapEnumValue(TOKEN_TYPE, host.tokenType),
