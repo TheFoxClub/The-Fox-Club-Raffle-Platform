@@ -32,7 +32,7 @@ import { formatXp } from "../../utils/formatXp";
 export const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, disconnect } = useWallet();
   const { connection } = useConnection();
   const user = useSelector((state: RootState) => state.user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -205,6 +205,12 @@ export const Header = () => {
     window.setTimeout(() => setWalletAddressCopied(false), 1200);
   };
 
+  const disconnectWallet = async () => {
+    await disconnect();
+    setBalanceMenuOpen(false);
+    setProfileMenuOpen(false);
+  };
+
   return (
     <nav className="sticky top-0 z-50 w-full overflow-visible bg-background/95 px-4 py-3 backdrop-blur-sm">
       <div className="container mx-auto flex flex-col items-center justify-between gap-4 overflow-visible rounded-lg border border-border/70 bg-card/50 px-5 py-3 shadow-lg shadow-black/20 md:flex-row">
@@ -332,16 +338,26 @@ export const Header = () => {
                   </Link>
                   <div className="my-1 border-t border-border" />
                   {connected && (
-                    <button
-                      type="button"
-                      className="flex h-10 w-full items-center gap-3 rounded-sm border border-transparent px-3 text-left text-muted-foreground transition-colors hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-foreground"
-                      onClick={copyWalletAddress}
-                      title="Copy wallet address"
-                    >
-                      <Wallet className="h-4 w-4 text-sky-300" />
-                      <span className="font-mono text-xs">{walletAddressCopied ? "Copied" : shortenAddress(publicKey?.toBase58() || "")}</span>
-                      <Copy className="ml-auto h-4 w-4 text-sky-200/70" />
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="flex h-10 w-full items-center gap-3 rounded-sm border border-transparent px-3 text-left text-muted-foreground transition-colors hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-foreground"
+                        onClick={copyWalletAddress}
+                        title="Copy wallet address"
+                      >
+                        <Wallet className="h-4 w-4 text-sky-300" />
+                        <span className="font-mono text-xs">{walletAddressCopied ? "Copied" : shortenAddress(publicKey?.toBase58() || "")}</span>
+                        <Copy className="ml-auto h-4 w-4 text-sky-200/70" />
+                      </button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 rounded-sm px-3 py-2.5 text-muted-foreground hover:bg-sky-500/10 hover:text-sky-200"
+                        onClick={disconnectWallet}
+                      >
+                        <Wallet className="h-4 w-4" />
+                        Disconnect Wallet
+                      </Button>
+                    </>
                   )}
                   <Button
                     variant="ghost"
