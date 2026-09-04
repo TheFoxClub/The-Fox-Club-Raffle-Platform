@@ -196,8 +196,8 @@ export const Header = () => {
     });
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-background/95 px-4 py-3 backdrop-blur-sm">
-      <div className="container mx-auto flex flex-col items-center justify-between gap-4 rounded-lg border border-border/70 bg-card/50 px-5 py-3 shadow-lg shadow-black/20 md:flex-row">
+    <nav className="sticky top-0 z-50 w-full overflow-visible bg-background/95 px-4 py-3 backdrop-blur-sm">
+      <div className="container mx-auto flex flex-col items-center justify-between gap-4 overflow-visible rounded-lg border border-border/70 bg-card/50 px-5 py-3 shadow-lg shadow-black/20 md:flex-row">
         {/* Logo */}
         <Link to="/" className="flex shrink-0 items-center gap-3 group whitespace-nowrap">
           <img
@@ -247,7 +247,7 @@ export const Header = () => {
             <Link to="/create">
               <Button
                 variant="outline"
-                className="hidden h-14 min-w-40 gap-2 border-amber-400/50 bg-gradient-to-br from-amber-400/15 via-background to-orange-500/10 px-4 text-foreground hover:border-amber-300/80 hover:bg-amber-400/15 sm:flex"
+                className="hidden h-10 gap-2 border-amber-400/50 bg-gradient-to-br from-amber-400/15 via-background to-orange-500/10 px-4 text-foreground hover:border-amber-300/80 hover:bg-amber-400/15 sm:flex"
               >
                 <PlusCircle className="h-4 w-4" /> Create Raffle
               </Button>
@@ -258,7 +258,7 @@ export const Header = () => {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-14 min-w-40 gap-1.5 border border-orange-500/50 bg-gradient-to-br from-orange-500/15 via-zinc-800 to-rose-500/10 px-4 text-sm font-medium hover:border-orange-400/80 hover:bg-orange-500/15"
+                className="h-10 gap-1.5 border border-orange-500/50 bg-gradient-to-br from-orange-500/15 via-zinc-800 to-rose-500/10 px-4 text-sm font-medium hover:border-orange-400/80 hover:bg-orange-500/15"
               >
                 <Star className="h-4 w-4 text-primary" />
                 <span>{formatXp(totalXp)} XP</span>
@@ -270,7 +270,7 @@ export const Header = () => {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-14 min-w-40 gap-1.5 border border-sky-400/50 bg-gradient-to-br from-sky-500/15 via-zinc-800 to-indigo-500/10 px-4 text-sm font-medium hover:border-sky-300/80 hover:bg-sky-500/15"
+                className="h-10 gap-1.5 border border-sky-400/50 bg-gradient-to-br from-sky-500/15 via-zinc-800 to-indigo-500/10 px-4 text-sm font-medium hover:border-sky-300/80 hover:bg-sky-500/15"
                 onClick={() => setBalanceMenuOpen((open) => !open)}
                 aria-expanded={balanceMenuOpen}
                 aria-haspopup="listbox"
@@ -280,7 +280,7 @@ export const Header = () => {
                 <ChevronDown className={`h-4 w-4 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
               </Button>
               {balanceMenuOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 min-w-52 overflow-hidden rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
+                <div className="absolute right-0 top-full z-[60] mt-2 min-w-52 overflow-visible rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
                   {balances.map((balance) => (
                     <div
                       key={balance.symbol}
@@ -300,7 +300,7 @@ export const Header = () => {
                 type="button"
                 variant="secondary"
                 size="icon"
-                className="relative h-14 w-14 border border-border bg-zinc-800/90 hover:bg-zinc-700"
+                className="relative h-10 w-10 border border-border bg-zinc-800/90 hover:bg-zinc-700"
                 onClick={() => setProfileMenuOpen((open) => !open)}
                 aria-expanded={profileMenuOpen}
                 aria-haspopup="menu"
@@ -308,30 +308,31 @@ export const Header = () => {
               >
                 <User className="h-5 w-5" />
                 {notificationsCount > 0 && (
-                  <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-zinc-800" />
+                  <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-zinc-800" />
                 )}
               </Button>
               {profileMenuOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 min-w-56 overflow-hidden rounded-md border border-border bg-card p-1 shadow-lg" role="menu" aria-label="Account menu">
+                <div className="absolute right-0 top-full z-[60] mt-2 min-w-60 overflow-visible rounded-md border border-border/80 bg-zinc-950/95 p-1.5 shadow-xl shadow-black/40 backdrop-blur" role="menu" aria-label="Account menu">
                   <Link to="/profile" onClick={() => setProfileMenuOpen(false)}>
-                    <span className="relative flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium hover:bg-accent">
+                    <span className="relative flex items-center gap-3 rounded-sm px-3 py-2.5 text-sm font-medium hover:bg-accent">
                       <User className="h-4 w-4" />
                       Profile
-                      {notificationsCount > 0 && <span className="h-2 w-2 rounded-full bg-orange-500" />}
+                      {notificationsCount > 0 && <span className="ml-auto h-2 w-2 rounded-full bg-orange-500" />}
                     </span>
                   </Link>
                   <div className="my-1 border-t border-border" />
                   <MyConnectWalletButton>
                     {connected ? (
-                      <Button variant="ghost" className="w-full justify-start gap-3 px-3">
-                        <Wallet className="h-4 w-4" />
-                        {shortenAddress(publicKey?.toBase58() || "")}
+                      <Button variant="ghost" className="w-full justify-start gap-3 rounded-sm border border-transparent px-3 py-2.5 text-muted-foreground hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-foreground">
+                        <Wallet className="h-4 w-4 text-sky-300" />
+                        <span className="font-mono text-xs">{shortenAddress(publicKey?.toBase58() || "")}</span>
+                        <ChevronDown className="ml-auto h-4 w-4" />
                       </Button>
                     ) : null}
                   </MyConnectWalletButton>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start gap-3 px-3 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    className="w-full justify-start gap-3 rounded-sm px-3 py-2.5 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                     onClick={logout}
                   >
                     <LogOut className="h-4 w-4" />
