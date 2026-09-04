@@ -354,7 +354,7 @@ export const Header = () => {
                 </div>
               )}
             </div>
-          ) : connected ? <SolanaSignIn /> : null}
+          ) : connected ? <SolanaSignIn /> : <MyConnectWalletButton />}
         </div>
         {/* Mobile Menu */}
         <div className="flex md:hidden items-center gap-2 mt-4 w-full">
