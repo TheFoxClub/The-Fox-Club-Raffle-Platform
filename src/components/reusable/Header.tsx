@@ -37,9 +37,11 @@ export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsCount, setNotificationsCount] = useState(0);
   const [balanceMenuOpen, setBalanceMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [balances, setBalances] = useState<{ symbol: string; amount: number }[]>([]);
   const [totalXp, setTotalXp] = useState<number | null>(null);
   const balanceMenuRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // console.log("Header user:", user);
 
@@ -52,6 +54,7 @@ export const Header = () => {
     await handleLogout();
     navigate("/");
     setMobileMenuOpen(false);
+    setProfileMenuOpen(false);
   };
 
   useEffect(() => {
@@ -171,14 +174,17 @@ export const Header = () => {
   }, [user.isAuthenticated]);
 
   useEffect(() => {
-    const closeBalanceMenu = (event: MouseEvent) => {
+    const closeAccountMenus = (event: MouseEvent) => {
       if (!balanceMenuRef.current?.contains(event.target as Node)) {
         setBalanceMenuOpen(false);
       }
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
     };
 
-    document.addEventListener("mousedown", closeBalanceMenu);
-    return () => document.removeEventListener("mousedown", closeBalanceMenu);
+    document.addEventListener("mousedown", closeAccountMenus);
+    return () => document.removeEventListener("mousedown", closeAccountMenus);
   }, []);
 
   const solBalance = balances.find((balance) => balance.symbol === "SOL");
@@ -190,8 +196,8 @@ export const Header = () => {
     });
 
   return (
-    <nav className="sticky top-0 z-50 bg-background border-b border-border/50 w-full backdrop-blur-sm">
-      <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+    <nav className="sticky top-0 z-50 w-full bg-background/95 px-4 py-3 backdrop-blur-sm">
+      <div className="container mx-auto flex flex-col items-center justify-between gap-4 rounded-lg border border-border/70 bg-card/50 px-5 py-3 shadow-lg shadow-black/20 md:flex-row">
         {/* Logo */}
         <Link to="/" className="flex shrink-0 items-center gap-3 group whitespace-nowrap">
           <img
@@ -222,27 +228,6 @@ export const Header = () => {
               <Trophy className="h-4 w-4" /> Leaderboard
             </Button>
           </Link>
-          {user.isAuthenticated && (
-            <Link to="/profile">
-              <Button
-                variant={isActive("/profile") ? "default" : "ghost"}
-                className={`w-full gap-2 cursor-pointer justify-center relative rounded-md hover:bg-accent ${
-                  notificationsCount > 0 ? "w-31 pl-0 pr-4 justify-center" : ""
-                }`}
-              >
-                {/* <User className="h-4 w-4" /> Profile */}
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>Profile</span>
-                </div>
-                {notificationsCount > 0 && (
-                  <span className="absolute right-4 top-1/3 -translate-y-1/2 min-w-[18px] h-[18px] px-1 text-[10px] flex items-center justify-center bg-red-600 text-white font-bold rounded-full ">
-                    {notificationsCount > 9 ? "9+" : notificationsCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
-          )}
           {user.isAdmin && (
             <Link to="/admin">
               <Button
@@ -256,89 +241,106 @@ export const Header = () => {
             </Link>
           )}
         </div>
-        {/* Wallet & Create Button */}
-        <div className="flex shrink-0 items-center gap-2 relative">
+        {/* Account controls */}
+        <div className="flex shrink-0 items-center gap-2">
           {user.isAuthenticated && connected && (
             <Link to="/create">
               <Button
                 variant="outline"
-                className="gap-2 hidden sm:flex cursor-pointer"
+                className="hidden h-14 min-w-40 gap-2 border-amber-400/50 bg-gradient-to-br from-amber-400/15 via-background to-orange-500/10 px-4 text-foreground hover:border-amber-300/80 hover:bg-amber-400/15 sm:flex"
               >
                 <PlusCircle className="h-4 w-4" /> Create Raffle
               </Button>
             </Link>
           )}
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex w-full flex-wrap items-center justify-center gap-2">
-              {user.isAuthenticated ? null : connected ? <SolanaSignIn /> : null}
-              <MyConnectWalletButton>
-                {connected ? (
-                  <Button
-                    variant="secondary"
-                    className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
-                  >
-                    <Wallet className="h-4 w-4" />
-                    {shortenAddress(publicKey?.toBase58() || "")}
-                  </Button>
-                ) : null}
-              </MyConnectWalletButton>
-              {user.isAuthenticated && (
-                <Button
-                  variant="default"
-                  className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
-                  onClick={logout}
-                  title="Logout"
-                  aria-label="Logout"
-                >
-                  Logout
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {user.isAuthenticated && totalXp !== null && (
-                <Link to="/profile" title="View your experience points">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
-                  >
-                    <Star className="h-4 w-4 text-primary" />
-                    <span>{formatXp(totalXp)} XP</span>
-                  </Button>
-                </Link>
-              )}
-              {user.isAuthenticated && connected && (
-                <div ref={balanceMenuRef} className="relative">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
-                    onClick={() => setBalanceMenuOpen((open) => !open)}
-                    aria-expanded={balanceMenuOpen}
-                    aria-haspopup="listbox"
-                  >
-                    <Coins className="h-4 w-4" />
-                    <span>{formatBalance(solBalance?.amount || 0)} SOL</span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
-                  </Button>
-                  {balanceMenuOpen && (
-                    <div className="absolute right-0 top-full z-50 mt-2 min-w-52 overflow-hidden rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
-                      {balances.map((balance) => (
-                        <div
-                          key={balance.symbol}
-                          className="flex w-full items-center justify-between gap-4 px-3 py-2 text-sm"
-                        >
-                          <span className="font-medium">{balance.symbol}</span>
-                          <span className="text-muted-foreground">{formatBalance(balance.amount)}</span>
-                        </div>
-                      ))}
+          {user.isAuthenticated && totalXp !== null && (
+            <Link to="/profile" title="View your experience points">
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-14 min-w-40 gap-1.5 border border-orange-500/50 bg-gradient-to-br from-orange-500/15 via-zinc-800 to-rose-500/10 px-4 text-sm font-medium hover:border-orange-400/80 hover:bg-orange-500/15"
+              >
+                <Star className="h-4 w-4 text-primary" />
+                <span>{formatXp(totalXp)} XP</span>
+              </Button>
+            </Link>
+          )}
+          {user.isAuthenticated && connected && (
+            <div ref={balanceMenuRef} className="relative">
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-14 min-w-40 gap-1.5 border border-sky-400/50 bg-gradient-to-br from-sky-500/15 via-zinc-800 to-indigo-500/10 px-4 text-sm font-medium hover:border-sky-300/80 hover:bg-sky-500/15"
+                onClick={() => setBalanceMenuOpen((open) => !open)}
+                aria-expanded={balanceMenuOpen}
+                aria-haspopup="listbox"
+              >
+                <Coins className="h-4 w-4" />
+                <span>{formatBalance(solBalance?.amount || 0)} SOL</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
+              </Button>
+              {balanceMenuOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-52 overflow-hidden rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
+                  {balances.map((balance) => (
+                    <div
+                      key={balance.symbol}
+                      className="flex w-full items-center justify-between gap-4 px-3 py-2 text-sm"
+                    >
+                      <span className="font-medium">{balance.symbol}</span>
+                      <span className="text-muted-foreground">{formatBalance(balance.amount)}</span>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
             </div>
-          </div>
+          )}
+          {user.isAuthenticated ? (
+            <div ref={profileMenuRef} className="relative">
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="relative h-14 w-14 border border-border bg-zinc-800/90 hover:bg-zinc-700"
+                onClick={() => setProfileMenuOpen((open) => !open)}
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="menu"
+                aria-label="Open account menu"
+              >
+                <User className="h-5 w-5" />
+                {notificationsCount > 0 && (
+                  <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-zinc-800" />
+                )}
+              </Button>
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-56 overflow-hidden rounded-md border border-border bg-card p-1 shadow-lg" role="menu" aria-label="Account menu">
+                  <Link to="/profile" onClick={() => setProfileMenuOpen(false)}>
+                    <span className="relative flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium hover:bg-accent">
+                      <User className="h-4 w-4" />
+                      Profile
+                      {notificationsCount > 0 && <span className="h-2 w-2 rounded-full bg-orange-500" />}
+                    </span>
+                  </Link>
+                  <div className="my-1 border-t border-border" />
+                  <MyConnectWalletButton>
+                    {connected ? (
+                      <Button variant="ghost" className="w-full justify-start gap-3 px-3">
+                        <Wallet className="h-4 w-4" />
+                        {shortenAddress(publicKey?.toBase58() || "")}
+                      </Button>
+                    ) : null}
+                  </MyConnectWalletButton>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 px-3 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    onClick={logout}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : connected ? <SolanaSignIn /> : null}
         </div>
         {/* Mobile Menu */}
         <div className="flex md:hidden items-center gap-2 mt-4 w-full">
