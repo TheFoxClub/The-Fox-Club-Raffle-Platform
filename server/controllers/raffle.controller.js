@@ -65,6 +65,11 @@ const {
 const { getFloorPrice } = require("../services/orbis.service");
 const PriceService = require("../services/price.service");
 
+const roundUpToDecimalPlaces = (value, decimalPlaces) => {
+  const factor = 10 ** decimalPlaces;
+  return Math.ceil(value * factor - Number.EPSILON) / factor;
+};
+
 const addFloorPrice = async (data) => {
   const nftReward = data.raffle_rewards?.find(
     (reward) => Number(reward.rewardType) === RAFFLE_REWARD_TYPES.NFT || reward.rewardType === "NFT",
@@ -1294,12 +1299,16 @@ class RaffleController {
           return respond(res, httpStatus.BAD_REQUEST, "Each payment option requires a valid ticket price");
         }
 
+        const storedTicketPrice = isSol && priceMode === "auto"
+          ? roundUpToDecimalPlaces(calculatedTicketPrice, 4)
+          : calculatedTicketPrice;
+
         paymentOptionsByAddress.set(optionAddress, {
           tokenAddress: optionAddress,
           tokenType: isSol ? TOKEN_TYPE.SOLANA : token.tokenType,
           tokenSymbol: isSol ? "SOL" : token.symbol || token.name || "Token",
           decimals: isSol ? 9 : token.decimals,
-          ticketPrice: calculatedTicketPrice.toFixed(12),
+          ticketPrice: storedTicketPrice.toFixed(12),
           baseSolPrice: referencePrice.toFixed(12),
           discountPercent,
           priceMode,
