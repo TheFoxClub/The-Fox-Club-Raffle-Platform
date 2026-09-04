@@ -12,6 +12,7 @@ import {
   X,
   ChevronDown,
   Coins,
+  Copy,
   Star,
 } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
@@ -38,6 +39,7 @@ export const Header = () => {
   const [notificationsCount, setNotificationsCount] = useState(0);
   const [balanceMenuOpen, setBalanceMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [walletAddressCopied, setWalletAddressCopied] = useState(false);
   const [balances, setBalances] = useState<{ symbol: string; amount: number }[]>([]);
   const [totalXp, setTotalXp] = useState<number | null>(null);
   const balanceMenuRef = useRef<HTMLDivElement>(null);
@@ -195,6 +197,14 @@ export const Header = () => {
       maximumFractionDigits: 4,
     });
 
+  const copyWalletAddress = async () => {
+    if (!publicKey) return;
+
+    await navigator.clipboard.writeText(publicKey.toBase58());
+    setWalletAddressCopied(true);
+    window.setTimeout(() => setWalletAddressCopied(false), 1200);
+  };
+
   return (
     <nav className="sticky top-0 z-50 w-full overflow-visible bg-background/95 px-4 py-3 backdrop-blur-sm">
       <div className="container mx-auto flex flex-col items-center justify-between gap-4 overflow-visible rounded-lg border border-border/70 bg-card/50 px-5 py-3 shadow-lg shadow-black/20 md:flex-row">
@@ -247,7 +257,7 @@ export const Header = () => {
             <Link to="/create">
               <Button
                 variant="outline"
-                className="hidden h-10 gap-2 border-amber-400/50 bg-gradient-to-br from-amber-400/15 via-background to-orange-500/10 px-4 text-foreground hover:border-amber-300/80 hover:bg-amber-400/15 sm:flex"
+                className="hidden h-10 w-40 shrink-0 gap-2 border-amber-400/50 bg-gradient-to-br from-amber-400/15 via-background to-orange-500/10 px-3 text-foreground hover:border-amber-300/80 hover:bg-amber-400/15 sm:flex"
               >
                 <PlusCircle className="h-4 w-4" /> Create Raffle
               </Button>
@@ -258,7 +268,7 @@ export const Header = () => {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-10 gap-1.5 border border-orange-500/50 bg-gradient-to-br from-orange-500/15 via-zinc-800 to-rose-500/10 px-4 text-sm font-medium hover:border-orange-400/80 hover:bg-orange-500/15"
+                className="h-10 w-40 shrink-0 gap-1.5 border border-orange-500/50 bg-gradient-to-br from-orange-500/15 via-zinc-800 to-rose-500/10 px-3 text-sm font-medium hover:border-orange-400/80 hover:bg-orange-500/15"
               >
                 <Star className="h-4 w-4 text-primary" />
                 <span>{formatXp(totalXp)} XP</span>
@@ -270,7 +280,7 @@ export const Header = () => {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-10 gap-1.5 border border-sky-400/50 bg-gradient-to-br from-sky-500/15 via-zinc-800 to-indigo-500/10 px-4 text-sm font-medium hover:border-sky-300/80 hover:bg-sky-500/15"
+                className="h-10 w-40 shrink-0 gap-1.5 border border-sky-400/50 bg-gradient-to-br from-sky-500/15 via-zinc-800 to-indigo-500/10 px-3 text-sm font-medium hover:border-sky-300/80 hover:bg-sky-500/15"
                 onClick={() => setBalanceMenuOpen((open) => !open)}
                 aria-expanded={balanceMenuOpen}
                 aria-haspopup="listbox"
@@ -321,15 +331,18 @@ export const Header = () => {
                     </span>
                   </Link>
                   <div className="my-1 border-t border-border" />
-                  <MyConnectWalletButton>
-                    {connected ? (
-                      <Button variant="ghost" className="w-full justify-start gap-3 rounded-sm border border-transparent px-3 py-2.5 text-muted-foreground hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-foreground">
-                        <Wallet className="h-4 w-4 text-sky-300" />
-                        <span className="font-mono text-xs">{shortenAddress(publicKey?.toBase58() || "")}</span>
-                        <ChevronDown className="ml-auto h-4 w-4" />
-                      </Button>
-                    ) : null}
-                  </MyConnectWalletButton>
+                  {connected && (
+                    <button
+                      type="button"
+                      className="flex h-10 w-full items-center gap-3 rounded-sm border border-transparent px-3 text-left text-muted-foreground transition-colors hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-foreground"
+                      onClick={copyWalletAddress}
+                      title="Copy wallet address"
+                    >
+                      <Wallet className="h-4 w-4 text-sky-300" />
+                      <span className="font-mono text-xs">{walletAddressCopied ? "Copied" : shortenAddress(publicKey?.toBase58() || "")}</span>
+                      <Copy className="ml-auto h-4 w-4 text-sky-200/70" />
+                    </button>
+                  )}
                   <Button
                     variant="ghost"
                     className="w-full justify-start gap-3 rounded-sm px-3 py-2.5 text-red-400 hover:bg-red-500/10 hover:text-red-300"
