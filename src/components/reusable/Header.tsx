@@ -268,72 +268,76 @@ export const Header = () => {
               </Button>
             </Link>
           )}
-          <div className="flex w-full flex-wrap items-center justify-center gap-2">
-            {user.isAuthenticated ? null : connected ? <SolanaSignIn /> : null}
-            {user.isAuthenticated && totalXp !== null && (
-              <Link to="/profile" title="View your experience points">
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex w-full flex-wrap items-center justify-center gap-2">
+              {user.isAuthenticated ? null : connected ? <SolanaSignIn /> : null}
+              <MyConnectWalletButton>
+                {connected ? (
+                  <Button
+                    variant="secondary"
+                    className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    {shortenAddress(publicKey?.toBase58() || "")}
+                  </Button>
+                ) : null}
+              </MyConnectWalletButton>
+              {user.isAuthenticated && (
                 <Button
-                  type="button"
-                  variant="secondary"
-                  className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
-                >
-                  <Star className="h-4 w-4 text-primary" />
-                  <span>{formatXp(totalXp)} XP</span>
-                </Button>
-              </Link>
-            )}
-            {user.isAuthenticated && connected && (
-              <div ref={balanceMenuRef} className="relative">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
-                  onClick={() => setBalanceMenuOpen((open) => !open)}
-                  aria-expanded={balanceMenuOpen}
-                  aria-haspopup="listbox"
-                >
-                  <Coins className="h-4 w-4" />
-                  <span>{formatBalance(solBalance?.amount || 0)} SOL</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
-                </Button>
-                {balanceMenuOpen && (
-                  <div className="absolute right-0 top-full z-50 mt-2 min-w-52 overflow-hidden rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
-                    {balances.map((balance) => (
-                      <div
-                        key={balance.symbol}
-                        className="flex w-full items-center justify-between gap-4 px-3 py-2 text-sm"
-                      >
-                        <span className="font-medium">{balance.symbol}</span>
-                        <span className="text-muted-foreground">{formatBalance(balance.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <MyConnectWalletButton>
-              {connected ? (
-                <Button
-                  variant="secondary"
+                  variant="default"
                   className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
+                  onClick={logout}
+                  title="Logout"
+                  aria-label="Logout"
                 >
-                  <Wallet className="h-4 w-4" />
-                  {shortenAddress(publicKey?.toBase58() || "")}
+                  Logout
+                  <LogOut className="h-4 w-4" />
                 </Button>
-              ) : null}
-            </MyConnectWalletButton>
-            {user.isAuthenticated && (
-              <Button
-                variant="default"
-                className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
-                onClick={logout}
-                title="Logout"
-                aria-label="Logout"
-              >
-                Logout
-                <LogOut className="h-4 w-4" />
-              </Button>
-            )}
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {user.isAuthenticated && totalXp !== null && (
+                <Link to="/profile" title="View your experience points">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
+                  >
+                    <Star className="h-4 w-4 text-primary" />
+                    <span>{formatXp(totalXp)} XP</span>
+                  </Button>
+                </Link>
+              )}
+              {user.isAuthenticated && connected && (
+                <div ref={balanceMenuRef} className="relative">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
+                    onClick={() => setBalanceMenuOpen((open) => !open)}
+                    aria-expanded={balanceMenuOpen}
+                    aria-haspopup="listbox"
+                  >
+                    <Coins className="h-4 w-4" />
+                    <span>{formatBalance(solBalance?.amount || 0)} SOL</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
+                  </Button>
+                  {balanceMenuOpen && (
+                    <div className="absolute right-0 top-full z-50 mt-2 min-w-52 overflow-hidden rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
+                      {balances.map((balance) => (
+                        <div
+                          key={balance.symbol}
+                          className="flex w-full items-center justify-between gap-4 px-3 py-2 text-sm"
+                        >
+                          <span className="font-medium">{balance.symbol}</span>
+                          <span className="text-muted-foreground">{formatBalance(balance.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {/* Mobile Menu */}
