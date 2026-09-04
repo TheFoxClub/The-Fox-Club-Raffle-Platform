@@ -44,6 +44,12 @@ module.exports.DISCORD_RAFFLE_WEBHOOK_USERNAME =
 module.exports.DISCORD_RAFFLE_WEBHOOK_AVATAR_URL =
   process.env.DISCORD_RAFFLE_WEBHOOK_AVATAR_URL;
 
+module.exports.DISCORD_TICKET_SALES_WEBHOOK_URL =
+  process.env.DISCORD_TICKET_SALES_WEBHOOK_URL;
+
+module.exports.DISCORD_TICKET_SALES_ROLE_ID =
+  process.env.DISCORD_TICKET_SALES_ROLE_ID;
+
 module.exports.JWT_SECRET = requireEnv("JWT_SECRET");
 
 module.exports.SESSION_SECRET = requireEnv("SESSION_SECRET");
@@ -55,3 +61,4 @@ module.exports.COLLECTION_ADDRESS = process.env.COLLECTION_ADDRESS
   : "";
 
 module.exports.JUPITER_API_KEY = process.env.JUPITER_API_KEY;
+module.exports.ORBIS_API_KEY = process.env.ORBIS_API_KEY;

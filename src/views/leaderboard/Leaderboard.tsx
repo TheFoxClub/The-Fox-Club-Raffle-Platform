@@ -148,7 +148,7 @@ const Leaderboard = () => {
             </TabsTrigger>
             <TabsTrigger value="periodic" className="gap-2 flex-1 sm:flex-none">
               <Calendar className="h-4 w-4" />
-              Periodic
+              Rewards
             </TabsTrigger>
           </TabsList>
 

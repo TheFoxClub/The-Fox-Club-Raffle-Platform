@@ -5,6 +5,8 @@ const {
   DISCORD_RAFFLE_WEBHOOK_URL,
   DISCORD_RAFFLE_WEBHOOK_USERNAME,
   DISCORD_RAFFLE_WEBHOOK_AVATAR_URL,
+  DISCORD_TICKET_SALES_WEBHOOK_URL,
+  DISCORD_TICKET_SALES_ROLE_ID,
   PUBLIC_APP_URL,
 } = require("../config/credentials");
 const { SPL_TOKEN_ADDRESS, RAFFLE_STATUS, mapEnumValue } = require("../config/data");
@@ -325,7 +327,55 @@ async function sendRaffleEndingSoonNotification({
   return true;
 }
 
+async function sendTicketSaleNotification({ raffle, buyerPubkey, ticketCount, amount, tokenSymbol }) {
+  if (!DISCORD_TICKET_SALES_WEBHOOK_URL) {
+    logger.warn("Ticket-sales Discord webhook is not configured");
+    return false;
+  }
+
+  if (!raffle) {
+    logger.warn("Ticket-sales Discord webhook skipped because raffle data is unavailable");
+    return false;
+  }
+
+  logger.info(`Sending Discord ticket-sales webhook for raffle ${raffle.id}`);
+
+  const baseUrl = normalizeBaseUrl(PUBLIC_APP_URL);
+  const raffleUrl = baseUrl ? `${baseUrl}/raffle/raffle-${raffle.id}` : undefined;
+  const imageUrl = toAbsoluteUrl(raffle.imageUrl, baseUrl);
+  const buyer = buyerPubkey ? `${buyerPubkey.slice(0, 4)}...${buyerPubkey.slice(-4)}` : "Unknown";
+  const embed = {
+    title: `Tickets sold: ${raffle.title || `Raffle #${raffle.id}`}`,
+    url: raffleUrl,
+    color: EMBED_COLOR,
+    fields: [
+      { name: "Tickets", value: String(ticketCount), inline: true },
+      { name: "Paid", value: `${amount} ${tokenSymbol}`, inline: true },
+      { name: "Buyer", value: buyer, inline: true },
+    ],
+    thumbnail: imageUrl ? { url: imageUrl } : undefined,
+    footer: { text: FOOTER_TEXT, icon_url: DISCORD_RAFFLE_WEBHOOK_AVATAR_URL || undefined },
+    timestamp: new Date().toISOString(),
+  };
+
+  const response = await axios.post(
+    DISCORD_TICKET_SALES_WEBHOOK_URL,
+    {
+      username: "FoxClub Ticket Sales",
+      avatar_url: DISCORD_RAFFLE_WEBHOOK_AVATAR_URL || undefined,
+      content: DISCORD_TICKET_SALES_ROLE_ID ? `<@&${DISCORD_TICKET_SALES_ROLE_ID}>` : undefined,
+      allowed_mentions: { roles: DISCORD_TICKET_SALES_ROLE_ID ? [DISCORD_TICKET_SALES_ROLE_ID] : [] },
+      embeds: [embed],
+    },
+    { timeout: 10000, headers: { "Content-Type": "application/json" } },
+  );
+
+  logger.info(`Discord ticket-sales webhook sent for raffle ${raffle.id} with status ${response.status}`);
+  return true;
+}
+
 module.exports = {
   sendRaffleCreatedNotification,
   sendRaffleEndingSoonNotification,
+  sendTicketSaleNotification,
 };

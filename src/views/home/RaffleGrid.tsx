@@ -33,6 +33,7 @@ interface RaffleData {
     isFeatured: boolean;
     requiresNftVerification: boolean;
   };
+  floorPrice?: { amount: number; collectionName?: string | null } | null;
 }
 
 type RaffleRealtimeUpdate = {
@@ -57,7 +58,9 @@ function formatCountdown(endDate: string) {
   const hours = Math.floor(diff / (1000 * 60 * 60));
   diff %= 1000 * 60 * 60;
 
-  return `${days}d ${hours}h`;
+  const minutes = Math.floor(diff / (1000 * 60));
+
+  return `${days}d ${hours}h ${minutes}m`;
 }
 
 const getTimestamp = (value: string) => {
@@ -334,6 +337,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
                     isVerified:
                       raffle.raffle_detail?.requiresNftVerification || false,
                     isFeatured: raffle.raffle_detail?.isFeatured || false,
+                    floorPrice: raffle.floorPrice,
                   };
 
                   return (
@@ -389,6 +393,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
                     isVerified:
                       raffle.raffle_detail?.requiresNftVerification || false,
                     isFeatured: raffle.raffle_detail?.isFeatured || false,
+                    floorPrice: raffle.floorPrice,
                   };
 
                   return (
@@ -446,6 +451,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
                     isVerified:
                       raffle.raffle_detail?.requiresNftVerification || false,
                     isFeatured: raffle.raffle_detail?.isFeatured || false,
+                    floorPrice: raffle.floorPrice,
                   };
 
                   return (

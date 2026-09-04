@@ -17,11 +17,35 @@ const {
 } = require("@solana/spl-token");
 const redisClient = require("../util/redisClient");
 const { TOKEN_TYPE } = require("../config/data");
+const PriceService = require("../services/price.service");
 
 const TOKENS_CACHE_TTL = process.env.TOKENS_CACHE_TTL || 300; // 5 minutes
 const METADATA_CACHE_TTL = process.env.METADATA_CACHE_TTL || 3600; // 1 hour
 
 class TokenController {
+  static async getVerifiedPaymentTokenPrices(req, res) {
+    try {
+      const tokens = await VerifiedToken.findAll({
+        where: { isVerified: true, isPaymentToken: true },
+        attributes: ["address", "symbol", "name", "conversionRate"],
+        raw: true,
+      });
+      const prices = {};
+      for (const token of tokens) {
+        prices[token.address] = await PriceService.getTokenUsdPrice(
+          token.address,
+          token.symbol || token.name,
+        ) || Number(token.conversionRate || 0);
+      }
+      const { SPL_TOKEN_ADDRESS } = require("../config/data");
+      prices[SPL_TOKEN_ADDRESS.SOLANA] = await PriceService.getSolPrice();
+      return respond(res, httpStatus.OK, "Payment token prices retrieved", { prices });
+    } catch (error) {
+      logger.error("Error fetching payment token prices:", error);
+      return respond(res, httpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch payment token prices");
+    }
+  }
+
   static async getUserTokens(req, res) {
     try {
       const wallet = new PublicKey(req.params.pubkey);

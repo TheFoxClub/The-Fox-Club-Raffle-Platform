@@ -6,6 +6,7 @@ const isAdmin = require("../middlewares/isAdmin");
 
 // Get verified payment tokens
 router.get("/payment-tokens", TokenController.getVerifiedPaymentTokens);
+router.get("/payment-token-prices", TokenController.getVerifiedPaymentTokenPrices);
 
 // Get all verified tokens
 router.get("/all-verified", TokenController.getAllVerifiedTokens);

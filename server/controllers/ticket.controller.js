@@ -6,6 +6,7 @@ const {
   RaffleReward,
   TicketReservation,
   VerifiedToken,
+  RafflePaymentOption,
   sequelize,
 } = require("../models");
 const {
@@ -48,6 +49,7 @@ const { addCommissionToTransaction } = require("../services/commissions");
 const NFTService = require("../services/nft.service");
 const SocketService = require("../services/socket.service");
 const TicketReservationService = require("../services/ticket-reservation.service");
+const { sendTicketSaleNotification } = require("../services/discord.service");
 
 const { getFeeData } = require("../helpers/cache/system-fee");
 const { DEFAULT_COMMISSION } = require("../config/constants");
@@ -69,6 +71,14 @@ class TicketController {
           res,
           httpStatus.BAD_REQUEST,
           "Insufficient data provided",
+        );
+      }
+
+      if (req.payload?.pubkey !== senderPubkey) {
+        return respond(
+          res,
+          httpStatus.UNAUTHORIZED,
+          "Your connected wallet does not match your signed-in account. Please sign in again after switching wallets.",
         );
       }
 
@@ -94,10 +104,25 @@ class TicketController {
         return respond(res, httpStatus.BAD_REQUEST, "Raffle is not live yet");
       }
 
-      let expectedTokenAddress = null;
-      let expectedTokenType = raffleData.tokenType;
+      const requestedTokenAddress = type === "solana"
+        ? SPL_TOKEN_ADDRESS.SOLANA
+        : type;
+      const paymentOption = await RafflePaymentOption.findOne({
+        where: {
+          raffleId,
+          tokenAddress: requestedTokenAddress,
+        },
+      });
 
-      if (expectedTokenType === TOKEN_TYPE.SOLANA) {
+      let expectedTokenAddress = null;
+      let expectedTokenType = paymentOption?.tokenType ?? raffleData.tokenType;
+
+      if (paymentOption) {
+        expectedTokenAddress =
+          paymentOption.tokenType === TOKEN_TYPE.SOLANA
+            ? "solana"
+            : paymentOption.tokenAddress;
+      } else if (expectedTokenType === TOKEN_TYPE.SOLANA) {
         expectedTokenAddress = "solana";
       } else {
         if (raffleData.tokenAddress) {
@@ -123,8 +148,6 @@ class TicketController {
         }
       }
 
-      console.log("Expected token address:", expectedTokenAddress); // Debug log
-
       if (type !== expectedTokenAddress) {
         let raffleTokenName = "Unknown";
         if (expectedTokenType === TOKEN_TYPE.SOLANA) {
@@ -147,6 +170,7 @@ class TicketController {
       // CRITICAL: Use reservation system to prevent race conditions
       const reservationResult = await TicketReservationService.reserveTickets({
         raffleId,
+        paymentOptionId: paymentOption?.id || null,
         userId: existingUser.id,
         walletAddress: senderPubkey,
         ticketCount,
@@ -173,7 +197,7 @@ class TicketController {
         { waivePlatformFees },
       );
 
-      const ticketPrice = raffleData.ticketPrice;
+      const ticketPrice = Number(paymentOption?.ticketPrice ?? raffleData.ticketPrice);
       const totalSolAmount = ticketPrice * ticketCount;
 
       let commissionAmount = safeRound(totalSolAmount * commissionRate);
@@ -494,6 +518,14 @@ class TicketController {
         return respond(res, httpStatus.BAD_REQUEST, "Insufficient data provided");
       }
 
+      if (req.payload?.pubkey !== pubkey) {
+        return respond(
+          res,
+          httpStatus.UNAUTHORIZED,
+          "Your connected wallet does not match your signed-in account. Please sign in again after switching wallets.",
+        );
+      }
+
       try {
         const signatureStatus = await getConnection().getSignatureStatus(signature, {
           searchTransactionHistory: true,
@@ -511,6 +543,11 @@ class TicketController {
 
       let updatedRaffle;
       let createdTicketNumbers = [];
+      let paymentTokenSymbol = "SOL";
+      let isNFTHolder = false;
+      let commissionRate = 0;
+      let commissionAmount = 0;
+      let creatorAmount = 0;
 
       await sequelize.transaction(async (dbTransaction) => {
         const reservation = await TicketReservation.findOne({
@@ -557,6 +594,20 @@ class TicketController {
           throw new Error("Raffle not found");
         }
 
+        const paymentOption = reservation.paymentOptionId
+          ? await RafflePaymentOption.findOne({
+            where: { id: reservation.paymentOptionId, raffleId },
+            transaction: dbTransaction,
+          })
+          : null;
+
+        if (reservation.paymentOptionId && !paymentOption) {
+          throw new Error("Reservation payment option is invalid");
+        }
+
+        const paymentTokenType = paymentOption?.tokenType ?? raffleData.tokenType;
+        paymentTokenSymbol = paymentOption?.tokenSymbol || "SOL";
+
         const user = await User.findOne({
           where: { id: reservation.userId, pubkey },
           transaction: dbTransaction,
@@ -570,40 +621,40 @@ class TicketController {
         let tokenAddress;
         let decimals;
 
-        if (raffleData.tokenType === TOKEN_TYPE.SOLANA) {
+        if (paymentTokenType === TOKEN_TYPE.SOLANA) {
           tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
           tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
           decimals = 9;
-        } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN) {
+        } else if (paymentTokenType === TOKEN_TYPE.SPL_TOKEN) {
           tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
-          tokenAddress = raffleData.tokenAddress;
+          tokenAddress = paymentOption?.tokenAddress || raffleData.tokenAddress;
           try {
             const { getTokenDetail } = require("../helpers/solana/token-program");
-            const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
+            const tokenDetail = await getTokenDetail(tokenAddress);
             decimals = tokenDetail.decimals || 9;
           } catch (error) {
             logger.warn(
-              `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
+              `Failed to get token details for ${tokenAddress}, using fallback decimals`,
             );
-            decimals = Number(tokenDecimals) || 9;
+            decimals = Number(paymentOption?.decimals ?? tokenDecimals) || 9;
           }
-        } else if (raffleData.tokenType === TOKEN_TYPE.SPL_TOKEN_2022) {
+        } else if (paymentTokenType === TOKEN_TYPE.SPL_TOKEN_2022) {
           tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN_2022;
-          tokenAddress = raffleData.tokenAddress;
+          tokenAddress = paymentOption?.tokenAddress || raffleData.tokenAddress;
           try {
             const { getTokenDetail } = require("../helpers/solana/token-program");
-            const tokenDetail = await getTokenDetail(raffleData.tokenAddress);
+            const tokenDetail = await getTokenDetail(tokenAddress);
             decimals = tokenDetail.decimals || 9;
           } catch (error) {
             logger.warn(
-              `Failed to get token details for ${raffleData.tokenAddress}, using fallback decimals`,
+              `Failed to get token details for ${tokenAddress}, using fallback decimals`,
             );
-            decimals = Number(tokenDecimals) || 9;
+            decimals = Number(paymentOption?.decimals ?? tokenDecimals) || 9;
           }
-        } else if (raffleData.tokenType === TOKEN_TYPE.USDC) {
+        } else if (paymentTokenType === TOKEN_TYPE.USDC) {
           tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SPL_TOKEN;
-          tokenAddress = raffleData.tokenAddress || SPL_TOKEN_ADDRESS.USDC;
-          decimals = 6;
+          tokenAddress = paymentOption?.tokenAddress || raffleData.tokenAddress || SPL_TOKEN_ADDRESS.USDC;
+          decimals = Number(paymentOption?.decimals) || 6;
         } else {
           tokenType = SPL_TOKEN_SEND_TRANSACTION_TYPE.SOLANA;
           tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
@@ -611,21 +662,21 @@ class TicketController {
         }
 
         const nftHolderInfo = await NFTService.checkNFTCollectionHolder(pubkey);
-        const isNFTHolder = nftHolderInfo.isHolder;
+        isNFTHolder = nftHolderInfo.isHolder;
         const feeData = await getFeeData();
         const waivePlatformFees = shouldWaivePlatformFees(req.payload);
-        const commissionRate = getParticipantCommissionRate(
+        commissionRate = getParticipantCommissionRate(
           feeData,
           isNFTHolder,
           COMMISSION_RATES,
           { waivePlatformFees },
         );
 
-        const ticketPrice = Number(raffleData.ticketPrice || 0);
+        const ticketPrice = Number(paymentOption?.ticketPrice ?? raffleData.ticketPrice ?? 0);
         const totalAmount = ticketPrice * ticketCount;
 
-        let commissionAmount = safeRound(totalAmount * commissionRate);
-        let creatorAmount = safeRound(totalAmount - commissionAmount);
+        commissionAmount = safeRound(totalAmount * commissionRate);
+        creatorAmount = safeRound(totalAmount - commissionAmount);
 
         if (raffleData.tokenType !== TOKEN_TYPE.SOLANA) {
           const totalBaseUnits = Math.round(totalAmount * Math.pow(10, decimals));
@@ -819,6 +870,19 @@ class TicketController {
         ).toFixed(2),
         updateType: "ticket_purchase",
       });
+
+      try {
+        logger.info(`Dispatching ticket-sales Discord notification for raffle ${raffleId}`);
+        await sendTicketSaleNotification({
+          raffle: updatedRaffle,
+          buyerPubkey: pubkey,
+          ticketCount,
+          amount: Number(lamports) / Math.pow(10, Number(tokenDecimals) || 9),
+          tokenSymbol: paymentTokenSymbol,
+        });
+      } catch (webhookError) {
+        logger.error(`Failed to send ticket-sales webhook: ${webhookError.message}`);
+      }
 
       if (updatedRaffle.ticketsSold >= updatedRaffle.totalTickets) {
         SocketService.emitRaffleStatusChange(raffleId, "LIVE", "ENDED", {

@@ -4,6 +4,8 @@ const {
   User,
   UserInfo,
   RaffleReward,
+  RafflePaymentOption,
+  VerifiedToken,
   VerifiedCollection,
   RaffleTicket,
   SplTokenSendTransaction,
@@ -28,6 +30,7 @@ const {
   sendMultipleSplTokenTx,
   createClaimTransaction,
   createPayoutTransaction,
+  createBatchPayoutTransaction,
   submitTransactionToBlockchain,
 } = require("../helpers/solana/spl-token-send-tx");
 const { getConnectionDas } = require("../config/solana");
@@ -59,6 +62,16 @@ const {
   shouldWaivePlatformFees,
   getTransactionFeeAmount,
 } = require("../util/platformFee");
+const { getFloorPrice } = require("../services/orbis.service");
+const PriceService = require("../services/price.service");
+
+const addFloorPrice = async (data) => {
+  const nftReward = data.raffle_rewards?.find(
+    (reward) => Number(reward.rewardType) === RAFFLE_REWARD_TYPES.NFT || reward.rewardType === "NFT",
+  );
+  data.floorPrice = nftReward ? await getFloorPrice(nftReward) : null;
+  return data;
+};
 
 const notifyRaffleCreated = async ({ raffle, origin, creatorPubkey }) => {
   if (!raffle || raffle.status === RAFFLE_STATUS.DRAFT || raffle.status === "DRAFT") {
@@ -107,7 +120,7 @@ class RaffleController {
         order: [["createdAt", "DESC"]],
       });
 
-      const formattedRaffles = raffles.map((raffle) => {
+      const formattedRaffles = await Promise.all(raffles.map(async (raffle) => {
         const data = raffle.get({ plain: true });
 
         data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
@@ -116,12 +129,12 @@ class RaffleController {
         if (data.raffle_rewards) {
           data.raffle_rewards = data.raffle_rewards.map((reward) => ({
             ...reward,
-            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+            rewardType: mapEnumValue(RAFFLE_REWARD_TYPES, reward.rewardType),
           }));
         }
 
-        return data;
-      });
+        return addFloorPrice(data);
+      }));
 
       return respond(
         res,
@@ -169,7 +182,7 @@ class RaffleController {
         order: [["createdAt", "DESC"]],
       });
 
-      const formattedRaffles = raffles.map((raffle) => {
+      const formattedRaffles = await Promise.all(raffles.map(async (raffle) => {
         const data = raffle.get({ plain: true });
 
         data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
@@ -178,12 +191,12 @@ class RaffleController {
         if (data.raffle_rewards) {
           data.raffle_rewards = data.raffle_rewards.map((reward) => ({
             ...reward,
-            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+            rewardType: mapEnumValue(RAFFLE_REWARD_TYPES, reward.rewardType),
           }));
         }
 
-        return data;
-      });
+        return addFloorPrice(data);
+      }));
 
       return respond(
         res,
@@ -231,7 +244,7 @@ class RaffleController {
         order: [["createdAt", "DESC"]],
       });
 
-      const formattedRaffles = raffles.map((raffle) => {
+      const formattedRaffles = await Promise.all(raffles.map(async (raffle) => {
         const data = raffle.get({ plain: true });
 
         data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
@@ -240,12 +253,12 @@ class RaffleController {
         if (data.raffle_rewards) {
           data.raffle_rewards = data.raffle_rewards.map((reward) => ({
             ...reward,
-            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+            rewardType: mapEnumValue(RAFFLE_REWARD_TYPES, reward.rewardType),
           }));
         }
 
-        return data;
-      });
+        return addFloorPrice(data);
+      }));
 
       return respond(
         res,
@@ -296,7 +309,7 @@ class RaffleController {
         order: [[RaffleDetail, "featuredPosition", "ASC"]],
       });
 
-      const formattedRaffles = raffles.map((raffle) => {
+      const formattedRaffles = await Promise.all(raffles.map(async (raffle) => {
         const data = raffle.get({ plain: true });
 
         data.tokenType = mapEnumValue(TOKEN_TYPE, data.tokenType);
@@ -305,12 +318,12 @@ class RaffleController {
         if (data.raffle_rewards) {
           data.raffle_rewards = data.raffle_rewards.map((reward) => ({
             ...reward,
-            rewardType: mapEnumValue(TOKEN_TYPE, reward.rewardType),
+            rewardType: mapEnumValue(RAFFLE_REWARD_TYPES, reward.rewardType),
           }));
         }
 
-        return data;
-      });
+        return addFloorPrice(data);
+      }));
 
       return respond(
         res,
@@ -352,6 +365,21 @@ class RaffleController {
                 as: "winnerTicket",
                 attributes: ["id", "ticketNumber"],
               },
+            ],
+          },
+          {
+            model: RafflePaymentOption,
+            as: "paymentOptions",
+            attributes: [
+              "id",
+              "tokenAddress",
+              "tokenType",
+              "tokenSymbol",
+              "decimals",
+              "ticketPrice",
+              "baseSolPrice",
+              "discountPercent",
+              "priceMode",
             ],
           },
         ],
@@ -399,7 +427,7 @@ class RaffleController {
         }));
 
       return respond(res, httpStatus.OK, "Raffle retrieved successfully", {
-        raffle,
+        raffle: await addFloorPrice(raffle.get({ plain: true })),
         userData,
         progressPercentage,
         winners,
@@ -633,6 +661,10 @@ class RaffleController {
         rewardTransferData, // for reward transfer metadata
         draftId, // for converting existing draft to live raffle
         isFeatured,
+        paymentOptions,
+        referenceTokenAddress,
+        priceSourceTokenAddress,
+        validateOnly = false,
       } = req.body;
 
       const raffleStatus = req.body.status || RAFFLE_STATUS.UPCOMING;
@@ -1062,7 +1094,7 @@ class RaffleController {
       }
 
       // For non-draft raffles, check reward transfer
-      if (statusEnum !== RAFFLE_STATUS.DRAFT && rewards && rewards.length > 0) {
+      if (!validateOnly && statusEnum !== RAFFLE_STATUS.DRAFT && rewards && rewards.length > 0) {
         // If rewardTransferSignature is provided, rewards were already transferred
         if (rewardTransferSignature) {
           logger.info(
@@ -1159,22 +1191,150 @@ class RaffleController {
         }
       }
 
+      const fallbackPaymentOption = ticketPrice
+        ? {
+          tokenAddress: tokenAddress || SPL_TOKEN_ADDRESS.SOLANA,
+          tokenType: resolvedTokenType,
+          tokenSymbol: resolvedTokenType === TOKEN_TYPE.SOLANA ? "SOL" : "Token",
+          decimals: resolvedTokenType === TOKEN_TYPE.SOLANA ? 9 : 0,
+          ticketPrice,
+          baseSolPrice: ticketPrice,
+          discountPercent: 0,
+          priceMode: "manual",
+        }
+        : null;
+      const requestedPaymentOptions = Array.isArray(paymentOptions) && paymentOptions.length
+        ? paymentOptions
+        : fallbackPaymentOption
+          ? [fallbackPaymentOption]
+          : [];
+      const paymentOptionsByAddress = new Map();
+
+      const requestedReferenceAddress = (priceSourceTokenAddress || referenceTokenAddress) === "solana"
+        ? SPL_TOKEN_ADDRESS.SOLANA
+        : priceSourceTokenAddress || referenceTokenAddress;
+      const referenceOption = requestedPaymentOptions.find((option) => {
+        const optionAddress = option.tokenAddress === "solana"
+          ? SPL_TOKEN_ADDRESS.SOLANA
+          : option.tokenAddress;
+        return optionAddress === requestedReferenceAddress;
+      });
+      const referenceAddress = requestedReferenceAddress || requestedPaymentOptions[0]?.tokenAddress;
+      const referencePrice = Number(referenceOption?.ticketPrice || ticketPrice);
+      let referenceTokenPrice = 0;
+      let undiscountedUsdTicketValue = 0;
+
+      if (Array.isArray(paymentOptions) && paymentOptions.length && (!referenceOption || !Number.isFinite(referencePrice) || referencePrice <= 0)) {
+        return respond(res, httpStatus.BAD_REQUEST, "Enter a valid ticket price for one selected payment token");
+      }
+
+      if (referenceOption) {
+        if (referenceAddress === SPL_TOKEN_ADDRESS.SOLANA) {
+          referenceTokenPrice = await PriceService.getSolPrice();
+        } else {
+          const token = await VerifiedToken.findOne({
+            where: { address: referenceAddress, isVerified: true, isPaymentToken: true },
+          });
+          if (!token) {
+            return respond(res, httpStatus.BAD_REQUEST, "Reference payment token is not verified");
+          }
+          referenceTokenPrice = await PriceService.getTokenUsdPrice(referenceAddress, token.symbol || token.name) || Number(token.conversionRate || 0);
+        }
+        if (referenceTokenPrice <= 0) {
+          return respond(res, httpStatus.BAD_REQUEST, "No live USD price is available for the selected payment token");
+        }
+        const referenceDiscount = Number(referenceOption.discountPercent || 0);
+        undiscountedUsdTicketValue = referencePrice * referenceTokenPrice / (1 - referenceDiscount / 100);
+      }
+
+      for (const option of requestedPaymentOptions) {
+        const isSol = Number(option.tokenType) === TOKEN_TYPE.SOLANA ||
+          option.tokenAddress === "solana" ||
+          option.tokenAddress === SPL_TOKEN_ADDRESS.SOLANA;
+        const optionAddress = isSol ? SPL_TOKEN_ADDRESS.SOLANA : option.tokenAddress;
+        const baseSolPrice = referencePrice || Number(option.baseSolPrice || ticketPrice);
+        const discountPercent = Number(option.discountPercent || 0);
+        const priceMode = option.priceMode === "manual" ? "manual" : "auto";
+
+        if (!optionAddress || !Number.isFinite(baseSolPrice) || baseSolPrice <= 0 ||
+          !Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent >= 100) {
+          return respond(res, httpStatus.BAD_REQUEST, "Each payment option requires a valid SOL base price and discount below 100%");
+        }
+
+        let token = null;
+        let calculatedTicketPrice = 0;
+        if (isSol) {
+          const solUsdPrice = await PriceService.getSolPrice();
+          if (solUsdPrice <= 0) {
+            return respond(res, httpStatus.BAD_REQUEST, "No live USD price is available for SOL");
+          }
+          calculatedTicketPrice = referenceOption
+            ? undiscountedUsdTicketValue / solUsdPrice * (1 - discountPercent / 100)
+            : baseSolPrice * (1 - discountPercent / 100);
+        } else {
+          token = await VerifiedToken.findOne({
+            where: { address: optionAddress, isVerified: true, isPaymentToken: true },
+          });
+          if (!token) {
+            return respond(res, httpStatus.BAD_REQUEST, "Payment token is not verified for raffle payments");
+          }
+
+          const liveTokenUsdPrice = await PriceService.getTokenUsdPrice(optionAddress, token.symbol || token.name);
+          const tokenUsdPrice = liveTokenUsdPrice || Number(token.conversionRate || 0);
+          if (tokenUsdPrice <= 0) {
+            calculatedTicketPrice = Number(option.ticketPrice);
+          } else {
+            calculatedTicketPrice = referenceOption
+              ? undiscountedUsdTicketValue / tokenUsdPrice * (1 - discountPercent / 100)
+              : Number(option.ticketPrice);
+          }
+        }
+
+        if (!Number.isFinite(calculatedTicketPrice) || calculatedTicketPrice <= 0) {
+          return respond(res, httpStatus.BAD_REQUEST, "Each payment option requires a valid ticket price");
+        }
+
+        paymentOptionsByAddress.set(optionAddress, {
+          tokenAddress: optionAddress,
+          tokenType: isSol ? TOKEN_TYPE.SOLANA : token.tokenType,
+          tokenSymbol: isSol ? "SOL" : token.symbol || token.name || "Token",
+          decimals: isSol ? 9 : token.decimals,
+          ticketPrice: calculatedTicketPrice.toFixed(12),
+          baseSolPrice: referencePrice.toFixed(12),
+          discountPercent,
+          priceMode,
+        });
+      }
+
+      const normalizedPaymentOptions = [...paymentOptionsByAddress.values()];
+      const primaryPaymentOption = normalizedPaymentOptions[0];
+
+      if (validateOnly) {
+        return respond(res, httpStatus.OK, "Raffle details are valid");
+      }
+
       const raffle = await Raffle.create({
         userId,
         title,
         description,
         imageUrl: imageUrl || null,
         totalTickets: totalTickets || 0,
-        ticketPrice: ticketPrice || 0,
+        ticketPrice: primaryPaymentOption?.ticketPrice || ticketPrice || 0,
         ticketsSold: 0,
-        tokenType: resolvedTokenType,
-        tokenAddress: tokenAddress || null,
+        tokenType: primaryPaymentOption?.tokenType ?? resolvedTokenType,
+        tokenAddress: primaryPaymentOption?.tokenAddress || tokenAddress || null,
         numberOfWinners: totalWinners,
         startDate: startDate || getFormattedDate(3),
         endDate: endDate || getFormattedDate(10),
         status: finalStatus, // Use calculated status based on dates
         platformWallet: Wallet.getWalletPubkey().toString(),
       });
+
+      if (normalizedPaymentOptions.length) {
+        await RafflePaymentOption.bulkCreate(
+          normalizedPaymentOptions.map((option) => ({ ...option, raffleId: raffle.id })),
+        );
+      }
 
       // Create raffle details
       await RaffleDetail.create({
@@ -1325,6 +1485,7 @@ class RaffleController {
             model: RaffleReward,
             attributes: { exclude: ["createdAt", "updatedAt"] },
           },
+          { model: RafflePaymentOption, as: "paymentOptions" },
         ],
       });
 
@@ -3286,6 +3447,51 @@ class RaffleController {
         order: [["createdAt", "DESC"]],
       });
 
+      const hostedRaffleIds = hostedRaffles.map((raffle) => raffle.id);
+      const ticketPayments = hostedRaffleIds.length
+        ? await SplTokenSendTransaction.findAll({
+          where: {
+            raffleId: { [Op.in]: hostedRaffleIds },
+            rewardTransferType: "ticket_purchase",
+            status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+          },
+        })
+        : [];
+      const payoutRecords = hostedRaffleIds.length
+        ? await SplTokenSendTransaction.findAll({
+          where: {
+            raffleId: { [Op.in]: hostedRaffleIds },
+            rewardTransferType: "creator_payout",
+          },
+        })
+        : [];
+      const claimedTicketTransactionIds = new Set();
+      payoutRecords.forEach((payout) => {
+        if (
+          payout.status !== SPL_TOKEN_SEND_TX_STATUS.SUCCESS &&
+          payout.status !== SPL_TOKEN_SEND_TX_STATUS.PENDING
+        ) {
+          return;
+        }
+        (payout.additionalJson?.sourceTransactionIds || []).forEach((id) => {
+          claimedTicketTransactionIds.add(Number(id));
+        });
+      });
+      const payoutTokensByRaffle = new Map();
+      ticketPayments
+        .filter((payment) => !claimedTicketTransactionIds.has(payment.id))
+        .forEach((payment) => {
+          const key = `${payment.raffleId}:${payment.type}:${payment.tokenAddress}:${payment.decimals}`;
+          const current = payoutTokensByRaffle.get(key) || {
+            tokenType: mapEnumValue(TOKEN_TYPE, payment.type),
+            tokenAddress: payment.tokenAddress,
+            decimals: Number(payment.decimals) || 9,
+            amount: 0,
+          };
+          current.amount += Number(payment.creatorAmount || 0);
+          payoutTokensByRaffle.set(key, current);
+        });
+
       // Format raffles with payout information
       const formattedRaffles = hostedRaffles.map((raffle) => {
         const data = raffle.get({ plain: true });
@@ -3296,6 +3502,9 @@ class RaffleController {
         const claimableAmount = parseFloat(data.claimableAmount || 0);
         const claimedAmount = parseFloat(data.claimedAmount || 0);
         const unclaimedAmount = claimableAmount - claimedAmount;
+        const payoutTokens = [...payoutTokensByRaffle.entries()]
+          .filter(([key]) => key.startsWith(`${data.id}:`))
+          .map(([, payout]) => payout);
 
         // Check if raffle has ended (manually ended OR naturally ended by reaching endDate)
         const hasEnded =
@@ -3346,12 +3555,13 @@ class RaffleController {
             claimableAmount: claimableAmount,
             claimedAmount: claimedAmount,
             unclaimedAmount: Math.max(0, unclaimedAmount), // Ensure non-negative
-            canClaim: hasEnded && !hasClaimed && unclaimedAmount > 0,
+            canClaim: hasEnded && !hasClaimed && (payoutTokens.length > 0 || unclaimedAmount > 0),
             hasEnded: hasEnded,
             hasClaimed: hasClaimed,
             claimStatus: claimStatus,
             claimTransactionId: data.creatorClaimTxId,
             claimSignature: claimTransaction?.txId || null,
+            tokens: payoutTokens,
             message: !hasEnded
               ? "You can claim the revenue generated from the raffle only after it ends"
               : hasClaimed
@@ -3478,6 +3688,115 @@ class RaffleController {
           httpStatus.BAD_REQUEST,
           "You can claim the revenue generated from the raffle only after it ends",
         );
+      }
+
+      const paymentOptionCount = await RafflePaymentOption.count({
+        where: { raffleId: raffleIdNum },
+        transaction,
+      });
+      const completedTicketPayments = await SplTokenSendTransaction.findAll({
+        where: {
+          raffleId: raffleIdNum,
+          rewardTransferType: "ticket_purchase",
+          status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      const existingPayouts = await SplTokenSendTransaction.findAll({
+        where: { raffleId: raffleIdNum, rewardTransferType: "creator_payout" },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      const claimedSourceIds = new Set();
+      const pendingBatch = existingPayouts.find((payout) => {
+        const metadata = payout.additionalJson || {};
+        (metadata.sourceTransactionIds || []).forEach((id) => claimedSourceIds.add(Number(id)));
+        return payout.status === SPL_TOKEN_SEND_TX_STATUS.PENDING && !payout.txId;
+      });
+
+      if (pendingBatch) {
+        await transaction.rollback();
+        return respond(res, httpStatus.CONFLICT, "A payout for this raffle is already awaiting signature");
+      }
+
+      const payoutGroups = new Map();
+      completedTicketPayments
+        .filter((payment) => !claimedSourceIds.has(payment.id))
+        .forEach((payment) => {
+          const key = `${payment.type}:${payment.tokenAddress}:${payment.decimals}`;
+          const group = payoutGroups.get(key) || {
+            tokenType: payment.type,
+            tokenAddress: payment.tokenAddress,
+            decimals: Number(payment.decimals) || 9,
+            amount: 0,
+            sourceTransactionIds: [],
+          };
+          group.amount += Number(payment.creatorAmount || 0);
+          group.sourceTransactionIds.push(payment.id);
+          payoutGroups.set(key, group);
+        });
+
+      const payouts = [...payoutGroups.values()].filter((payout) => payout.amount > 0);
+      if (paymentOptionCount > 1 && payouts.length) {
+        const activePlatformWallet = Wallet.getWalletPubkey().toString();
+        if (!activePlatformWallet) {
+          await transaction.rollback();
+          return respond(res, httpStatus.INTERNAL_SERVER_ERROR, "Platform wallet not configured");
+        }
+
+        const payoutResponse = await createBatchPayoutTransaction({
+          payouts,
+          toAccount: user.pubkey,
+          fromAccount: activePlatformWallet,
+          feePayer: user.pubkey,
+          waivePlatformFees,
+        });
+        if (!payoutResponse.success) {
+          await transaction.rollback();
+          return respond(res, httpStatus.BAD_REQUEST, `Failed to create payout transaction: ${payoutResponse.message}`);
+        }
+
+        const payoutRecords = await SplTokenSendTransaction.bulkCreate(
+          payouts.map((payout) => ({
+            senderPubkey: activePlatformWallet,
+            receiverPubkey: user.pubkey,
+            type: payout.tokenType,
+            txId: null,
+            tokenAddress: payout.tokenAddress,
+            decimals: payout.decimals,
+            uiAmount: Math.round(payout.amount * Math.pow(10, payout.decimals)).toString(),
+            status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+            raffleId: raffleIdNum,
+            rewardTransferType: "creator_payout",
+            rewardName: `Payout for ${raffle.title}`,
+            rewardIndex: 0,
+            commissionRate: 0,
+            creatorAmount: 0,
+            commissionAmount: 0,
+            isNFTHolder: false,
+            additionalJson: { sourceTransactionIds: payout.sourceTransactionIds },
+          })),
+          { transaction, returning: true },
+        );
+        const batchId = String(payoutRecords[0].id);
+        await Promise.all(payoutRecords.map((record) => record.update(
+          { additionalJson: { ...record.additionalJson, batchId } },
+          { transaction },
+        )));
+        await raffle.update({ creatorClaimTxId: payoutRecords[0].id, platformWallet: activePlatformWallet }, { transaction });
+        await transaction.commit();
+
+        return respond(res, httpStatus.OK, "Payout transaction created, please sign and submit", {
+          success: true,
+          requiresSubmission: true,
+          transaction: payoutResponse.data.serializedTx,
+          blockhash: payoutResponse.data.blockhash,
+          raffleId: raffleIdNum,
+          transactionId: payoutRecords[0].id,
+          payouts: payouts.map(({ sourceTransactionIds, ...payout }) => payout),
+          submitEndpoint: "/raffle/payout/submit",
+        });
       }
 
       // Check if already claimed
@@ -3813,6 +4132,22 @@ class RaffleController {
         );
       }
 
+      const payoutBatchId = splTokenTx.additionalJson?.batchId;
+      const batchPayouts = payoutBatchId
+        ? (await SplTokenSendTransaction.findAll({
+          where: {
+            raffleId,
+            rewardTransferType: "creator_payout",
+            status: SPL_TOKEN_SEND_TX_STATUS.PENDING,
+            txId: null,
+          },
+        })).filter((payout) => payout.additionalJson?.batchId === payoutBatchId)
+        : [splTokenTx];
+
+      if (!batchPayouts.length) {
+        return respond(res, httpStatus.NOT_FOUND, "Payout batch not found or already processed");
+      }
+
       // Verify the raffle is still valid for claiming
       const raffle = await Raffle.findOne({
         where: {
@@ -3886,12 +4221,12 @@ class RaffleController {
             status: nextTxStatus,
           },
           {
-            where: { id: transactionId },
+            where: { id: batchPayouts.map((payout) => payout.id) },
             transaction,
           },
         );
 
-        if (nextTxStatus === SPL_TOKEN_SEND_TX_STATUS.SUCCESS) {
+        if (nextTxStatus === SPL_TOKEN_SEND_TX_STATUS.SUCCESS && !payoutBatchId) {
           const lockedRaffle = await Raffle.findByPk(raffleId, {
             lock: transaction.LOCK.UPDATE,
             transaction,
@@ -3931,6 +4266,7 @@ class RaffleController {
           success: true,
           signature: signature,
           transactionId: transactionId,
+          payoutCount: batchPayouts.length,
           raffleId: raffleId,
           status: nextTxStatus,
           explorerUrl: `https://solscan.io/tx/${signature}`,

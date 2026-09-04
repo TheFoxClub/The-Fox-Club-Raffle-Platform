@@ -2,7 +2,6 @@ import { AlertCircle, Calendar, PlusCircle, Wallet, X } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
-import Select from "../../components/ui/Select";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +54,21 @@ const parseDecimalInput = (value: string) => {
 
   const numericValue = Number(normalized);
   return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+type PaymentTokenOption = {
+  value: string;
+  label: string;
+  decimals: number;
+  tokenType: number;
+  name?: string;
+  conversionRate?: string | number | null;
+};
+
+type PaymentConfiguration = {
+  enabled: boolean;
+  discountPercent: string;
+  ticketPrice: string;
 };
 
 const CreateRaffle = () => {
@@ -118,13 +132,23 @@ const CreateRaffle = () => {
 
   // Dynamic token options state
   const [tokenOptions, setTokenOptions] = useState<
-    { value: string; label: string; decimals: number; tokenType: number }[]
+    PaymentTokenOption[]
   >([]);
   const [tokenOptionsLoading, setTokenOptionsLoading] = useState(true);
+  const [paymentConfigurations, setPaymentConfigurations] = useState<
+    Record<string, PaymentConfiguration>
+  >({});
+  const [referenceTokenAddress, setReferenceTokenAddress] = useState("");
+  const [liveTokenPrices, setLiveTokenPrices] = useState<Record<string, number>>({});
+  const [autofillPrices, setAutofillPrices] = useState(true);
 
   const [errors, setErrors] = useState<{
     [key: string]: string | undefined;
   }>({});
+  const referenceToken = tokenOptions.find(
+    (token) => token.value === referenceTokenAddress,
+  );
+  const referencePrice = parseDecimalInput(ticketPrice);
 
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLDivElement>(null);
@@ -151,6 +175,7 @@ const CreateRaffle = () => {
             decimals: token.decimals,
             tokenType: token.tokenType,
             name: token.name,
+            conversionRate: token.conversionRate,
           }));
 
           const uniqueTokens = Array.from(
@@ -159,12 +184,6 @@ const CreateRaffle = () => {
 
           setTokenOptions(uniqueTokens);
 
-          // Set default to SOL if available
-          const solToken = tokens.find((t: any) => t.tokenType === 0);
-          if (solToken && !selectedTokenType) {
-            setSelectedTokenType(solToken);
-            setSelectedTokenAddress(solToken.value);
-          }
         } else {
           // console.warn("No tokens found in API response, using fallback");
           // Fallback to SOL only if API fails
@@ -182,6 +201,13 @@ const CreateRaffle = () => {
             setSelectedTokenType(fallbackTokens[0]);
             setSelectedTokenAddress(fallbackTokens[0].value);
           }
+          setPaymentConfigurations({
+            [fallbackTokens[0].value]: {
+              enabled: true,
+              discountPercent: "0",
+              ticketPrice: "",
+            },
+          });
         }
       } catch (error) {
         console.error("Failed to fetch payment tokens:", error);
@@ -201,6 +227,13 @@ const CreateRaffle = () => {
           setSelectedTokenType(fallbackTokens[0]);
           setSelectedTokenAddress(fallbackTokens[0].value);
         }
+        setPaymentConfigurations({
+          [fallbackTokens[0].value]: {
+            enabled: true,
+            discountPercent: "0",
+            ticketPrice: "",
+          },
+        });
       } finally {
         setTokenOptionsLoading(false);
       }
@@ -208,6 +241,65 @@ const CreateRaffle = () => {
 
     fetchPaymentTokens();
   }, []);
+
+  useEffect(() => {
+    const fetchLivePrices = async () => {
+      try {
+        const response = await server.get("/tokens/payment-token-prices");
+        if (response.data?.success) {
+          setLiveTokenPrices(response.data.data?.prices || {});
+        }
+      } catch (error) {
+        console.error("Failed to fetch live payment token prices:", error);
+      }
+    };
+    void fetchLivePrices();
+  }, []);
+
+  const updateTokenTicketPrice = (sourceToken: PaymentTokenOption, value: string) => {
+    if (!autofillPrices) {
+      setPaymentConfigurations((current) => ({
+        ...current,
+        [sourceToken.value]: {
+          ...current[sourceToken.value],
+          ticketPrice: value,
+        },
+      }));
+      return;
+    }
+
+    const sourcePrice = parseDecimalInput(value);
+    const sourceUsdPrice = Number(liveTokenPrices[sourceToken.value] || sourceToken.conversionRate || 0);
+    if (sourceUsdPrice <= 0) {
+      setPaymentConfigurations((current) => ({
+        ...current,
+        [sourceToken.value]: {
+          ...current[sourceToken.value],
+          ticketPrice: value,
+        },
+      }));
+      return;
+    }
+
+    setReferenceTokenAddress(sourceToken.value);
+    setTicketPrice(value);
+    setPaymentConfigurations((current) => {
+      const next = { ...current };
+      Object.entries(current).forEach(([address, configuration]) => {
+        if (!configuration.enabled) return;
+        const token = tokenOptions.find((candidate) => candidate.value === address);
+        const targetUsdPrice = Number(liveTokenPrices[address] || token?.conversionRate || 0);
+        const calculatedPrice = sourcePrice && sourceUsdPrice > 0 && targetUsdPrice > 0
+          ? sourcePrice * sourceUsdPrice / targetUsdPrice
+          : null;
+        next[address] = {
+          ...configuration,
+          ticketPrice: address === sourceToken.value ? value : calculatedPrice?.toPrecision(8) || "",
+        };
+      });
+      return next;
+    });
+  };
 
   useEffect(() => {
     const fetchSystemFee = async () => {
@@ -578,18 +670,6 @@ const CreateRaffle = () => {
     });
 
     if (!title.trim()) newErrors.title = "Title is required";
-    const parsedTicketPrice = parseDecimalInput(ticketPrice);
-
-    if (parsedTicketPrice === null || parsedTicketPrice <= 0) {
-      newErrors.ticketPrice = "Ticket price must be greater than 0";
-    } else {
-      // Check for max 3 decimal places
-      const decimalPart = normalizeDecimalInput(ticketPrice).split(".")[1];
-      if (decimalPart && decimalPart.length > 3) {
-        newErrors.ticketPrice =
-          "Ticket price cannot have more than 3 decimal places";
-      }
-    }
 
     if (!totalTickets || Number(totalTickets) <= 0)
       newErrors.totalTickets = "Total tickets must be greater than 0";
@@ -608,8 +688,23 @@ const CreateRaffle = () => {
 
     if (!startNow && !startDate) newErrors.startDate = "Start date is required";
     if (!endDate) newErrors.endDate = "End date is required";
-    if (!selectedTokenType)
-      newErrors.selectedTokenType = "Please select a token";
+    const selectedPaymentTokens = tokenOptions.filter(
+      (token) => paymentConfigurations[token.value]?.enabled,
+    );
+    if (!selectedPaymentTokens.length) {
+      newErrors.selectedTokenType = "Select at least one payment token";
+    }
+    selectedPaymentTokens.forEach((token) => {
+      const configuration = paymentConfigurations[token.value];
+      const discount = parseDecimalInput(configuration.discountPercent);
+      if (discount === null || discount < 0 || discount >= 100) {
+        newErrors[`payment-${token.value}`] = "Discount must be from 0 to 99.999%";
+      }
+      const tokenPrice = parseDecimalInput(configuration.ticketPrice);
+      if (tokenPrice === null || tokenPrice <= 0) {
+        newErrors[`payment-${token.value}`] = "Ticket price must be greater than 0";
+      }
+    });
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -638,11 +733,6 @@ const CreateRaffle = () => {
         });
       else if (newErrors.prize)
         prizeRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      else if (newErrors.ticketPrice)
-        ticketPriceRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
@@ -754,6 +844,11 @@ const CreateRaffle = () => {
       return;
     }
 
+    if (user.pubkey !== publicKey.toString()) {
+      toast.error("Your wallet changed. Please sign in again before creating a raffle.");
+      return;
+    }
+
     if (!validateForm(status === "DRAFT")) return;
 
     try {
@@ -761,14 +856,34 @@ const CreateRaffle = () => {
       const raffleImageUrl = getRaffleImageFromRewards();
 
       const finalStartDate = startNow ? new Date().toISOString() : startDate;
+      const paymentOptions = tokenOptions
+        .filter((token) => paymentConfigurations[token.value]?.enabled)
+        .map((token) => {
+          const configuration = paymentConfigurations[token.value];
+          const enteredPrice = parseDecimalInput(configuration.ticketPrice) || 0;
+          const discountPercent = parseDecimalInput(configuration.discountPercent) || 0;
+          return {
+            tokenAddress: token.value,
+            tokenType: token.tokenType,
+            tokenSymbol: token.label,
+            decimals: token.decimals,
+            baseSolPrice: normalizeDecimalInput(configuration.ticketPrice),
+            discountPercent: normalizeDecimalInput(configuration.discountPercent) || "0",
+            priceMode: token.value === referenceTokenAddress ? "manual" : "auto",
+            ticketPrice: (enteredPrice * (1 - discountPercent / 100)).toPrecision(12),
+          };
+        });
+      const referenceToken = tokenOptions.find((token) => token.value === referenceTokenAddress);
 
       const payload = {
         title: title.trim(),
         description: description.trim(),
         totalTickets,
-        ticketPrice: normalizeDecimalInput(ticketPrice),
-        tokenType: selectedTokenType?.tokenType || 0,
-        tokenAddress: selectedTokenType?.value || null,
+        ticketPrice: referencePrice,
+        tokenType: referenceToken?.tokenType || 0,
+        tokenAddress: referenceToken?.value || null,
+        priceSourceTokenAddress: referenceTokenAddress,
+        paymentOptions,
         numberOfWinners,
         startDate: finalStartDate,
         endDate,
@@ -837,6 +952,15 @@ const CreateRaffle = () => {
         return;
       } else {
         const hasRewards = selectedNFTs.length > 0 || selectedTokens.length > 0;
+
+        const validationRes = await server.post("/raffle/create", {
+          ...payload,
+          validateOnly: true,
+        });
+
+        if (!validationRes.data.success) {
+          throw new Error(validationRes.data.message || "Raffle details could not be validated");
+        }
 
         if (hasRewards) {
           // Get reward transfer transaction WITHOUT creating raffle
@@ -973,9 +1097,18 @@ const CreateRaffle = () => {
               createPayload.draftId = draftId;
             }
 
-            res = await server.post("/raffle/create", createPayload);
+            try {
+              res = await server.post("/raffle/create", createPayload);
+            } catch (createError: any) {
+              const message = createError.response?.data?.message || createError.message || "Raffle creation failed";
+              throw new Error(`Reward transfer confirmed, but raffle creation failed: ${message}`);
+            }
           } catch (signError: any) {
             console.error("Reward transfer failed:", signError);
+            if (signError.message?.startsWith("Reward transfer confirmed,")) {
+              toast.error(signError.message);
+              return;
+            }
             if (signError.message?.includes("rejected")) {
               toast.error("Reward transfer was rejected by wallet");
             } else if (
@@ -1650,65 +1783,149 @@ const CreateRaffle = () => {
           <h1 className="text-2xl font-bold">Raffle Settings</h1>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div ref={ticketPriceRef}>
-              <label className="text-sm font-medium">Ticket Price *</label>
-              <div>
-                <Input
-                  type="text"
-                  value={ticketPrice}
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    const normalizedValue = normalizeDecimalInput(nextValue);
-                    const parts = normalizedValue.split(".");
-
-                    if (parts.length > 2) {
-                      return;
-                    }
-
-                    setTicketPrice(normalizedValue);
-                    setErrors((prev) => ({
-                      ...prev,
-                      ticketPrice: undefined,
-                    }));
-                  }}
-                  placeholder="0.5"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="mt-2 w-full text-base md:text-sm bg-background/50 outline-none"
+            <div ref={selectedTokenTypeRef} className="md:col-span-2">
+              <label className="text-sm font-medium">Payment Tokens *</label>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Choose one or more tokens to accept as ticket payments. Set a token-specific discount to encourage payments in that token.
+              </p>
+              <label className="mt-3 flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={autofillPrices}
+                  onChange={(event) => setAutofillPrices(event.target.checked)}
+                  className="h-4 w-4"
                 />
-
-                {errors.ticketPrice && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.ticketPrice}
-                  </p>
-                )}
+                Autofill prices from live token rates <span className="font-normal text-muted-foreground">(If multiple tokens are chosen)</span>
+              </label>
+              <div className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-100/70">
+                <span className="font-medium text-amber-100">Note:</span> Payment token prices are fixed when the raffle is created. If a selected token loses value afterwards, buyers may prefer that token and the raffle creator may receive less value than expected.
               </div>
-            </div>
+              <div className="mt-2 divide-y divide-border rounded-lg border border-border bg-background/50">
+                {tokenOptions.map((token) => {
+                  const configuration = paymentConfigurations[token.value] || {
+                    enabled: false,
+                    discountPercent: "0",
+                    ticketPrice: "",
+                  };
+                  const tokenUsdPrice = Number(liveTokenPrices[token.value] || token.conversionRate || 0);
+                  const discount = parseDecimalInput(configuration.discountPercent) || 0;
+                  const enteredPrice = parseDecimalInput(configuration.ticketPrice);
+                  const discountedPrice = enteredPrice === null
+                    ? null
+                    : enteredPrice * (1 - discount / 100);
 
-            <div ref={selectedTokenTypeRef}>
-              <label className="text-sm font-medium">Token Type *</label>
-              <Select
-                options={tokenOptions}
-                value={selectedTokenAddress}
-                onValueChange={(tokenAddress) => {
-                  const selectedToken = tokenOptions.find(
-                    (t) => t.value === tokenAddress
+                  return (
+                    <div key={token.value} className="space-y-3 p-3 sm:p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="flex min-w-0 items-center gap-3 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            checked={configuration.enabled}
+                            onChange={(event) => {
+                              const isEnabled = event.target.checked;
+                              setPaymentConfigurations((current) => {
+                                const currentConfiguration = current[token.value] || {
+                                  enabled: false,
+                                  discountPercent: "0",
+                                  ticketPrice: "",
+                                };
+                                const sourceConfiguration = current[referenceTokenAddress];
+                                const sourceToken = tokenOptions.find(
+                                  (candidate) => candidate.value === referenceTokenAddress,
+                                );
+                                const sourcePrice = parseDecimalInput(sourceConfiguration?.ticketPrice || "");
+                                const sourceUsdPrice = Number(
+                                  liveTokenPrices[referenceTokenAddress] || sourceToken?.conversionRate || 0,
+                                );
+                                const calculatedPrice = autofillPrices && isEnabled && sourcePrice && sourceUsdPrice > 0 && tokenUsdPrice > 0
+                                  ? (sourcePrice * sourceUsdPrice / tokenUsdPrice).toPrecision(8)
+                                  : currentConfiguration.ticketPrice;
+
+                                return {
+                                  ...current,
+                                  [token.value]: {
+                                    ...currentConfiguration,
+                                    enabled: isEnabled,
+                                    ticketPrice: calculatedPrice,
+                                  },
+                                };
+                              });
+                              if (autofillPrices && isEnabled && !referenceTokenAddress && tokenUsdPrice > 0) {
+                                setReferenceTokenAddress(token.value);
+                              }
+                              if (autofillPrices && !isEnabled && referenceTokenAddress === token.value) {
+                                const nextSource = tokenOptions.find((candidate) =>
+                                  candidate.value !== token.value && paymentConfigurations[candidate.value]?.enabled,
+                                );
+                                const nextSourcePrice = nextSource
+                                  ? paymentConfigurations[nextSource.value]?.ticketPrice || ""
+                                  : "";
+                                setReferenceTokenAddress(nextSource?.value || "");
+                                setTicketPrice(nextSourcePrice);
+                              }
+                            }}
+                            className="h-4 w-4 shrink-0"
+                          />
+                          <span className="truncate">{token.label}</span>
+                        </label>
+                        {configuration.enabled ? (
+                          <span className="text-xs text-muted-foreground">
+                            {discountedPrice !== null
+                              ? discount > 0
+                                ? <><span className="mr-1 line-through">{configuration.ticketPrice}</span>{discountedPrice.toPrecision(8)} {token.label}</>
+                                : `${configuration.ticketPrice} ${token.label}`
+                              : "Enter ticket price"}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {configuration.enabled && (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="text-xs font-medium">
+                            Price per ticket ({token.label})
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={configuration.ticketPrice}
+                              onChange={(event) => {
+                                const value = normalizeDecimalInput(event.target.value);
+                                updateTokenTicketPrice(token, value);
+                                setErrors((current) => ({ ...current, [`payment-${token.value}`]: undefined }));
+                              }}
+                              className="mt-1 w-full bg-background"
+                            />
+                            <span className="mt-1 block text-muted-foreground">
+                              {tokenUsdPrice > 0 ? `Live USD rate: $${tokenUsdPrice.toPrecision(8)}` : "Live USD rate unavailable"}
+                            </span>
+                          </label>
+                          <label className="text-xs font-medium">
+                            Discount (%)
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={configuration.discountPercent}
+                              onChange={(event) => {
+                                setPaymentConfigurations((current) => ({
+                                  ...current,
+                                  [token.value]: {
+                                    ...configuration,
+                                    discountPercent: normalizeDecimalInput(event.target.value),
+                                  },
+                                }));
+                              }}
+                              className="mt-1 w-full bg-background"
+                            />
+                          </label>
+                        </div>
+                      )}
+
+                      {errors[`payment-${token.value}`] && (
+                        <p className="text-sm text-red-500">{errors[`payment-${token.value}`]}</p>
+                      )}
+                    </div>
                   );
-                  setSelectedTokenType(selectedToken);
-                  setSelectedTokenAddress(tokenAddress);
-                  setErrors((prev) => ({
-                    ...prev,
-                    selectedTokenType: undefined,
-                  }));
-                }}
-                className="bg-background-50 mt-2"
-                disabled={tokenOptionsLoading}
-                placeholder={
-                  tokenOptionsLoading
-                    ? "Loading payment options..."
-                    : "Select payment token"
-                }
-              />
+                })}
+              </div>
               {errors.selectedTokenType && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.selectedTokenType}

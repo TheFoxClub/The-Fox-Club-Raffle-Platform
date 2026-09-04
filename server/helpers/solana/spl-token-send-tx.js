@@ -669,6 +669,83 @@ const createClaimTransaction = async ({
   }
 };
 
+const createBatchPayoutTransaction = async ({
+  payouts,
+  toAccount,
+  fromAccount,
+  feePayer,
+  waivePlatformFees = false,
+}) => {
+  try {
+    const transaction = new Transaction();
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 300_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+    );
+
+    const feeData = await getFeeData();
+    const transactionFee = getTransactionFeeAmount(feeData, { waivePlatformFees });
+    if (transactionFee > 0) {
+      transaction.add(SystemProgram.transfer({
+        fromPubkey: new PublicKey(feePayer),
+        toPubkey: new PublicKey(FUND_RECEIVER_WALLET),
+        lamports: BigInt(transactionFee * LAMPORTS_PER_SOL),
+      }));
+    }
+
+    for (const payout of payouts) {
+      if (payout.tokenType === TOKEN_TYPE.SOLANA) {
+        transaction.add(SystemProgram.transfer({
+          fromPubkey: new PublicKey(fromAccount),
+          toPubkey: new PublicKey(toAccount),
+          lamports: Math.round(Number(payout.amount) * LAMPORTS_PER_SOL),
+        }));
+        continue;
+      }
+
+      const tokenDetail = await getTokenDetail(payout.tokenAddress);
+      const mint = new PublicKey(payout.tokenAddress);
+      const fromAta = getAssociatedTokenAddressSync(mint, new PublicKey(fromAccount), false, tokenDetail.tokenProgramId);
+      const toAta = getAssociatedTokenAddressSync(mint, new PublicKey(toAccount), false, tokenDetail.tokenProgramId);
+
+      try {
+        await getAccount(connection, toAta, "confirmed", tokenDetail.tokenProgramId);
+      } catch (error) {
+        if (!(error instanceof TokenAccountNotFoundError)) throw error;
+        transaction.add(createAssociatedTokenAccountInstruction(
+          new PublicKey(feePayer), toAta, new PublicKey(toAccount), mint,
+          tokenDetail.tokenProgramId, ASSOCIATED_TOKEN_PROGRAM_ID,
+        ));
+      }
+
+      transaction.add(createTransferInstruction(
+        fromAta,
+        toAta,
+        new PublicKey(fromAccount),
+        BigInt(Math.round(Number(payout.amount) * Math.pow(10, tokenDetail.decimals))),
+        [],
+        tokenDetail.tokenProgramId,
+      ));
+    }
+
+    const latestBlockhash = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.feePayer = new PublicKey(feePayer);
+    const signedTransaction = Wallet.partialSign(transaction);
+    return {
+      success: true,
+      data: {
+        serializedTx: signedTransaction.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64"),
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      },
+      message: "Created batch payout transaction",
+    };
+  } catch (error) {
+    return { success: false, data: null, message: error?.message || "Failed to create batch payout transaction", error: error.stack };
+  }
+};
+
 /**
  * Create a payout transaction that's pre-signed by platform wallet
  * User only needs to sign for fee payment
@@ -1200,6 +1277,7 @@ module.exports = {
   sendMultipleSplTokenTx,
   sendSingleRewardTx,
   createClaimTransaction,
+  createBatchPayoutTransaction,
   createPayoutTransaction,
   submitTransactionToBlockchain,
   createAirdropClaimTransaction,

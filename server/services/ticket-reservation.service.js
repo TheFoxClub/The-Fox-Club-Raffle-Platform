@@ -9,6 +9,7 @@ class TicketReservationService {
    * Reserve tickets atomically with database-level locking
    * @param {Object} params
    * @param {number} params.raffleId - Raffle ID
+  * @param {number|null} params.paymentOptionId - Selected raffle payment option
    * @param {number} params.userId - User ID  
    * @param {string} params.walletAddress - User wallet address
    * @param {number} params.ticketCount - Number of tickets to reserve
@@ -17,6 +18,7 @@ class TicketReservationService {
    */
   static async reserveTickets({ 
     raffleId, 
+    paymentOptionId = null,
     userId, 
     walletAddress, 
     ticketCount, 
@@ -97,6 +99,7 @@ class TicketReservationService {
 
       const reservation = await TicketReservation.create({
         raffleId,
+        paymentOptionId,
         userId,
         walletAddress,
         ticketCount,

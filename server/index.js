@@ -1,7 +1,9 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
+require("./config/loadEnv");
 const {
   ALLOWED_ORIGINS,
   SERVER_PORT,
@@ -71,6 +73,61 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 app.use("/api", require("./api"));
+
+const escapeHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+app.get("/raffle/:slug", async (req, res, next) => {
+  const match = /^raffle-(\d+)$/.exec(req.params.slug);
+  if (!match) {
+    return next();
+  }
+
+  try {
+    const { Raffle } = require("./models");
+    const raffle = await Raffle.findByPk(match[1], {
+      attributes: ["id", "title", "description", "imageUrl"],
+      raw: true,
+    });
+
+    if (!raffle) {
+      return next();
+    }
+
+    const appUrl = (process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+    const raffleUrl = `${appUrl}/raffle/raffle-${raffle.id}`;
+    const imageUrl = raffle.imageUrl
+      ? (/^https?:\/\//i.test(raffle.imageUrl) ? raffle.imageUrl : `${appUrl}${raffle.imageUrl.startsWith("/") ? "" : "/"}${raffle.imageUrl}`)
+      : `${appUrl}/uploads/nft-placeholder.svg`;
+    const title = `${raffle.title} | The Fox Club`;
+    const description = (raffle.description || "Join this raffle on The Fox Club.").replace(/\s+/g, " ").trim().slice(0, 200);
+    const metadata = [
+      `<title>${escapeHtml(title)}</title>`,
+      `<link rel="canonical" href="${escapeHtml(raffleUrl)}" />`,
+      `<meta property="og:type" content="website" />`,
+      `<meta property="og:title" content="${escapeHtml(title)}" />`,
+      `<meta property="og:description" content="${escapeHtml(description)}" />`,
+      `<meta property="og:url" content="${escapeHtml(raffleUrl)}" />`,
+      `<meta property="og:image" content="${escapeHtml(imageUrl)}" />`,
+      `<meta name="twitter:card" content="summary_large_image" />`,
+      `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+      `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+      `<meta name="twitter:image" content="${escapeHtml(imageUrl)}" />`,
+    ].join("\n    ");
+    const indexPath = path.join(__dirname, "../build", "index.html");
+    const indexHtml = await fs.promises.readFile(indexPath, "utf8");
+
+    return res.type("html").send(indexHtml.replace("</head>", `    ${metadata}\n  </head>`));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.use("/", express.static("build"));
 
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));

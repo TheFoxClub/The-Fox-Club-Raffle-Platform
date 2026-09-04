@@ -79,6 +79,18 @@ export interface RaffleReward {
   metadataJson: string;
 }
 
+export interface RafflePaymentOption {
+  id: number;
+  tokenAddress: string;
+  tokenType: number;
+  tokenSymbol: string;
+  decimals: number;
+  ticketPrice: number;
+  baseSolPrice: number;
+  discountPercent: number;
+  priceMode: "auto" | "manual";
+}
+
 export interface RaffleType {
   id: number;
   title: string;
@@ -110,6 +122,8 @@ export interface RaffleType {
   status?: number;
   tokenTypeNumber?: number;
   tokenAddress?: string;
+    paymentOptions?: RafflePaymentOption[];
+  floorPrice?: { amount: number; collectionName?: string | null } | null;
 }
 
 type TTicketPurchaser = {
@@ -216,6 +230,7 @@ const RaffleDetail = () => {
   const winners = raffle?.winnersData ?? [];
   // const [nftImages, setNftImages] = useState<Record<string, string>>({});
   const [isBuying, setIsBuying] = useState(false);
+    const [selectedPaymentOptionId, setSelectedPaymentOptionId] = useState<number | null>(null);
   const user = useSelector((state: RootState) => state.user);
   const [ticketPurchasers, setTicketPurchasers] = useState<TTicketPurchaser[]>(
     [],
@@ -298,6 +313,10 @@ const RaffleDetail = () => {
     }
   };
 
+  const selectedPaymentOption = raffle?.paymentOptions?.find(
+    (option) => option.id === selectedPaymentOptionId,
+  ) || raffle?.paymentOptions?.[0];
+
   const handleBuyTickets = useCallback(async () => {
     if (isBuying) return;
     if (!raffle) {
@@ -348,6 +367,10 @@ const RaffleDetail = () => {
       signature: string,
       confirmedTicketsSold?: number,
     ) => {
+      if (processedPurchaseSignatures.current.has(signature)) {
+        return;
+      }
+
       processedPurchaseSignatures.current.add(signature);
       setRaffle((currentRaffle) =>
         currentRaffle
@@ -380,7 +403,9 @@ const RaffleDetail = () => {
       // Step 1: Reserve tickets (this prevents race conditions)
       const transactionResponse = await server.post("/ticket/buy", {
         senderPubkey: publicKey.toBase58(),
-        type: getTokenTypeForAPI(raffle.tokenTypeNumber, raffle.tokenAddress),
+        type: selectedPaymentOption
+          ? getTokenTypeForAPI(selectedPaymentOption.tokenType, selectedPaymentOption.tokenAddress)
+          : getTokenTypeForAPI(raffle.tokenTypeNumber, raffle.tokenAddress),
         raffleId: raffle.id,
         ticketCount: ticketCount,
       });
@@ -437,6 +462,7 @@ const RaffleDetail = () => {
         ticketCount,
         raffle.id,
         reservationId, // Pass reservation ID
+        transactionResponse?.data?.data?.tokenDecimals,
       );
 
       if (confirmResponse.success) {
@@ -458,9 +484,7 @@ const RaffleDetail = () => {
       if (reservationId) {
         try {
           if (await reservationWasConfirmed()) {
-            toast.success(`Successfully purchased ${ticketCount} ticket(s)!`);
-            void fetchTicketPurchasers();
-            void fetchRaffle();
+            applyConfirmedPurchase(signature);
             return;
           }
 
@@ -500,6 +524,7 @@ const RaffleDetail = () => {
     isBuying,
     user.isAuthenticated,
     fetchTicketPurchasers,
+    selectedPaymentOption,
   ]);
 
   const fetchRaffle = useCallback(async () => {
@@ -519,6 +544,12 @@ const RaffleDetail = () => {
           tokenType: mapNumericTokenType(data.tokenType),
           tokenTypeNumber: data.tokenType,
           tokenAddress: data.tokenAddress,
+          paymentOptions: (data.paymentOptions || []).map((option: RafflePaymentOption) => ({
+            ...option,
+            ticketPrice: Number(option.ticketPrice),
+            baseSolPrice: Number(option.baseSolPrice),
+            discountPercent: Number(option.discountPercent),
+          })),
           total: data.totalTickets,
           sold: data.ticketsSold,
           winners: data.numberOfWinners,
@@ -540,11 +571,21 @@ const RaffleDetail = () => {
           winnersSelected: res.data.data.winnersSelected || false,
           // participants: data.participants || [],
           purchaserUserIds: res.data.data.purchaserUserIds || [],
-
+          floorPrice: data.floorPrice || null,
           status: data.status,
         };
 
         setRaffle(mappedRaffle);
+        setSelectedPaymentOptionId((current) =>
+          current && mappedRaffle.paymentOptions?.some((option) => option.id === current)
+            ? current
+            : mappedRaffle.paymentOptions?.[0]?.id || null,
+        );
+        setSelectedPaymentOptionId((current) =>
+          current && mappedRaffle.paymentOptions?.some((option) => option.id === current)
+            ? current
+            : mappedRaffle.paymentOptions?.[0]?.id || null,
+        );
 
         if (mappedRaffle.hostId) {
           try {
@@ -791,8 +832,10 @@ const RaffleDetail = () => {
     );
 
   const ticketsLeft = Math.max(raffle.total - raffle.sold, 0);
-  // const totalCost = raffle.price * ticketCount;
-  const totalCost = Number((raffle.price * ticketCount).toPrecision(12));
+  const activeTicketPrice = selectedPaymentOption?.ticketPrice ?? raffle.price;
+  const activeTokenType = selectedPaymentOption?.tokenType ?? raffle.tokenTypeNumber;
+  const activeTokenAddress = selectedPaymentOption?.tokenAddress ?? raffle.tokenAddress;
+  const totalCost = Number((activeTicketPrice * ticketCount).toPrecision(12));
 
   const isUpcoming = raffle.status === RAFFLE_STATUS.UPCOMING;
   const isLive = raffle.status === RAFFLE_STATUS.LIVE;
@@ -918,6 +961,11 @@ const RaffleDetail = () => {
                       <CheckCircle size={16} /> Verified Collection
                     </div>
                   )}
+                  {raffle.floorPrice && (
+                    <div className="absolute bottom-3 left-3 rounded-md bg-black/65 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur-sm">
+                      Floor Price: {raffle.floorPrice.amount.toLocaleString("nb-NO", { maximumFractionDigits: 4 })} SOL
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -1000,6 +1048,11 @@ const RaffleDetail = () => {
                             mintAddress={reward.mintAddress}
                           />
                         </p>
+                        {reward.rewardType === RAFFLE_REWARD_TYPES.NFT && raffle.floorPrice && (
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            Floor Price: {raffle.floorPrice.amount.toLocaleString("nb-NO", { maximumFractionDigits: 4 })} SOL
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           <span className="sm:hidden">
                             Mint: {reward.mintAddress.slice(0, 4)}…
@@ -1197,12 +1250,30 @@ const RaffleDetail = () => {
               </div>
               <span className="text-lg sm:text-xl font-bold">
                 <TokenDisplay
-                  amount={raffle.price}
-                  tokenType={raffle.tokenType}
-                  tokenAddress={raffle.tokenAddress}
+                  amount={activeTicketPrice}
+                  tokenType={mapNumericTokenType(activeTokenType ?? 0)}
+                  tokenAddress={activeTokenAddress}
                 />
               </span>
             </div>
+
+            {(raffle.paymentOptions?.length || 0) > 1 && (
+              <label className="mb-4 block text-xs sm:text-sm font-medium text-muted-foreground">
+                Pay with
+                <select
+                  value={selectedPaymentOption?.id || ""}
+                  onChange={(event) => setSelectedPaymentOptionId(Number(event.target.value))}
+                  className="mt-1 block h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                >
+                  {raffle.paymentOptions?.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.ticketPrice} {option.tokenSymbol}
+                      {option.discountPercent > 0 ? ` (${option.discountPercent}% discount)` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             {/* remaining time */}
 
@@ -1317,8 +1388,8 @@ const RaffleDetail = () => {
                 <span className="text-xl sm:text-2xl font-bold text-primary">
                   <TokenDisplay
                     amount={totalCost}
-                    tokenType={raffle.tokenType}
-                    tokenAddress={raffle.tokenAddress}
+                    tokenType={mapNumericTokenType(activeTokenType ?? 0)}
+                    tokenAddress={activeTokenAddress}
                     className="text-xl sm:text-2xl font-bold text-primary"
                   />
                 </span>

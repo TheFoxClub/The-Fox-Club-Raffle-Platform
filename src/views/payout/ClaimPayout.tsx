@@ -57,9 +57,7 @@ const ClaimPayout = ({ raffleId, payoutAmount, tokenType, tokenAddress, onClaime
       });
       
       if (submitResponse.data.success) {
-        toast.success(
-          `Payout transaction submitted! Your ${payoutAmount.toFixed(4)} ${getTokenSymbol(tokenType, tokenAddress)} will be processed shortly.`
-        );
+        toast.success("Payout transaction submitted and will be processed shortly.");
 
         onClaimed();
       } else {

@@ -18,6 +18,7 @@ export interface RaffleCardProps {
   tokenAddress?: string;
   isVerified: boolean;
   isFeatured: boolean;
+  floorPrice?: { amount: number; collectionName?: string | null } | null;
 }
 
 export const RaffleCard = ({
@@ -32,6 +33,7 @@ export const RaffleCard = ({
   tokenAddress,
   isVerified = false,
   isFeatured = false,
+  floorPrice,
 }: RaffleCardProps) => {
   const ticketsLeft = Math.max(total - sold, 0);
   const progress = Math.min((sold / total) * 100, 100);
@@ -56,13 +58,18 @@ export const RaffleCard = ({
             loading="lazy"
           />
           {isFeatured && (
-            <div className="absolute top-3 left-3 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
+            <div className="absolute top-12 left-3 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold bg-gradient-to-r from-orange-400 to-orange-600 text-white w-fit">
               Featured
             </div>
           )}
           {isVerified && (
             <div className="absolute top-4 right-4 bg-green-900/30 backdrop-blur-sm text-green-400 px-3 py-1 rounded-full flex items-center gap-2 text-sm">
               <CheckCircle size={16} /> Verified
+            </div>
+          )}
+          {floorPrice && (
+            <div className="absolute top-3 left-3 rounded-md bg-orange-500/80 px-2.5 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
+              FP: {formatPrice(floorPrice.amount)} SOL
             </div>
           )}
         </div>

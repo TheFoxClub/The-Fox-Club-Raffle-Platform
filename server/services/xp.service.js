@@ -426,7 +426,7 @@ class XpService {
       try {
         const cached = await redisClient.get(cacheKey);
         if (cached) {
-          return cached;
+          return typeof cached === "string" ? JSON.parse(cached) : cached;
         }
       } catch (redisError) {
         logger.warn(

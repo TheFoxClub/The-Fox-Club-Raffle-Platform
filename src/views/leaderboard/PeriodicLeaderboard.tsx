@@ -148,7 +148,7 @@ export default function PeriodicLeaderboard() {
               <Calendar className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Periodic Leaderboard</h1>
+              <h1 className="text-3xl font-bold">Reward Leaderboard</h1>
               <p className="text-muted-foreground">
                 XP earned during the latest airdrop period
               </p>

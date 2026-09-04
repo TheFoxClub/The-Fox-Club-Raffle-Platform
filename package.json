@@ -26,6 +26,8 @@
     "live:preflight": "powershell -ExecutionPolicy Bypass -File .\\scripts\\go-live-preflight.ps1",
     "live:caddy:config": "powershell -ExecutionPolicy Bypass -File .\\scripts\\setup-caddy-config.ps1",
     "live:db:autostart": "powershell -ExecutionPolicy Bypass -File .\\scripts\\setup-mariadb-autostart.ps1",
+    "db:backup": "node scripts/backup-db.js",
+    "db:backup:setup": "powershell -ExecutionPolicy Bypass -File .\\scripts\\setup-db-backup.ps1",
     "dev": "vite",
     "lint": "eslint .",
     "preview": "vite preview"

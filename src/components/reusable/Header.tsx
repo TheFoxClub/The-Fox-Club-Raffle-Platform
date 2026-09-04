@@ -10,26 +10,36 @@ import {
   Shield,
   Menu,
   X,
+  ChevronDown,
+  Coins,
+  Star,
 } from "lucide-react";
 // import logoWhite from "../../../public/vite.svg";
 import logo from "../../../public/assets/foxclub_logo.png";
 import MyConnectWalletButton from "../../helpers/wallet-hooks/MyConnectWalletButton";
 import { useWallet } from "../../helpers/solana-helpers/solana-hooks";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../redux/store";
 import SolanaSignIn from "../../helpers/solana-helpers/SolanaSignIn";
 import { handleLogout } from "../../config/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import server from "../../config/server";
+import { formatXp } from "../../utils/formatXp";
 
 export const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { publicKey, connected } = useWallet();
+  const { connection } = useConnection();
   const user = useSelector((state: RootState) => state.user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsCount, setNotificationsCount] = useState(0);
+  const [balanceMenuOpen, setBalanceMenuOpen] = useState(false);
+  const [balances, setBalances] = useState<{ symbol: string; amount: number }[]>([]);
+  const [totalXp, setTotalXp] = useState<number | null>(null);
+  const balanceMenuRef = useRef<HTMLDivElement>(null);
 
   // console.log("Header user:", user);
 
@@ -101,11 +111,89 @@ export const Header = () => {
     getUserWinsAndPayouts();
   }, [user]);
 
+  useEffect(() => {
+    if (!user.isAuthenticated || !connected || !publicKey) {
+      setBalances([]);
+      return;
+    }
+
+    const fetchBalances = async () => {
+      try {
+        const [lamports, tokenResponse] = await Promise.all([
+          connection.getBalance(publicKey),
+          server.get("/tokens/verified"),
+        ]);
+        const tokenData = tokenResponse.data?.message || {};
+        const tokenAccounts = [
+          ...(tokenData.splTokens || []),
+          ...(tokenData.token2022Tokens || []),
+        ];
+        const tokenBalances = tokenAccounts.reduce(
+          (result: Map<string, number>, token: any) => {
+            const symbol = token.metadata?.symbol || token.metadata?.name || "Token";
+            const amount = Number(token.amount?.uiAmount || 0);
+            result.set(symbol, (result.get(symbol) || 0) + amount);
+            return result;
+          },
+          new Map<string, number>(),
+        );
+
+        setBalances([
+          { symbol: "SOL", amount: lamports / 1_000_000_000 },
+          ...Array.from(tokenBalances, ([symbol, amount]) => ({ symbol, amount })),
+        ]);
+      } catch (error) {
+        console.error("Failed to load wallet balances", error);
+        setBalances([]);
+      }
+    };
+
+    fetchBalances();
+  }, [connection, connected, publicKey, user.isAuthenticated]);
+
+  useEffect(() => {
+    if (!user.isAuthenticated) {
+      setTotalXp(null);
+      return;
+    }
+
+    const fetchTotalXp = async () => {
+      try {
+        const response = await server.get("/user/xp");
+        setTotalXp(Number(response.data?.data?.totalXp ?? 0));
+      } catch (error) {
+        console.error("Failed to load XP total", error);
+        setTotalXp(null);
+      }
+    };
+
+    fetchTotalXp();
+  }, [user.isAuthenticated]);
+
+  useEffect(() => {
+    const closeBalanceMenu = (event: MouseEvent) => {
+      if (!balanceMenuRef.current?.contains(event.target as Node)) {
+        setBalanceMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeBalanceMenu);
+    return () => document.removeEventListener("mousedown", closeBalanceMenu);
+  }, []);
+
+  const solBalance = balances.find((balance) => balance.symbol === "SOL");
+
+  const formatBalance = (amount: number) =>
+    amount.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 4,
+    });
+
   return (
     <nav className="sticky top-0 z-50 bg-background border-b border-border/50 w-full backdrop-blur-sm">
       <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
+        <Link to="/" className="flex shrink-0 items-center gap-3 group whitespace-nowrap">
           <img
             src={logo}
             alt="The Fox Club"
@@ -117,7 +205,7 @@ export const Header = () => {
           </div>
         </Link>
         {/* Desktop Menu */}
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden min-w-0 md:flex items-center gap-2">
           <Link to="/">
             <Button
               variant={isActive("/") ? "default" : "ghost"}
@@ -169,7 +257,7 @@ export const Header = () => {
           )}
         </div>
         {/* Wallet & Create Button */}
-        <div className="flex items-center gap-2  relative">
+        <div className="flex shrink-0 items-center gap-2 relative">
           {user.isAuthenticated && connected && (
             <Link to="/create">
               <Button
@@ -180,8 +268,49 @@ export const Header = () => {
               </Button>
             </Link>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center justify-center gap-2">
             {user.isAuthenticated ? null : connected ? <SolanaSignIn /> : null}
+            {user.isAuthenticated && totalXp !== null && (
+              <Link to="/profile" title="View your experience points">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
+                >
+                  <Star className="h-4 w-4 text-primary" />
+                  <span>{formatXp(totalXp)} XP</span>
+                </Button>
+              </Link>
+            )}
+            {user.isAuthenticated && connected && (
+              <div ref={balanceMenuRef} className="relative">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium"
+                  onClick={() => setBalanceMenuOpen((open) => !open)}
+                  aria-expanded={balanceMenuOpen}
+                  aria-haspopup="listbox"
+                >
+                  <Coins className="h-4 w-4" />
+                  <span>{formatBalance(solBalance?.amount || 0)} SOL</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
+                </Button>
+                {balanceMenuOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 min-w-52 overflow-hidden rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
+                    {balances.map((balance) => (
+                      <div
+                        key={balance.symbol}
+                        className="flex w-full items-center justify-between gap-4 px-3 py-2 text-sm"
+                      >
+                        <span className="font-medium">{balance.symbol}</span>
+                        <span className="text-muted-foreground">{formatBalance(balance.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <MyConnectWalletButton>
               {connected ? (
                 <Button

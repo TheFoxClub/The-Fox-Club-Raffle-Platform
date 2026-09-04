@@ -61,6 +61,12 @@ type HostedRaffle = {
     claimStatus: string;
     claimTransactionId?: number;
     claimSignature?: string;
+    tokens?: {
+      tokenType: string;
+      tokenAddress?: string;
+      decimals: number;
+      amount: number;
+    }[];
     message: string;
   };
 };
@@ -1232,25 +1238,29 @@ const Profile = () => {
                         </div>
 
                         {/* Claim Button */}
-                        {raffle.payoutInfo.canClaim &&
-                          raffle.payoutInfo.unclaimedAmount > 0 && (
+                        {raffle.payoutInfo.canClaim && (
                             <div className="flex items-center justify-between bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-lg p-3">
                               <div className="flex items-center gap-2">
                                 <Coins className="h-5 w-5 text-primary" />
                                 <div>
                                   <p className="text-sm font-semibold">
-                                    Ready to claim{" "}
-                                    <TokenDisplay
-                                      amount={raffle.payoutInfo.unclaimedAmount.toFixed(
-                                        4
-                                      )}
-                                      tokenType={raffle.tokenType}
-                                      tokenAddress={raffle.tokenAddress}
-                                    />
+                                    Ready to claim
                                   </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Your share from this completed raffle
-                                  </p>
+                                  <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                                    {raffle.payoutInfo.tokens?.length ? (
+                                      raffle.payoutInfo.tokens.map((payout) => (
+                                        <div key={`${payout.tokenType}-${payout.tokenAddress}`}>
+                                          <TokenDisplay
+                                            amount={payout.amount.toFixed(4)}
+                                            tokenType={payout.tokenType}
+                                            tokenAddress={payout.tokenAddress}
+                                          />
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <span>Your share from this completed raffle</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 

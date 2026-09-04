@@ -25,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
         sourceKey: "id",
         foreignKey: "raffleId",
       });
+      this.hasMany(models.RafflePaymentOption, {
+        sourceKey: "id",
+        foreignKey: "raffleId",
+        as: "paymentOptions",
+      });
       this.belongsTo(models.SplTokenSendTransaction, {
         foreignKey: "creatorClaimTxId",
         targetKey: "id",
