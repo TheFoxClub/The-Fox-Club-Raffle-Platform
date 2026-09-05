@@ -2,6 +2,7 @@ const axios = require("axios");
 const { publicKey } = require("@metaplex-foundation/umi");
 const { getUmi } = require("../config/solana");
 const { ORBIS_API_KEY } = require("../config/credentials");
+const { VerifiedCollection } = require("../models");
 const redisClient = require("../util/redisClient");
 const logger = require("../util/logger");
 
@@ -20,7 +21,21 @@ const getCollectionAddress = async (reward) => {
 
   if (!reward.mintAddress) return null;
   const asset = await getUmi().rpc.getAsset(publicKey(reward.mintAddress));
-  return asset.grouping?.find((group) => group.group_key === "collection")?.group_value || null;
+  const collectionAddress = asset.grouping?.find(
+    (group) => group.group_key === "collection",
+  )?.group_value;
+  if (collectionAddress) return collectionAddress;
+
+  const verifiedCreator = asset.creators?.find(
+    (creator) => creator.verified && creator.address,
+  )?.address;
+  if (!verifiedCreator) return null;
+
+  const creatorCollection = await VerifiedCollection.findOne({
+    where: { address: verifiedCreator, matchType: "creator", isVerified: true },
+    attributes: ["address"],
+  });
+  return creatorCollection?.address || null;
 };
 
 const getFloorPrice = async (reward) => {

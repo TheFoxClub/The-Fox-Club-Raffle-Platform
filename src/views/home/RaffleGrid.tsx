@@ -34,6 +34,7 @@ interface RaffleData {
     requiresNftVerification: boolean;
   };
   floorPrice?: { amount: number; collectionName?: string | null } | null;
+  paymentOptions?: { id: number; tokenSymbol: string; ticketPrice: string }[];
 }
 
 type RaffleRealtimeUpdate = {
@@ -338,6 +339,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
                       raffle.raffle_detail?.requiresNftVerification || false,
                     isFeatured: raffle.raffle_detail?.isFeatured || false,
                     floorPrice: raffle.floorPrice,
+                    paymentOptions: raffle.paymentOptions,
                   };
 
                   return (
@@ -394,6 +396,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
                       raffle.raffle_detail?.requiresNftVerification || false,
                     isFeatured: raffle.raffle_detail?.isFeatured || false,
                     floorPrice: raffle.floorPrice,
+                    paymentOptions: raffle.paymentOptions,
                   };
 
                   return (
@@ -452,6 +455,7 @@ export const RaffleGrid = ({ sortBy = "" }: { sortBy?: RaffleSortOption }) => {
                       raffle.raffle_detail?.requiresNftVerification || false,
                     isFeatured: raffle.raffle_detail?.isFeatured || false,
                     floorPrice: raffle.floorPrice,
+                    paymentOptions: raffle.paymentOptions,
                   };
 
                   return (

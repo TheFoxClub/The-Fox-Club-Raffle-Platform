@@ -3024,6 +3024,12 @@ class RaffleController {
         { model: RaffleDetail, required: false },
         { model: User, attributes: ["id", "pubkey"], required: false },
         { model: RaffleReward, required: false },
+        {
+          model: RafflePaymentOption,
+          as: "paymentOptions",
+          required: false,
+          attributes: ["id", "tokenAddress", "tokenType", "tokenSymbol", "ticketPrice"],
+        },
       ];
 
       // Filter by verified collection

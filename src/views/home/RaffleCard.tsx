@@ -1,7 +1,8 @@
 import { Card } from "../../components/ui/Card";
 import { Progress } from "../../components/ui/Progress";
-import { CheckCircle, Clock, Ticket, Coins } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, Clock, Ticket, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { getAssetUrl } from "../../helpers/assetUrl";
 import { formatPrice } from "../../helpers/formatPrice";
 import { useTokenSymbol } from "../../hooks/useTokenDisplay";
@@ -19,6 +20,7 @@ export interface RaffleCardProps {
   isVerified: boolean;
   isFeatured: boolean;
   floorPrice?: { amount: number; collectionName?: string | null } | null;
+  paymentOptions?: { id: number; tokenSymbol: string; ticketPrice: string }[];
 }
 
 export const RaffleCard = ({
@@ -34,13 +36,23 @@ export const RaffleCard = ({
   isVerified = false,
   isFeatured = false,
   floorPrice,
+  paymentOptions = [],
 }: RaffleCardProps) => {
+  const [priceIndex, setPriceIndex] = useState(0);
   const ticketsLeft = Math.max(total - sold, 0);
   const progress = Math.min((sold / total) * 100, 100);
+  const activePaymentOption = paymentOptions[priceIndex];
   const { symbol: enhancedTokenSymbol, loading: tokenLoading } = useTokenSymbol(
     tokenType,
     tokenAddress,
   );
+  const changePrice = (event: React.MouseEvent, direction: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setPriceIndex((currentIndex) =>
+      (currentIndex + direction + paymentOptions.length) % paymentOptions.length,
+    );
+  };
 
   return (
     <Link to={`/raffle/raffle-${id}`}>
@@ -79,12 +91,32 @@ export const RaffleCard = ({
               {title}
             </p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
+              <div className="flex min-w-0 items-center gap-1">
+                {paymentOptions.length > 1 && (
+                  <button
+                    type="button"
+                    className="rounded-sm p-0.5 hover:bg-accent hover:text-foreground"
+                    onClick={(event) => changePrice(event, -1)}
+                    aria-label="Show previous ticket currency"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                )}
                 <Coins className="h-4 w-4" />
                 <span>
-                  {formatPrice(price)}{" "}
-                  {tokenLoading ? "..." : enhancedTokenSymbol}
+                  {formatPrice(activePaymentOption?.ticketPrice ?? price)}{" "}
+                  {activePaymentOption?.tokenSymbol || (tokenLoading ? "..." : enhancedTokenSymbol)}
                 </span>
+                {paymentOptions.length > 1 && (
+                  <button
+                    type="button"
+                    className="rounded-sm p-0.5 hover:bg-accent hover:text-foreground"
+                    onClick={(event) => changePrice(event, 1)}
+                    aria-label="Show next ticket currency"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />

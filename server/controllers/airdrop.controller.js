@@ -301,6 +301,10 @@ const buildXpLeaderboardForRange = async ({
     );
 
   const totalParticipants = enrichedEarners.length;
+  const totalPeriodXp = enrichedEarners.reduce(
+    (total, earner) => total + earner.periodXp,
+    0,
+  );
   let paginatedEarners;
   let totalPages;
   let offset = 0;
@@ -324,6 +328,7 @@ const buildXpLeaderboardForRange = async ({
     parsedPage,
     parsedLimit,
     totalParticipants,
+    totalPeriodXp,
     totalPages,
     leaderboard,
   };
@@ -643,7 +648,7 @@ class AirdropController {
 
       const latestAirdropRows = await sequelize.query(
         `
-          SELECT id, airdropName, startDate, endDate, tokenSymbol, tokenAddress, imageUrl, createdAt
+          SELECT id, airdropName, startDate, endDate, tokenSymbol, tokenAddress, totalAmount, imageUrl, createdAt
           FROM airdrop_details
           ORDER BY createdAt DESC
           LIMIT 1
@@ -688,6 +693,14 @@ class AirdropController {
         page: parsedPage,
         limit: parsedLimit,
       });
+      const totalAmount = parseFloat(latestAirdrop.totalAmount || 0);
+      const users = leaderboardData.leaderboard.map((user) => ({
+        ...user,
+        potentialReward:
+          leaderboardData.totalPeriodXp > 0
+            ? Number(((user.periodXp / leaderboardData.totalPeriodXp) * totalAmount).toFixed(9))
+            : 0,
+      }));
 
       return respond(
         res,
@@ -701,10 +714,11 @@ class AirdropController {
             endDate: normalizedEndDate,
             tokenSymbol: latestAirdrop.tokenSymbol || null,
             tokenAddress: latestAirdrop.tokenAddress || null,
+            totalAmount,
             imageUrl: latestAirdrop.imageUrl || TOKEN_IMAGE_PLACEHOLDER,
             createdAt: latestAirdrop.createdAt,
           },
-          users: leaderboardData.leaderboard,
+          users,
           pagination: {
             total: leaderboardData.totalParticipants,
             page: leaderboardData.parsedPage,

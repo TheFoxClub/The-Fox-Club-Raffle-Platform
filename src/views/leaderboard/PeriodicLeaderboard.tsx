@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Clock3, RefreshCw, Star, User } from "lucide-react";
+import { Calendar, Clock3, Coins, RefreshCw, Star, User } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import server from "../../config/server";
@@ -13,6 +13,7 @@ interface PeriodicLeaderboardUser {
   username: string | null;
   periodXp: number;
   allTimeXp: number;
+  potentialReward: number;
 }
 
 interface PeriodicLeaderboardData {
@@ -23,6 +24,7 @@ interface PeriodicLeaderboardData {
     endDate: string;
     tokenSymbol: string | null;
     tokenAddress: string | null;
+    totalAmount: number;
     createdAt: string;
   } | null;
   users: PeriodicLeaderboardUser[];
@@ -169,12 +171,12 @@ export default function PeriodicLeaderboard() {
         </div>
 
         {data?.airdrop && (
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6 md:p-8">
-            <div className="space-y-6">
+          <Card className="border border-border/50 bg-card/50 p-4 backdrop-blur-xl">
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Active Period Snapshot
+                    Active Reward Leaderboard
                   </p>
                   <h2 className="text-2xl md:text-3xl font-bold mt-1">
                     {data.airdrop.airdropName || "Latest Airdrop"}
@@ -195,34 +197,10 @@ export default function PeriodicLeaderboard() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-border/50 bg-background/40 p-5">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                    Start Date
-                  </p>
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-primary mt-1" />
-                    <div>
-                      <p className="text-xl md:text-2xl font-extrabold leading-tight">
-                        {formatDate(data.airdrop.startDate)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-border/50 bg-background/40 p-5">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                    End Date
-                  </p>
-                  <div className="flex items-start gap-3">
-                    <Clock3 className="h-5 w-5 text-primary mt-1" />
-                    <div>
-                      <p className="text-xl md:text-2xl font-extrabold leading-tight">
-                        {formatDate(data.airdrop.endDate)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="flex items-center gap-3 rounded-md border border-orange-500/40 bg-orange-500/10 px-4 py-3"><Coins className="h-5 w-5 text-primary" /><div><p className="text-xs text-muted-foreground">Total Period Rewards</p><p className="font-bold text-primary">{data.airdrop.totalAmount.toLocaleString()} {data.airdrop.tokenSymbol || "tokens"}</p></div></div>
+                <div className="flex items-center gap-3 rounded-md border border-border/50 bg-background/40 px-4 py-3"><Calendar className="h-5 w-5 text-primary" /><div><p className="text-xs text-muted-foreground">From</p><p className="text-sm font-semibold">{formatDate(data.airdrop.startDate)}</p></div></div>
+                <div className="flex items-center gap-3 rounded-md border border-border/50 bg-background/40 px-4 py-3"><Clock3 className="h-5 w-5 text-primary" /><div><p className="text-xs text-muted-foreground">To</p><p className="text-sm font-semibold">{formatDate(data.airdrop.endDate)}</p></div></div>
               </div>
 
             </div>
@@ -230,10 +208,11 @@ export default function PeriodicLeaderboard() {
         )}
 
         {data && data.users.length > 0 ? (
-          <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-6">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Card className="border border-border/50 bg-card/50 p-5 backdrop-blur-xl">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Full Rankings</h3>
+                <h3 className="text-lg font-semibold">Leaderboard</h3>
                 <p className="text-sm text-muted-foreground">
                   {data.pagination.total.toLocaleString()} participants
                 </p>
@@ -330,6 +309,18 @@ export default function PeriodicLeaderboard() {
               </div>
             )}
           </Card>
+          <Card className="border border-border/50 bg-card/50 p-5 backdrop-blur-xl">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Potential Rewards</h3><p className="text-sm text-muted-foreground">{data.pagination.total.toLocaleString()} participants</p></div>
+              {data.users.map((user) => (
+                <div key={`reward-${user.userId}-${user.rank}`} className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/20 p-4">
+                  <div className="flex items-center gap-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground">{user.rank}</div><div><p className="font-medium">{user.username || shortenAddress(user.walletAddress)}</p><p className="text-xs text-muted-foreground">{shortenAddress(user.walletAddress)}</p></div></div>
+                  <div className="flex items-center gap-2 text-emerald-300"><Coins className="h-5 w-5" /><span className="text-lg font-bold">{user.potentialReward.toLocaleString(undefined, { maximumFractionDigits: 4 })} {data.airdrop.tokenSymbol || "tokens"}</span></div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          </div>
         ) : (
           <Card className="bg-card/50 backdrop-blur-xl border border-border/50 p-12">
             <div className="text-center space-y-4">
