@@ -43,9 +43,9 @@ export default function PeriodicLeaderboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchPeriodicLeaderboard = async (page = 1) => {
+  const fetchPeriodicLeaderboard = async (page = 1, background = false) => {
     try {
-      if (page === 1) {
+      if (page === 1 && !background) {
         setLoading(true);
       } else {
         setRefreshing(true);
@@ -69,6 +69,16 @@ export default function PeriodicLeaderboard() {
   useEffect(() => {
     fetchPeriodicLeaderboard();
   }, []);
+
+  useEffect(() => {
+    if (!data?.airdrop) return;
+
+    const refreshInterval = window.setInterval(
+      () => fetchPeriodicLeaderboard(currentPage, true),
+      60_000,
+    );
+    return () => window.clearInterval(refreshInterval);
+  }, [currentPage, data?.airdrop?.id]);
 
   const shortenAddress = (address: string, start = 3, end = 3) =>
     `${address.slice(0, start)}...${address.slice(-end)}`;
