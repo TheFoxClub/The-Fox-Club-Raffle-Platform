@@ -258,7 +258,7 @@ export const Header = () => {
           )}
         </div>
         {/* Account controls */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex w-full min-w-0 items-center justify-center gap-2 md:w-auto md:shrink-0">
           {user.isAuthenticated && connected && (
             <Link to="/create">
               <Button
@@ -270,30 +270,30 @@ export const Header = () => {
             </Link>
           )}
           {user.isAuthenticated && totalXp !== null && (
-            <Link to="/profile" title="View your experience points">
+            <Link to="/profile" title="View your experience points" className="min-w-0 flex-1 md:flex-none">
               <Button
                 type="button"
                 variant="secondary"
-                className="h-10 w-40 shrink-0 gap-1.5 border border-orange-500/50 bg-gradient-to-br from-orange-500/15 via-zinc-800 to-rose-500/10 px-3 text-sm font-medium hover:border-orange-400/80 hover:bg-orange-500/15"
+                className="h-10 w-full min-w-0 gap-1.5 border border-orange-500/50 bg-gradient-to-br from-orange-500/15 via-zinc-800 to-rose-500/10 px-2 text-sm font-medium hover:border-orange-400/80 hover:bg-orange-500/15 md:w-40 md:shrink-0 md:px-3"
               >
                 <Star className="h-4 w-4 text-primary" />
-                <span>{formatXp(totalXp)} XP</span>
+                <span className="truncate">{formatXp(totalXp)} XP</span>
               </Button>
             </Link>
           )}
           {user.isAuthenticated && connected && (
-            <div ref={balanceMenuRef} className="relative">
+            <div ref={balanceMenuRef} className="relative min-w-0 flex-1 md:flex-none">
               <Button
                 type="button"
                 variant="secondary"
-                className="h-10 w-40 shrink-0 gap-1.5 border border-sky-400/50 bg-gradient-to-br from-sky-500/15 via-zinc-800 to-indigo-500/10 px-3 text-sm font-medium hover:border-sky-300/80 hover:bg-sky-500/15"
+                className="h-10 w-full min-w-0 gap-1.5 border border-sky-400/50 bg-gradient-to-br from-sky-500/15 via-zinc-800 to-indigo-500/10 px-2 text-sm font-medium hover:border-sky-300/80 hover:bg-sky-500/15 md:w-40 md:shrink-0 md:px-3"
                 onClick={() => setBalanceMenuOpen((open) => !open)}
                 aria-expanded={balanceMenuOpen}
                 aria-haspopup="listbox"
               >
                 <Coins className="h-4 w-4" />
-                <span>{formatBalance(solBalance?.amount || 0)} SOL</span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
+                <span className="truncate">{formatBalance(solBalance?.amount || 0)} SOL</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${balanceMenuOpen ? "rotate-180" : ""}`} />
               </Button>
               {balanceMenuOpen && (
                 <div className="absolute right-0 top-full z-[60] mt-2 min-w-52 overflow-visible rounded-md border border-border bg-card shadow-lg" role="listbox" aria-label="Wallet balances">
