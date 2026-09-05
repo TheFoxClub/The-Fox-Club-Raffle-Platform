@@ -648,7 +648,7 @@ class AirdropController {
 
       const latestAirdropRows = await sequelize.query(
         `
-          SELECT id, airdropName, startDate, endDate, tokenSymbol, tokenAddress, totalAmount, imageUrl, createdAt
+          SELECT id, airdropName, startDate, endDate, tokenSymbol, tokenAddress, totalAmount, activationConfig, imageUrl, createdAt
           FROM airdrop_details
           ORDER BY createdAt DESC
           LIMIT 1
@@ -694,6 +694,14 @@ class AirdropController {
         limit: parsedLimit,
       });
       const totalAmount = parseFloat(latestAirdrop.totalAmount || 0);
+      const activationConfig = typeof latestAirdrop.activationConfig === "string"
+        ? JSON.parse(latestAirdrop.activationConfig)
+        : latestAirdrop.activationConfig || {};
+      const configuredRewardLimit = parseInt(activationConfig.leaderboardLimit, 10);
+      const rewardLimit = parseBooleanFlag(activationConfig.hasLeaderboardLimit)
+        && configuredRewardLimit > 0
+        ? configuredRewardLimit
+        : null;
       const users = leaderboardData.leaderboard.map((user) => ({
         ...user,
         potentialReward:
@@ -715,6 +723,7 @@ class AirdropController {
             tokenSymbol: latestAirdrop.tokenSymbol || null,
             tokenAddress: latestAirdrop.tokenAddress || null,
             totalAmount,
+            rewardLimit,
             imageUrl: latestAirdrop.imageUrl || TOKEN_IMAGE_PLACEHOLDER,
             createdAt: latestAirdrop.createdAt,
           },

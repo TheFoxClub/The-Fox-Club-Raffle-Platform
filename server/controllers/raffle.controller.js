@@ -121,6 +121,12 @@ class RaffleController {
           {
             model: RaffleReward,
           },
+          {
+            model: RafflePaymentOption,
+            as: "paymentOptions",
+            required: false,
+            attributes: ["id", "tokenAddress", "tokenType", "tokenSymbol", "ticketPrice"],
+          },
         ],
         order: [["createdAt", "DESC"]],
       });
@@ -183,6 +189,12 @@ class RaffleController {
           {
             model: RaffleReward,
           },
+          {
+            model: RafflePaymentOption,
+            as: "paymentOptions",
+            required: false,
+            attributes: ["id", "tokenAddress", "tokenType", "tokenSymbol", "ticketPrice"],
+          },
         ],
         order: [["createdAt", "DESC"]],
       });
@@ -244,6 +256,12 @@ class RaffleController {
           },
           {
             model: RaffleReward,
+          },
+          {
+            model: RafflePaymentOption,
+            as: "paymentOptions",
+            required: false,
+            attributes: ["id", "tokenAddress", "tokenType", "tokenSymbol", "ticketPrice"],
           },
         ],
         order: [["createdAt", "DESC"]],

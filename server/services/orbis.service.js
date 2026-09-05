@@ -33,9 +33,9 @@ const getCollectionAddress = async (reward) => {
 
   const creatorCollection = await VerifiedCollection.findOne({
     where: { address: verifiedCreator, matchType: "creator", isVerified: true },
-    attributes: ["address"],
+    attributes: ["address", "name"],
   });
-  return creatorCollection?.address || null;
+  return creatorCollection?.name || creatorCollection?.address || null;
 };
 
 const getFloorPrice = async (reward) => {

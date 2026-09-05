@@ -25,6 +25,7 @@ interface PeriodicLeaderboardData {
     tokenSymbol: string | null;
     tokenAddress: string | null;
     totalAmount: number;
+    rewardLimit: number | null;
     createdAt: string;
   } | null;
   users: PeriodicLeaderboardUser[];
@@ -99,6 +100,10 @@ export default function PeriodicLeaderboard() {
       toast.error("Failed to copy wallet address");
     }
   };
+
+  const rewardUsers = data?.airdrop?.rewardLimit
+    ? data.users.filter((user) => user.rank <= data.airdrop.rewardLimit)
+    : data?.users || [];
 
   const getPeriodStatus = (startDate?: string, endDate?: string) => {
     if (!startDate || !endDate) return null;
@@ -311,10 +316,26 @@ export default function PeriodicLeaderboard() {
           </Card>
           <Card className="border border-border/50 bg-card/50 p-5 backdrop-blur-xl">
             <div className="space-y-4">
-              <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Potential Rewards</h3><p className="text-sm text-muted-foreground">{data.pagination.total.toLocaleString()} participants</p></div>
-              {data.users.map((user) => (
-                <div key={`reward-${user.userId}-${user.rank}`} className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/20 p-4">
-                  <div className="flex items-center gap-4"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground">{user.rank}</div><div><p className="font-medium">{user.username || shortenAddress(user.walletAddress)}</p><p className="text-xs text-muted-foreground">{shortenAddress(user.walletAddress)}</p></div></div>
+              <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Potential Rewards</h3><p className="text-sm text-muted-foreground">{rewardUsers.length} eligible</p></div>
+              {rewardUsers.map((user) => (
+                <div key={`reward-${user.userId}-${user.rank}`} className={`flex items-center justify-between rounded-lg border p-4 ${
+                  user.rank === 1
+                    ? "border-yellow-200 bg-linear-to-r"
+                    : user.rank === 2
+                      ? "border-gray-200 bg-linear-to-r"
+                      : user.rank === 3
+                        ? "border-orange-200 bg-linear-to-r"
+                        : "border-border/30 bg-muted/20"
+                }`}>
+                  <div className="flex items-center gap-4"><div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${
+                    user.rank === 1
+                      ? "bg-linear-to-r from-yellow-500 to-orange-500 text-white"
+                      : user.rank === 2
+                        ? "bg-linear-to-r from-gray-400 to-gray-500 text-white"
+                        : user.rank === 3
+                          ? "bg-linear-to-r from-orange-500 to-red-500 text-white"
+                          : "bg-muted text-muted-foreground"
+                  }`}>{user.rank}</div><div><p className="font-medium">{user.username || shortenAddress(user.walletAddress)}</p><p className="text-xs text-muted-foreground">{shortenAddress(user.walletAddress)}</p></div></div>
                   <div className="flex items-center gap-2 text-emerald-300"><Coins className="h-5 w-5" /><span className="text-lg font-bold">{user.potentialReward.toLocaleString(undefined, { maximumFractionDigits: 4 })} {data.airdrop.tokenSymbol || "tokens"}</span></div>
                 </div>
               ))}
