@@ -240,6 +240,7 @@ const buildXpLeaderboardForRange = async ({
   rangeEnd,
   page = 1,
   limit = 10,
+  rewardLimit = null,
 }) => {
   const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
   const rawLimit = parseInt(limit, 10);
@@ -305,6 +306,9 @@ const buildXpLeaderboardForRange = async ({
     (total, earner) => total + earner.periodXp,
     0,
   );
+  const eligiblePeriodXp = enrichedEarners
+    .slice(0, rewardLimit || enrichedEarners.length)
+    .reduce((total, earner) => total + earner.periodXp, 0);
   let paginatedEarners;
   let totalPages;
   let offset = 0;
@@ -329,6 +333,7 @@ const buildXpLeaderboardForRange = async ({
     parsedLimit,
     totalParticipants,
     totalPeriodXp,
+    eligiblePeriodXp,
     totalPages,
     leaderboard,
   };
@@ -686,14 +691,6 @@ class AirdropController {
 
       const normalizedStartDate = rangeStart.toISOString();
       const normalizedEndDate = rangeEnd.toISOString();
-
-      const leaderboardData = await buildXpLeaderboardForRange({
-        rangeStart,
-        rangeEnd,
-        page: parsedPage,
-        limit: parsedLimit,
-      });
-      const totalAmount = parseFloat(latestAirdrop.totalAmount || 0);
       const activationConfig = typeof latestAirdrop.activationConfig === "string"
         ? JSON.parse(latestAirdrop.activationConfig)
         : latestAirdrop.activationConfig || {};
@@ -702,11 +699,20 @@ class AirdropController {
         && configuredRewardLimit > 0
         ? configuredRewardLimit
         : null;
+
+      const leaderboardData = await buildXpLeaderboardForRange({
+        rangeStart,
+        rangeEnd,
+        page: parsedPage,
+        limit: parsedLimit,
+        rewardLimit,
+      });
+      const totalAmount = parseFloat(latestAirdrop.totalAmount || 0);
       const users = leaderboardData.leaderboard.map((user) => ({
         ...user,
         potentialReward:
-          leaderboardData.totalPeriodXp > 0
-            ? Number(((user.periodXp / leaderboardData.totalPeriodXp) * totalAmount).toFixed(9))
+          leaderboardData.eligiblePeriodXp > 0 && (!rewardLimit || user.rank <= rewardLimit)
+            ? Number(((user.periodXp / leaderboardData.eligiblePeriodXp) * totalAmount).toFixed(9))
             : 0,
       }));
 

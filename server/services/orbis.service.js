@@ -32,10 +32,13 @@ const getCollectionAddress = async (reward) => {
   if (!verifiedCreator) return null;
 
   const creatorCollection = await VerifiedCollection.findOne({
-    where: { address: verifiedCreator, matchType: "creator", isVerified: true },
+    where: { address: verifiedCreator, isVerified: true },
     attributes: ["address", "name"],
   });
-  return creatorCollection?.name || creatorCollection?.address || null;
+  const legacyCollectionName = asset.content?.metadata?.name
+    ?.replace(/\s+#\d+$/, "")
+    .trim();
+  return creatorCollection?.name || legacyCollectionName || creatorCollection?.address || null;
 };
 
 const getFloorPrice = async (reward) => {
