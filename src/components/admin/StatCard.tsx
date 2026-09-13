@@ -11,8 +11,8 @@ interface StatCardProps {
 
 export function StatCard({ title, value, change, icon, trend }: StatCardProps) {
   return (
-    <div className="glass-card p-6 rounded-xl border border-border/50 hover:border-primary/50 transition-all hover:glow-primary">
-      <div className="flex items-start justify-between mb-4">
+    <div className="glass-card flex flex-col items-center p-6 rounded-xl border border-border/50 text-center hover:border-primary/50 transition-all hover:glow-primary">
+      <div className="flex w-full items-center justify-center mb-4">
         <div className="p-3 rounded-lg bg-gradient-primary/10 text-primary">
           {icon}
         </div>

@@ -166,11 +166,16 @@ class XpProcessor {
       }
 
       // Convert transaction amount to USD
+      const paymentTokenType = transaction.type ?? raffle.tokenType;
+      const paymentTokenAddress = transaction.tokenAddress || raffle.tokenAddress;
+      const paymentDecimals = transaction.decimals || 9;
+      const rawPaymentAmount = parseFloat(transaction.uiAmount);
+
       const usdValue = await XpService.convertToUsd(
-        raffle.tokenType,
-        raffle.tokenAddress,
-        parseFloat(transaction.uiAmount),
-        transaction.decimals || 9
+        paymentTokenType,
+        paymentTokenAddress,
+        rawPaymentAmount,
+        paymentDecimals,
       );
 
       if (usdValue <= 0) {
@@ -184,12 +189,11 @@ class XpProcessor {
       await XpService.awardTicketPurchaseXp(user.id, transaction.id, usdValue, {
         raffleId: raffle.id,
         raffleTitle: raffle.title,
-        tokenType: raffle.tokenType,
-        tokenAddress: raffle.tokenAddress,
-        rawTokenAmount: parseFloat(transaction.uiAmount),
+        tokenType: paymentTokenType,
+        tokenAddress: paymentTokenAddress,
+        rawTokenAmount: rawPaymentAmount,
         conversionRate:
-          (usdValue / parseFloat(transaction.uiAmount)) *
-          Math.pow(10, transaction.decimals),
+          (usdValue / rawPaymentAmount) * Math.pow(10, paymentDecimals),
         transactionHash: transaction.txId,
         ticketCount: transaction.additionalJson?.ticketCount || 1,
       });
@@ -256,31 +260,47 @@ class XpProcessor {
         `Processing raffle ${raffle.id} for revenue XP - totalRevenue: ${raffle.totalRevenue}, claimableAmount: ${raffle.claimableAmount}`
       );
 
-      // For raffle revenue, we need to look up token decimals from verified_tokens
-      const token = await VerifiedToken.findOne({
-        where: { address: raffle.tokenAddress },
+      const ticketPayments = await SplTokenSendTransaction.findAll({
+        where: {
+          raffleId: raffle.id,
+          rewardTransferType: "ticket_purchase",
+          status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+        },
+        attributes: ["type", "tokenAddress", "decimals", "uiAmount"],
       });
-      const decimals = token ? token.decimals : 9;
 
-      const revenueAmount = parseFloat(raffle.totalRevenue || 0);
+      let usdRevenue = 0;
+      const revenueByToken = [];
+      for (const payment of ticketPayments) {
+        const decimals = Number(payment.decimals) || 9;
+        const rawTokenAmount = Number(payment.uiAmount || 0);
+        if (rawTokenAmount <= 0) {
+          continue;
+        }
 
-      if (revenueAmount <= 0) {
-        logger.warn(
-          `No revenue to process for raffle ${raffle.id} - totalRevenue: ${raffle.totalRevenue}`
+        const usdValue = await XpService.convertToUsd(
+          payment.type,
+          payment.tokenAddress,
+          rawTokenAmount,
+          decimals,
         );
-        return;
-      }
+        if (usdValue <= 0) {
+          continue;
+        }
 
-      const usdRevenue = await XpService.convertToUsd(
-        raffle.tokenType,
-        raffle.tokenAddress,
-        revenueAmount,
-        0 // decimals = 0 since totalRevenue is already converted
-      );
+        usdRevenue += usdValue;
+        revenueByToken.push({
+          tokenType: payment.type,
+          tokenAddress: payment.tokenAddress,
+          rawTokenAmount,
+          decimals,
+          usdValue,
+        });
+      }
 
       if (usdRevenue <= 0) {
         logger.warn(
-          `Invalid USD revenue ${usdRevenue} for raffle ${raffle.id} (totalRevenue: ${revenueAmount})`
+          `No convertible ticket revenue for raffle ${raffle.id}`
         );
         return;
       }
@@ -299,8 +319,7 @@ class XpProcessor {
           ticketsSold: raffle.ticketsSold,
           totalRevenue: parseFloat(raffle.totalRevenue),
           claimableAmount: parseFloat(raffle.claimableAmount),
-          tokenType: raffle.tokenType,
-          tokenAddress: raffle.tokenAddress,
+          revenueByToken,
         }
       );
     } catch (error) {

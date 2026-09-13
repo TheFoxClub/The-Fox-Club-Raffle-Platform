@@ -89,6 +89,7 @@ export interface RafflePaymentOption {
   baseSolPrice: number;
   discountPercent: number;
   priceMode: "auto" | "manual";
+  isFeatured?: boolean;
 }
 
 export interface RaffleType {
@@ -104,6 +105,7 @@ export interface RaffleType {
   endTime: string;
   created: string;
   host: string;
+  hostName?: string | null;
   hostId: number;
   // hostReputation: number;
   isVerified: boolean;
@@ -544,17 +546,28 @@ const RaffleDetail = () => {
           tokenType: mapNumericTokenType(data.tokenType),
           tokenTypeNumber: data.tokenType,
           tokenAddress: data.tokenAddress,
-          paymentOptions: (data.paymentOptions || []).map((option: RafflePaymentOption) => ({
-            ...option,
-            ticketPrice: Number(option.ticketPrice),
-            baseSolPrice: Number(option.baseSolPrice),
-            discountPercent: Number(option.discountPercent),
-          })),
+          paymentOptions: (data.paymentOptions || [])
+            .map((option: RafflePaymentOption) => ({
+              ...option,
+              ticketPrice: Number(option.ticketPrice),
+              baseSolPrice: Number(option.baseSolPrice),
+              discountPercent: Number(option.discountPercent),
+            }))
+            .sort((first: RafflePaymentOption, second: RafflePaymentOption) => {
+              if (first.tokenType === 0 || second.tokenType === 0) {
+                return first.tokenType === 0 ? -1 : 1;
+              }
+              if (Boolean(first.isFeatured) !== Boolean(second.isFeatured)) {
+                return first.isFeatured ? -1 : 1;
+              }
+              return first.tokenSymbol.localeCompare(second.tokenSymbol);
+            }),
           total: data.totalTickets,
           sold: data.ticketsSold,
           winners: data.numberOfWinners,
           created: formatDateOnly(data.createdAt),
           host: res.data.data.userData.pubkey,
+          hostName: res.data.data.userData.user_info?.username || null,
           hostId: res.data.data.userData.id,
           // hostReputation: data.userReputation || 100,
           isVerified: data.raffle_detail?.requiresNftVerification || false,
@@ -576,11 +589,6 @@ const RaffleDetail = () => {
         };
 
         setRaffle(mappedRaffle);
-        setSelectedPaymentOptionId((current) =>
-          current && mappedRaffle.paymentOptions?.some((option) => option.id === current)
-            ? current
-            : mappedRaffle.paymentOptions?.[0]?.id || null,
-        );
         setSelectedPaymentOptionId((current) =>
           current && mappedRaffle.paymentOptions?.some((option) => option.id === current)
             ? current
@@ -1189,9 +1197,12 @@ const RaffleDetail = () => {
                   </div>
                 )}
                 <div className="flex flex-col min-w-0">
+                  {raffle.hostName && (
+                    <p className="font-semibold truncate">{raffle.hostName}</p>
+                  )}
                   <button
                     onClick={() => copyToClipboard(raffle.host)}
-                    className="hover:text-primary transition cursor-pointer"
+                    className="text-sm text-muted-foreground hover:text-primary transition cursor-pointer"
                   >
                     {/* Mobile (short) */}
                     <span className="sm:hidden">

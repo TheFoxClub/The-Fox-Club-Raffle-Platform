@@ -20,7 +20,7 @@ export interface RaffleCardProps {
   isVerified: boolean;
   isFeatured: boolean;
   floorPrice?: { amount: number; collectionName?: string | null } | null;
-  paymentOptions?: { id: number; tokenSymbol: string; ticketPrice: string }[];
+  paymentOptions?: { id: number; tokenAddress: string; tokenType: number; tokenSymbol: string; ticketPrice: string; isFeatured?: boolean }[];
 }
 
 export const RaffleCard = ({

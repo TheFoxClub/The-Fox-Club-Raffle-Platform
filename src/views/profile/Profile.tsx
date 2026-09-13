@@ -67,6 +67,15 @@ type HostedRaffle = {
       decimals: number;
       amount: number;
     }[];
+    tokenSummaries?: {
+      tokenType: string;
+      tokenAddress?: string;
+      decimals: number;
+      totalRevenue: number;
+      totalCommission: number;
+      claimableAmount: number;
+      unclaimedAmount: number;
+    }[];
     message: string;
   };
 };
@@ -1163,50 +1172,33 @@ const Profile = () => {
                             <p className="text-xs text-muted-foreground">
                               Total Revenue
                             </p>
-                            <p className="text-sm font-semibold">
-                              <TokenDisplay
-                                amount={raffle.payoutInfo.totalRevenue.toFixed(
-                                  4
-                                )}
-                                tokenType={raffle.tokenType}
-                                tokenAddress={raffle.tokenAddress}
-                              />
-                            </p>
+                            <div className="flex flex-col gap-1 text-sm font-semibold">
+                              {raffle.payoutInfo.tokenSummaries?.length ? raffle.payoutInfo.tokenSummaries.map((token) => (
+                                <TokenDisplay key={`revenue-${token.tokenType}-${token.tokenAddress}`} amount={token.totalRevenue.toFixed(4)} tokenType={token.tokenType} tokenAddress={token.tokenAddress} />
+                              )) : <TokenDisplay amount={raffle.payoutInfo.totalRevenue.toFixed(4)} tokenType={raffle.tokenType} tokenAddress={raffle.tokenAddress} />}
+                            </div>
                           </div>
 
                           <div className="space-y-1">
                             <p className="text-xs text-muted-foreground">
                               Platform Commission
                             </p>
-                            <p className="text-sm font-semibold text-orange-400">
-                              <TokenDisplay
-                                amount={raffle.payoutInfo.totalCommission.toFixed(
-                                  4
-                                )}
-                                tokenType={raffle.tokenType}
-                                tokenAddress={raffle.tokenAddress}
-                              />
-                            </p>
+                            <div className="flex flex-col gap-1 text-sm font-semibold text-orange-400">
+                              {raffle.payoutInfo.tokenSummaries?.length ? raffle.payoutInfo.tokenSummaries.map((token) => (
+                                <TokenDisplay key={`commission-${token.tokenType}-${token.tokenAddress}`} amount={token.totalCommission.toFixed(4)} tokenType={token.tokenType} tokenAddress={token.tokenAddress} />
+                              )) : <TokenDisplay amount={raffle.payoutInfo.totalCommission.toFixed(4)} tokenType={raffle.tokenType} tokenAddress={raffle.tokenAddress} />}
+                            </div>
                           </div>
 
                           <div className="space-y-1">
                             <p className="text-xs text-muted-foreground">
                               Your Revenue
                             </p>
-                            <p className="text-sm font-semibold text-green-400">
-                              {/* {raffle.payoutInfo.claimableAmount.toFixed(4)}{" "}
-                              {getTokenSymbol(
-                                raffle.tokenType,
-                                raffle.tokenAddress,
-                              )} */}
-                              <TokenDisplay
-                                amount={raffle.payoutInfo.claimableAmount.toFixed(
-                                  4
-                                )}
-                                tokenType={raffle.tokenType}
-                                tokenAddress={raffle.tokenAddress}
-                              />
-                            </p>
+                            <div className="flex flex-col gap-1 text-sm font-semibold text-green-400">
+                              {raffle.payoutInfo.tokenSummaries?.length ? raffle.payoutInfo.tokenSummaries.map((token) => (
+                                <TokenDisplay key={`creator-${token.tokenType}-${token.tokenAddress}`} amount={token.claimableAmount.toFixed(4)} tokenType={token.tokenType} tokenAddress={token.tokenAddress} />
+                              )) : <TokenDisplay amount={raffle.payoutInfo.claimableAmount.toFixed(4)} tokenType={raffle.tokenType} tokenAddress={raffle.tokenAddress} />}
+                            </div>
                           </div>
 
                           <div className="space-y-1">
@@ -1215,7 +1207,7 @@ const Profile = () => {
                                 ? "Unclaimed"
                                 : "Claimed"}
                             </p>
-                            <p
+                            <div
                               className={`text-sm font-semibold ${
                                 raffle.payoutInfo.unclaimedAmount > 0
                                   ? "text-primary"
@@ -1223,17 +1215,15 @@ const Profile = () => {
                               }`}
                             >
                               {raffle.payoutInfo.unclaimedAmount > 0 ? (
-                                <TokenDisplay
-                                  amount={raffle.payoutInfo.unclaimedAmount.toFixed(
-                                    4
-                                  )}
-                                  tokenType={raffle.tokenType}
-                                  tokenAddress={raffle.tokenAddress}
-                                />
+                                <div className="flex flex-col gap-1">
+                                  {raffle.payoutInfo.tokenSummaries?.length ? raffle.payoutInfo.tokenSummaries.filter((token) => token.unclaimedAmount > 0).map((token) => (
+                                    <TokenDisplay key={`unclaimed-${token.tokenType}-${token.tokenAddress}`} amount={token.unclaimedAmount.toFixed(4)} tokenType={token.tokenType} tokenAddress={token.tokenAddress} />
+                                  )) : <TokenDisplay amount={raffle.payoutInfo.unclaimedAmount.toFixed(4)} tokenType={raffle.tokenType} tokenAddress={raffle.tokenAddress} />}
+                                </div>
                               ) : (
                                 "All claimed"
                               )}
-                            </p>
+                            </div>
                           </div>
                         </div>
 
@@ -1314,13 +1304,12 @@ const Profile = () => {
                                   "confirmed" ? (
                                     <>
                                       Payout completed:{" "}
-                                      <TokenDisplay
-                                        amount={raffle.payoutInfo.claimableAmount.toFixed(
-                                          4
-                                        )}
-                                        tokenType={raffle.tokenType}
-                                        tokenAddress={raffle.tokenAddress}
-                                      />
+                                          {raffle.payoutInfo.tokenSummaries?.length ? raffle.payoutInfo.tokenSummaries.map((token, index) => (
+                                            <span key={`completed-${token.tokenType}-${token.tokenAddress}`}>
+                                              {index > 0 && ", "}
+                                              <TokenDisplay amount={token.claimableAmount.toFixed(4)} tokenType={token.tokenType} tokenAddress={token.tokenAddress} />
+                                            </span>
+                                          )) : <TokenDisplay amount={raffle.payoutInfo.claimableAmount.toFixed(4)} tokenType={raffle.tokenType} tokenAddress={raffle.tokenAddress} />}
                                     </>
                                   ) : raffle.payoutInfo.claimStatus ===
                                     "failed" ? (

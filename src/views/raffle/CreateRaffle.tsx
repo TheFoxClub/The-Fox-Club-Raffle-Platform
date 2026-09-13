@@ -56,6 +56,9 @@ const parseDecimalInput = (value: string) => {
   return Number.isFinite(numericValue) ? numericValue : null;
 };
 
+const roundUpTicketPrice = (value: number) =>
+  (Math.ceil(value * 10_000 - Number.EPSILON) / 10_000).toString();
+
 type PaymentTokenOption = {
   value: string;
   label: string;
@@ -63,6 +66,7 @@ type PaymentTokenOption = {
   tokenType: number;
   name?: string;
   conversionRate?: string | number | null;
+  isFeatured?: boolean;
 };
 
 type PaymentConfiguration = {
@@ -105,6 +109,8 @@ const CreateRaffle = () => {
     }[]
   >([]);
   const [tokenLoading, setTokenLoading] = useState(false);
+  const [tokenMint, setTokenMint] = useState("");
+  const [tokenLookupLoading, setTokenLookupLoading] = useState(false);
 
   const [savedDraft, setSavedDraft] = useState<any>(null);
   const [isResumingDraft, setIsResumingDraft] = useState(false);
@@ -176,13 +182,22 @@ const CreateRaffle = () => {
             tokenType: token.tokenType,
             name: token.name,
             conversionRate: token.conversionRate,
+            isFeatured: Boolean(token.isFeatured),
           }));
 
           const uniqueTokens = Array.from(
             new Map(tokens.map((t) => [t.value, t])).values()
           );
 
-          setTokenOptions(uniqueTokens);
+          setTokenOptions(uniqueTokens.sort((first, second) => {
+            if (first.tokenType === 0 || second.tokenType === 0) {
+              return first.tokenType === 0 ? -1 : 1;
+            }
+            if (Boolean(first.isFeatured) !== Boolean(second.isFeatured)) {
+              return first.isFeatured ? -1 : 1;
+            }
+            return first.label.localeCompare(second.label);
+          }));
 
         } else {
           // console.warn("No tokens found in API response, using fallback");
@@ -294,7 +309,9 @@ const CreateRaffle = () => {
           : null;
         next[address] = {
           ...configuration,
-          ticketPrice: address === sourceToken.value ? value : calculatedPrice?.toPrecision(8) || "",
+          ticketPrice: address === sourceToken.value
+            ? value
+            : calculatedPrice ? roundUpTicketPrice(calculatedPrice) : "",
         };
       });
       return next;
@@ -590,6 +607,60 @@ const CreateRaffle = () => {
     }));
   };
 
+  const handleAddTokenByMint = async () => {
+    const mint = tokenMint.trim();
+    if (!publicKey || !mint) {
+      toast.error("Enter a token mint and connect your wallet first");
+      return;
+    }
+
+    try {
+      setTokenLookupLoading(true);
+      const response = await server.get(`/tokens/${publicKey.toBase58()}/mint/${mint}`);
+      const tokenAccount = response.data?.data?.token;
+      const tokenInfo = tokenAccount?.account?.data?.parsed?.info;
+
+      if (!response.data?.success || !tokenInfo) {
+        throw new Error(response.data?.message || "Token was not found in the connected wallet");
+      }
+
+      const metadata = tokenAccount.metadata || {};
+      let image: string | null = null;
+      if (metadata.uri) {
+        try {
+          const metadataResponse = await fetch(normalizeIpfs(metadata.uri)!);
+          if (metadataResponse.ok) {
+            const tokenMetadata = await metadataResponse.json();
+            image = normalizeIpfs(
+              tokenMetadata.image || tokenMetadata.image_url || tokenMetadata.logoURI,
+            );
+          }
+        } catch {
+          image = null;
+        }
+      }
+      const token = {
+        mint,
+        name: metadata.name || metadata.symbol || `Token ${mint.slice(0, 6)}...`,
+        amount: Number(tokenInfo.tokenAmount?.uiAmount || 0),
+        programId: tokenAccount.account?.owner || TOKEN_PROGRAM_ID,
+        image,
+      };
+
+      if (selectedTokens.some((selectedToken) => selectedToken.mint === mint)) {
+        toast.info("This token is already added");
+      } else {
+        handleSelectToken(token);
+        toast.success("Token added");
+      }
+      setTokenMint("");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error.message || "Failed to find token");
+    } finally {
+      setTokenLookupLoading(false);
+    }
+  };
+
   const removeToken = (mint: string) => {
     setSelectedTokens((prev) => prev.filter((t) => t.mint !== mint));
   };
@@ -658,8 +729,7 @@ const CreateRaffle = () => {
       if (t.amountToUse <= 0) {
         newErrors[`token-${t.mint}`] = "Amount must be greater than 0";
       }
-      const walletBalance =
-        tokenCandidates.find((c) => c.mint === t.mint)?.amount ?? 0;
+      const walletBalance = t.amount ?? 0;
 
       if (t.amountToUse > walletBalance)
         if (t.amountToUse > walletBalance) {
@@ -1608,11 +1678,9 @@ const CreateRaffle = () => {
                     >
                       <div className="flex flex-col items-center gap-2">
                         <Wallet className="h-8 w-8" />
-                        <span className="font-semibold">
-                          Choose Token from Wallet
-                        </span>
+                        <span className="font-semibold">Add Token by Mint</span>
                         <span className="text-xs text-muted-foreground">
-                          Select from verified collections
+                          Fetch token details and balance automatically
                         </span>
                       </div>
                     </Button>
@@ -1621,68 +1689,44 @@ const CreateRaffle = () => {
                   {/* Modal */}
                   <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Select Token from Your Wallet</DialogTitle>
+                      <DialogTitle>Add Prize Token</DialogTitle>
                     </DialogHeader>
 
                     {!user.isAuthenticated ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <p className="text-muted-foreground text-sm mb-4">
-                          Please sign in or log in to view your wallet Tokens.
-                        </p>
-                      </div>
-                    ) : tokenLoading ? (
-                      <p className="text-center py-6 text-muted-foreground">
-                        Loading tokens...
-                      </p>
-                    ) : tokenCandidates.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <p className="text-muted-foreground text-sm">
-                          No tokens found in your wallet
+                          Please sign in before adding a prize token.
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-4">
-                        {tokenCandidates.map((token) => {
-                          const isSelected = selectedTokens.some(
-                            (t) => t.mint === token.mint
-                          );
-
-                          return (
-                            <button
-                              key={token.mint}
-                              type="button"
-                              onClick={() => toggleToken(token)}
-                              className={`
-                                      group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2
-                                      ${
-                                        isSelected
-                                          ? "border-green-500 ring-2 ring-green-500"
-                                          : "border-border hover:border-primary hover:scale-105"
-                                      }
-                                    `}
-                            >
-                              {/* Content */}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm truncate">
-                                  {token.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  Mint: {token.mint}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  Amount: {token.amount}
-                                </p>
-                              </div>
-
-                              {/* Selected Badge */}
-                              {isSelected && (
-                                <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                                  Selected
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
+                      <div className="space-y-3 py-2">
+                        <label className="block text-sm font-medium">
+                          Token mint
+                          <Input
+                            type="text"
+                            value={tokenMint}
+                            onChange={(event) => setTokenMint(event.target.value.trim())}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                void handleAddTokenByMint();
+                              }
+                            }}
+                            placeholder="Enter the Solana token mint address"
+                            className="mt-2 w-full bg-background"
+                          />
+                        </label>
+                        <Button
+                          type="button"
+                          className="w-full gradient-primary"
+                          onClick={() => void handleAddTokenByMint()}
+                          disabled={tokenLookupLoading || !tokenMint}
+                        >
+                          {tokenLookupLoading ? "Fetching token..." : "Add Token"}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          The token must be held by the connected wallet.
+                        </p>
                       </div>
                     )}
 
@@ -1700,9 +1744,7 @@ const CreateRaffle = () => {
                 {selectedTokens.length > 0 && (
                   <div className="mt-4 space-y-2">
                     {selectedTokens.map((t) => {
-                      const walletBalance =
-                        tokenCandidates.find((c) => c.mint === t.mint)
-                          ?.amount ?? 0;
+                      const walletBalance = t.amount ?? 0;
 
                       return (
                         <div
@@ -1838,7 +1880,7 @@ const CreateRaffle = () => {
                                   liveTokenPrices[referenceTokenAddress] || sourceToken?.conversionRate || 0,
                                 );
                                 const calculatedPrice = autofillPrices && isEnabled && sourcePrice && sourceUsdPrice > 0 && tokenUsdPrice > 0
-                                  ? (sourcePrice * sourceUsdPrice / tokenUsdPrice).toPrecision(8)
+                                  ? roundUpTicketPrice(sourcePrice * sourceUsdPrice / tokenUsdPrice)
                                   : currentConfiguration.ticketPrice;
 
                                 return {
@@ -1872,8 +1914,8 @@ const CreateRaffle = () => {
                           <span className="text-xs text-muted-foreground">
                             {discountedPrice !== null
                               ? discount > 0
-                                ? <><span className="mr-1 line-through">{configuration.ticketPrice}</span>{discountedPrice.toPrecision(8)} {token.label}</>
-                                : `${configuration.ticketPrice} ${token.label}`
+                                ? <><span className="mr-1 line-through">{formatPrice(configuration.ticketPrice)}</span>{formatPrice(discountedPrice)} {token.label}</>
+                                : `${formatPrice(configuration.ticketPrice)} ${token.label}`
                               : "Enter ticket price"}
                           </span>
                         ) : null}

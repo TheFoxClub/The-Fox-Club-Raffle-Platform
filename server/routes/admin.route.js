@@ -158,6 +158,13 @@ router.get(
   AdminController.getAllVerifiedTokens,
 );
 
+router.get(
+  "/verified-token/inspect/:mint",
+  auth.bearer,
+  isAdmin,
+  AdminController.inspectTokenMint,
+);
+
 // Get single Token by ID
 router.get(
   "/verified-token/:id",
@@ -188,6 +195,13 @@ router.patch(
   auth.bearer,
   isAdmin,
   AdminController.togglePaymentToken,
+);
+
+router.patch(
+  "/verified-token/:id/toggle-featured",
+  auth.bearer,
+  isAdmin,
+  AdminController.toggleTokenFeatured,
 );
 
 // XP Management Routes

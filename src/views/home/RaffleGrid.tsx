@@ -34,7 +34,7 @@ interface RaffleData {
     requiresNftVerification: boolean;
   };
   floorPrice?: { amount: number; collectionName?: string | null } | null;
-  paymentOptions?: { id: number; tokenSymbol: string; ticketPrice: string }[];
+  paymentOptions?: { id: number; tokenAddress: string; tokenType: number; tokenSymbol: string; ticketPrice: string; isFeatured?: boolean }[];
 }
 
 type RaffleRealtimeUpdate = {

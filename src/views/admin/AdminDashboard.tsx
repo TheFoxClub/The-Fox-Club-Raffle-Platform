@@ -17,8 +17,6 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import server from "../../config/server";
 import { toast } from "react-toastify";
-import { getTokenSymbol } from "../../utils/tokenUtils";
-
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +25,8 @@ export default function AdminDashboard() {
     totalTicketsSold: 0,
     totalPlatformRevenue: 0,
     liveRaffleCount: 0,
-    tokenType: "MIXED", // Indicates mixed token types -> show as "Total Volume" instead of specific token
+    totalRafflesCreated: 0,
+    currency: "USD",
   });
 
   const [xpStats, setXpStats] = useState({
@@ -62,7 +61,8 @@ export default function AdminDashboard() {
         totalTicketsSold: statsRes.data.data.totalTicketsSold,
         totalPlatformRevenue: statsRes.data.data.totalPlatformRevenue,
         liveRaffleCount: statsRes.data.data.liveRaffleCount,
-        tokenType: "SOL", //sol only
+        totalRafflesCreated: statsRes.data.data.totalRafflesCreated,
+        currency: statsRes.data.data.currency || "USD",
       });
 
       // Set XP stats if available
@@ -105,14 +105,10 @@ export default function AdminDashboard() {
         </Button>
       </div>
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 sm:gap-6">
         <StatCard
           title="Total Volume"
-          value={
-            stats.tokenType === "MIXED"
-              ? `${stats.totalRevenue.toFixed(4)} (Mixed)`
-              : `${stats.totalRevenue} ${getTokenSymbol(stats.tokenType)}`
-          }
+          value={`${stats.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${stats.currency}`}
           //change={0}
           //trend="up"
           icon={<Wallet className="h-6 w-6" />}
@@ -125,6 +121,11 @@ export default function AdminDashboard() {
           icon={<Ticket className="h-6 w-6" />}
         />
         <StatCard
+          title="Total Raffles Created"
+          value={stats.totalRafflesCreated}
+          icon={<Ticket className="h-6 w-6" />}
+        />
+        <StatCard
           title="Total Tickets Sold"
           value={stats.totalTicketsSold}
           // change={0}
@@ -133,13 +134,7 @@ export default function AdminDashboard() {
         />
         <StatCard
           title="Platform Fees Earned"
-          value={
-            stats.tokenType === "MIXED"
-              ? `${stats.totalPlatformRevenue.toFixed(4)} (Mixed)`
-              : `${stats.totalPlatformRevenue} ${getTokenSymbol(
-                  stats.tokenType
-                )}`
-          }
+          value={`${stats.totalPlatformRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${stats.currency}`}
           // change={0}
           // trend="up"
           icon={<Coins className="h-6 w-6" />}

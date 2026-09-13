@@ -1,8 +1,10 @@
 export const formatPrice = (value: number | string) => {
   if (value === null || value === undefined) return "";
 
-  const str = value.toString();
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "";
 
-  // Remove trailing zeros but keep meaningful decimals
-  return str.replace(/(\.\d*?[1-9])0+$/g, "$1").replace(/\.0+$/, "");
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 4,
+  }).format(numericValue);
 };

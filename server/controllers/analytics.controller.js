@@ -9,6 +9,42 @@ const {
 } = require("../config/data");
 const PriceService = require("../services/price.service");
 
+const getTicketPayments = async (startDate, endDate) => {
+  const rows = await sequelize.query(
+    `
+      SELECT
+        st.id, st.createdAt, st.senderPubkey, st.type, st.tokenAddress,
+        st.decimals, st.uiAmount, st.commissionAmount,
+        COUNT(rt.id) AS ticketsSold,
+        SUM(CASE WHEN rt.isWinner = 1 THEN 1 ELSE 0 END) AS winnersCount
+      FROM spl_token_send_transactions st
+      LEFT JOIN raffle_tickets rt ON rt.splTokenSendTxId = st.id
+      WHERE st.status = ?
+        AND st.rewardTransferType = 'ticket_purchase'
+        AND st.createdAt BETWEEN ? AND ?
+      GROUP BY st.id
+      ORDER BY st.createdAt ASC
+    `,
+    {
+      replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, startDate, endDate],
+      type: sequelize.QueryTypes.SELECT,
+    },
+  );
+
+  return Promise.all(rows.map(async (payment) => {
+    const decimals = Number(payment.decimals) || 9;
+    const price = await PriceService.getTokenUsdPrice(payment.tokenAddress);
+    const totalAmount = Number(payment.uiAmount || 0) / Math.pow(10, decimals);
+    const commissionAmount = Number(payment.commissionAmount || 0);
+    return {
+      ...payment,
+      totalUsd: totalAmount * price,
+      commissionUsd: commissionAmount * price,
+      creatorUsd: (totalAmount - commissionAmount) * price,
+    };
+  }));
+};
+
 // Total Users
 const getTotalUsers = async () => {
   try {
@@ -174,60 +210,36 @@ const getGrowthRate = async (startDate, endDate) => {
 // Volume Over Time (for graph)
 const getVolumeOverTime = async (startDate, endDate, period = "daily") => {
   try {
-    let dateFormat, groupBy;
-
-    // Set date format based on period
-    switch (period.toLowerCase()) {
-      case "weekly":
-        dateFormat = "%Y-%u"; // Year-Week number
-        groupBy = 'CONCAT(YEAR(st.createdAt), "-W", WEEK(st.createdAt))';
-        break;
-      case "monthly":
-        dateFormat = "%Y-%m"; // Year-Month
-        groupBy = 'DATE_FORMAT(st.createdAt, "%Y-%m")';
-        break;
-      case "daily":
-      default:
-        dateFormat = "%Y-%m-%d"; // Year-Month-Day
-        groupBy = "DATE(st.createdAt)";
-        break;
-    }
-
-    const result = await sequelize.query(
-      `
-      SELECT 
-        ${groupBy} as period,
-        DATE_FORMAT(MIN(st.createdAt), '${dateFormat}') as date,
-        COUNT(DISTINCT st.senderPubkey) as activeUsers,
-        COUNT(st.id) as transactionsCount,
-        SUM(COALESCE(st.commissionAmount, 0) + COALESCE(st.creatorAmount, 0)) as totalVolume,
-        SUM(COALESCE(st.commissionAmount, 0)) as commissionVolume,
-        SUM(COALESCE(st.creatorAmount, 0)) as creatorVolume,
-        COUNT(rt.id) as ticketsSold,
-        SUM(CASE WHEN rt.isWinner = 1 THEN 1 ELSE 0 END) as winnersCount
-      FROM spl_token_send_transactions st
-      LEFT JOIN raffle_tickets rt ON rt.splTokenSendTxId = st.id
-      WHERE st.status = ?
-        AND st.createdAt BETWEEN ? AND ?
-      GROUP BY ${groupBy}
-      ORDER BY MIN(st.createdAt) ASC
-      `,
-      {
-        replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, startDate, endDate],
-        type: sequelize.QueryTypes.SELECT,
-      }
-    );
-
-    return result.map((item) => ({
-      period: item.period,
-      date: item.date,
-      totalVolume: parseFloat(item.totalVolume || 0),
-      commissionVolume: parseFloat(item.commissionVolume || 0),
-      creatorVolume: parseFloat(item.creatorVolume || 0),
-      transactionsCount: parseInt(item.transactionsCount || 0, 10),
-      activeUsers: parseInt(item.activeUsers || 0, 10),
-      ticketsSold: parseInt(item.ticketsSold || 0, 10),
-      winnersCount: parseInt(item.winnersCount || 0, 10),
+    const payments = await getTicketPayments(startDate, endDate);
+    const groups = new Map();
+    payments.forEach((payment) => {
+      const date = new Date(payment.createdAt);
+      const key = period === "monthly"
+        ? date.toISOString().slice(0, 7)
+        : date.toISOString().slice(0, 10);
+      const current = groups.get(key) || {
+        period: key,
+        date: key,
+        totalVolume: 0,
+        commissionVolume: 0,
+        creatorVolume: 0,
+        transactionsCount: 0,
+        activeUsers: new Set(),
+        ticketsSold: 0,
+        winnersCount: 0,
+      };
+      current.totalVolume += payment.totalUsd;
+      current.commissionVolume += payment.commissionUsd;
+      current.creatorVolume += payment.creatorUsd;
+      current.transactionsCount += 1;
+      current.activeUsers.add(payment.senderPubkey);
+      current.ticketsSold += Number(payment.ticketsSold || 0);
+      current.winnersCount += Number(payment.winnersCount || 0);
+      groups.set(key, current);
+    });
+    return [...groups.values()].map(({ activeUsers, ...item }) => ({
+      ...item,
+      activeUsers: activeUsers.size,
     }));
   } catch (error) {
     logger.error("Error getting volume over time:", error);
@@ -238,30 +250,31 @@ const getVolumeOverTime = async (startDate, endDate, period = "daily") => {
 // Volume by Token Type (for pie chart)
 const getVolumeByTokenType = async (startDate, endDate) => {
   try {
-    const result = await sequelize.query(
-      `
-      SELECT 
-        st.type as tokenType,
-        st.tokenAddress,
-        COUNT(st.id) as transactionsCount,
-        SUM(COALESCE(st.commissionAmount, 0) + COALESCE(st.creatorAmount, 0)) as totalVolume,
-        SUM(COALESCE(st.commissionAmount, 0)) as commissionVolume,
-        SUM(COALESCE(st.creatorAmount, 0)) as creatorVolume,
-        COUNT(DISTINCT st.senderPubkey) as uniqueUsers,
-        COUNT(rt.id) as ticketsSold,
-        SUM(CASE WHEN rt.isWinner = 1 THEN 1 ELSE 0 END) as winnersCount
-      FROM spl_token_send_transactions st
-      LEFT JOIN raffle_tickets rt ON rt.splTokenSendTxId = st.id
-      WHERE st.status = ?
-        AND st.createdAt BETWEEN ? AND ?
-      GROUP BY st.type, st.tokenAddress
-      ORDER BY totalVolume DESC
-      `,
-      {
-        replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, startDate, endDate],
-        type: sequelize.QueryTypes.SELECT,
-      }
-    );
+    const payments = await getTicketPayments(startDate, endDate);
+    const groups = new Map();
+    payments.forEach((payment) => {
+      const key = `${payment.type}:${payment.tokenAddress}`;
+      const current = groups.get(key) || {
+        tokenType: payment.type,
+        tokenAddress: payment.tokenAddress,
+        transactionsCount: 0,
+        totalVolume: 0,
+        commissionVolume: 0,
+        creatorVolume: 0,
+        users: new Set(),
+        ticketsSold: 0,
+        winnersCount: 0,
+      };
+      current.transactionsCount += 1;
+      current.totalVolume += payment.totalUsd;
+      current.commissionVolume += payment.commissionUsd;
+      current.creatorVolume += payment.creatorUsd;
+      current.users.add(payment.senderPubkey);
+      current.ticketsSold += Number(payment.ticketsSold || 0);
+      current.winnersCount += Number(payment.winnersCount || 0);
+      groups.set(key, current);
+    });
+    const result = [...groups.values()];
 
     // Calculate total for percentages
     const totalVolume = result.reduce(
@@ -273,17 +286,17 @@ const getVolumeByTokenType = async (startDate, endDate) => {
       tokenType: mapEnumValue(TOKEN_TYPE, item.tokenType),
       tokenTypeRaw: item.tokenType,
       tokenAddress: item.tokenAddress,
-      totalVolume: parseFloat(item.totalVolume || 0),
+      totalVolume: item.totalVolume,
       percentage:
         totalVolume > 0
           ? parseFloat(((item.totalVolume / totalVolume) * 100).toFixed(8))
           : 0,
-      commissionVolume: parseFloat(item.commissionVolume || 0),
-      creatorVolume: parseFloat(item.creatorVolume || 0),
-      transactionsCount: parseInt(item.transactionsCount || 0, 10),
-      uniqueUsers: parseInt(item.uniqueUsers || 0, 10),
-      ticketsSold: parseInt(item.ticketsSold || 0, 10),
-      winnersCount: parseInt(item.winnersCount || 0, 10),
+      commissionVolume: item.commissionVolume,
+      creatorVolume: item.creatorVolume,
+      transactionsCount: item.transactionsCount,
+      uniqueUsers: item.users.size,
+      ticketsSold: item.ticketsSold,
+      winnersCount: item.winnersCount,
     }));
   } catch (error) {
     logger.error("Error getting volume by token type:", error);

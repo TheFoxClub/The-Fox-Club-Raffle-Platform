@@ -2,6 +2,8 @@ const {
   Raffle,
   RaffleDetail,
   RaffleReward,
+  RaffleTicket,
+  SplTokenSendTransaction,
   User,
   UserInfo,
   VerifiedCollection,
@@ -17,6 +19,7 @@ const { parseSequelizeErrors } = require("../util/error");
 const { Op, where } = require("sequelize");
 const {
   TOKEN_TYPE,
+  SPL_TOKEN_SEND_TX_STATUS,
   RAFFLE_STATUS,
   RAFFLE_FEATURED_STATUS,
   RAFFLE_FEATURED_POSITION,
@@ -28,10 +31,15 @@ const {
   getTopBuyers,
 } = require("../services/leaderboard.service");
 const redisClient = require("../util/redisClient");
+const { LEADERBOARD_EXCLUDED_WALLETS } = require("../config/constants");
 const { getFeeData } = require("../helpers/cache/system-fee");
 const XpService = require("../services/xp.service");
 const { publicKey } = require("@metaplex-foundation/umi");
+const {
+  fetchMetadataFromSeeds,
+} = require("@metaplex-foundation/mpl-token-metadata");
 const { getUmi } = require("../config/solana");
+const { getTokenDetail } = require("../helpers/solana/token-program");
 const PriceService = require("../services/price.service");
 const {
   sendRaffleEndingSoonNotification,
@@ -758,108 +766,81 @@ class AdminController {
 
   static async getDashboardStats(req, res) {
     try {
-      // Fetch all raffles that are not DRAFT
-      const raffles = await sequelize.query(
-        `
-      SELECT
-        r.id,
-        r.tokenType,
-        r.tokenAddress,
-        COALESCE(r.totalRevenue, 0) AS totalRevenue,
-        COALESCE(r.ticketsSold, 0) AS totalTicketsSold,
-        COALESCE(r.platformRevenue, 0) AS totalPlatformRevenue
-      FROM raffles r
-      WHERE r.status != ?
-      `,
-        {
-          replacements: [0], // Exclude DRAFT raffles
-          type: sequelize.QueryTypes.SELECT,
-        }
-      );
-
-      const liveRaffleCount = await Raffle.count({
-        where: { status: RAFFLE_STATUS.LIVE },
+      const [liveRaffleCount, totalRafflesCreated] = await Promise.all([
+        Raffle.count({
+          where: { status: RAFFLE_STATUS.LIVE },
+        }),
+        Raffle.count(),
+      ]);
+      const ticketPayments = await SplTokenSendTransaction.findAll({
+        where: {
+          rewardTransferType: "ticket_purchase",
+          status: SPL_TOKEN_SEND_TX_STATUS.SUCCESS,
+        },
+        attributes: [
+          "id",
+          "type",
+          "tokenAddress",
+          "decimals",
+          "uiAmount",
+          "commissionAmount",
+          "additionalJson",
+        ],
+        raw: true,
       });
-
-      // Get unique token addresses
-      const uniqueTokens = [
-        ...new Set(raffles.map((r) => r.tokenAddress).filter(Boolean)),
-      ];
-
-      // Fetch USD price for each token
-      const tokenUsdPrices = {};
-      for (const token of uniqueTokens) {
-        tokenUsdPrices[token] = await PriceService.getTokenUsdPrice(token);
-      }
-
-      // Get current SOL price in USD
-      const solPrice = await PriceService.getTokenUsdPrice(
-        SPL_TOKEN_ADDRESS.SOLANA
+      const successfulTicketTransactionIds = ticketPayments.map((payment) =>
+        String(payment.id),
       );
+      const totalTicketsSold = successfulTicketTransactionIds.length
+        ? await RaffleTicket.count({
+          where: {
+            splTokenSendTxId: { [Op.in]: successfulTicketTransactionIds },
+          },
+        })
+        : 0;
 
-      // Compute totals in SOL
-      let totalRevenueSol = 0;
-      let totalPlatformRevenueSol = 0;
-      let totalTicketsSold = 0;
-
-      // Also prepare statsByToken
+      let totalRevenueUsd = 0;
+      let totalPlatformRevenueUsd = 0;
       const statsByToken = {};
 
-      raffles.forEach((r) => {
-        const usdPrice = tokenUsdPrices[r.tokenAddress] || 0;
+      for (const payment of ticketPayments) {
+        const decimals = Number(payment.decimals) || 9;
+        const tokenPrice = await PriceService.getTokenUsdPrice(payment.tokenAddress);
+        const totalAmount = Number(payment.uiAmount || 0) / Math.pow(10, decimals);
+        const commissionAmount = Number(payment.commissionAmount || 0);
+        const totalUsd = totalAmount * tokenPrice;
+        const commissionUsd = commissionAmount * tokenPrice;
+        const key = `${payment.type}:${payment.tokenAddress}`;
 
-        const revenueUsd = Number(r.totalRevenue || 0) * usdPrice;
-        const platformRevenueUsd =
-          Number(r.totalPlatformRevenue || 0) * usdPrice;
+        totalRevenueUsd += totalUsd;
+        totalPlatformRevenueUsd += commissionUsd;
 
-        const revenueSol = solPrice ? revenueUsd / solPrice : 0;
-        const platformRevenueSol = solPrice ? platformRevenueUsd / solPrice : 0;
-
-        // Add to global totals
-        totalRevenueSol += revenueSol;
-        totalPlatformRevenueSol += platformRevenueSol;
-        totalTicketsSold += Number(r.totalTicketsSold || 0);
-
-        // Add per-token stats
-        if (!statsByToken[r.tokenType]) {
-          statsByToken[r.tokenType] = {
-            tokenType: mapEnumValue(TOKEN_TYPE, r.tokenType),
-            tokenTypeRaw: r.tokenType,
+        if (!statsByToken[key]) {
+          statsByToken[key] = {
+            tokenType: mapEnumValue(TOKEN_TYPE, payment.type),
+            tokenTypeRaw: payment.type,
+            tokenAddress: payment.tokenAddress,
             totalRevenue: 0,
             totalTicketsSold: 0,
             totalPlatformRevenue: 0,
           };
         }
 
-        statsByToken[r.tokenType].totalRevenue += revenueSol;
-        statsByToken[r.tokenType].totalPlatformRevenue += platformRevenueSol;
-        statsByToken[r.tokenType].totalTicketsSold += Number(
-          r.totalTicketsSold || 0
-        );
-      });
+        statsByToken[key].totalRevenue += totalUsd;
+        statsByToken[key].totalPlatformRevenue += commissionUsd;
+        statsByToken[key].totalTicketsSold += Number(payment.additionalJson?.ticketCount || 1);
+      }
 
-      // Convert statsByToken object to array
       const statsByTokenArray = Object.values(statsByToken);
 
-      // SOL-only stats (tokenType = 0)
-      const solStats = statsByTokenArray.find((s) => s.tokenTypeRaw === 0) || {
-        tokenType: mapEnumValue(TOKEN_TYPE, 0),
-        tokenTypeRaw: 0,
-        totalRevenue: 0,
-        totalTicketsSold: 0,
-        totalPlatformRevenue: 0,
-      };
-
       const response = {
-        // Totals in SOL
-        totalRevenue: totalRevenueSol,
+        totalRevenue: totalRevenueUsd,
         totalTicketsSold,
-        totalPlatformRevenue: totalPlatformRevenueSol,
+        totalPlatformRevenue: totalPlatformRevenueUsd,
         liveRaffleCount,
-        // breakdown by token
+        totalRafflesCreated,
+        currency: "USD",
         statsByToken: statsByTokenArray,
-        // SOL-only stats for primary display
-        primaryTokenStats: solStats,
       };
 
       return respond(res, httpStatus.OK, "Dashboard stats fetched!", response);
@@ -1118,6 +1099,42 @@ class AdminController {
     }
   }
 
+  static async inspectTokenMint(req, res) {
+    try {
+      const { mint } = req.params;
+      const tokenDetail = await getTokenDetail(mint);
+
+      if (!tokenDetail) {
+        return respond(res, httpStatus.NOT_FOUND, "Token mint was not found");
+      }
+
+      let metadata = null;
+      try {
+        metadata = await fetchMetadataFromSeeds(getUmi(), {
+          mint: publicKey(mint),
+        });
+      } catch (error) {
+        logger.debug(`Token metadata was not found for ${mint}: ${error.message}`);
+      }
+
+      return respond(res, httpStatus.OK, "Token mint retrieved successfully", {
+        token: {
+          mint,
+          name: metadata?.name?.trim() || null,
+          symbol: metadata?.symbol?.trim() || null,
+          decimals: Number(tokenDetail.decimals || 0),
+          programId: tokenDetail.tokenProgramId.toString(),
+        },
+      });
+    } catch (error) {
+      const statusCode = error.message?.includes("Invalid public key")
+        ? httpStatus.BAD_REQUEST
+        : httpStatus.INTERNAL_SERVER_ERROR;
+      logger.error(`Failed to inspect token mint: ${error.message}`);
+      return respond(res, statusCode, "Failed to retrieve token mint details");
+    }
+  }
+
   static async deleteVerifiedToken(req, res) {
     try {
       const { id } = req.params;
@@ -1239,6 +1256,10 @@ class AdminController {
       await token.update({
         isPaymentToken: !token.isPaymentToken,
       });
+      if (!token.isPaymentToken && token.isFeatured) {
+        await token.update({ isFeatured: false });
+      }
+      await redisClient.del("verified:payment:tokens");
 
       return respond(
         res,
@@ -1255,6 +1276,34 @@ class AdminController {
         httpStatus.INTERNAL_SERVER_ERROR,
         parseSequelizeErrors(error)
       );
+    }
+  }
+
+  static async toggleTokenFeatured(req, res) {
+    try {
+      const { id } = req.params;
+      const token = await VerifiedToken.findByPk(id);
+
+      if (!token) {
+        return respond(res, httpStatus.NOT_FOUND, "Token not found");
+      }
+
+      if (!token.isVerified || !token.isPaymentToken) {
+        return respond(res, httpStatus.BAD_REQUEST, "Token must be verified and enabled for payments first");
+      }
+
+      await token.update({ isFeatured: !token.isFeatured });
+      await redisClient.del("verified:payment:tokens");
+
+      return respond(
+        res,
+        httpStatus.OK,
+        `Token ${token.isFeatured ? "featured" : "unfeatured"} successfully`,
+        { token },
+      );
+    } catch (error) {
+      logger.error(error);
+      return respond(res, httpStatus.INTERNAL_SERVER_ERROR, parseSequelizeErrors(error));
     }
   }
 
@@ -1358,6 +1407,7 @@ class AdminController {
         attributes: ["id", "pubkey", "totalXp", "xpLastUpdated"],
         where: {
           totalXp: { [Op.gt]: 0 },
+          pubkey: { [Op.notIn]: LEADERBOARD_EXCLUDED_WALLETS },
         },
         order: [["totalXp", "DESC"]],
         limit: parseInt(limit),

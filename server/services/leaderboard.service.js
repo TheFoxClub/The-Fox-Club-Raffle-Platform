@@ -9,31 +9,30 @@ const logger = require("../util/logger");
 const PriceService = require("./price.service");
 const { getTokenUsdPrice } = require("./price.service");
 const { getXpRates } = require("./xp.service");
+const { LEADERBOARD_EXCLUDED_WALLETS } = require("../config/constants");
 
 const getTopHosts = async (limit = 10, xpConfig) => {
   try {
-    // Get host raffle revenue records from non-draft raffles.
-    // Sort and limit are applied after USD normalization.
-
-    const results2 = await sequelize.query(
+    // Use each ticket transaction's payment token so multi-token raffles are
+    // valued correctly instead of treating every payment as the primary token.
+    const ticketPayments = await sequelize.query(
       `
-  SELECT
-    u.pubkey AS walletAddress,
-    JSON_ARRAYAGG(
-      JSON_OBJECT(
-        'raffleId', r.id,
-        'revenue', (COALESCE(r.claimableAmount,0) + COALESCE(r.totalCommission,0)),
-        'tokenAddress', r.tokenAddress,
-        'tokenType', r.tokenType
-      )
-    ) AS raffles
-  FROM users u
-  INNER JOIN raffles r
-    ON u.id = r.userId
-  WHERE r.status != 0
-  GROUP BY u.id, u.pubkey
-  `,
+        SELECT
+          host.pubkey AS walletAddress,
+          st.raffleId,
+          st.tokenAddress,
+          st.decimals,
+          st.uiAmount
+        FROM spl_token_send_transactions st
+        INNER JOIN raffles r ON r.id = st.raffleId
+        INNER JOIN users host ON host.id = r.userId
+        WHERE st.status = ?
+          AND st.rewardTransferType = 'ticket_purchase'
+          AND r.status != 0
+          AND host.pubkey NOT IN (?)
+      `,
       {
+        replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, LEADERBOARD_EXCLUDED_WALLETS],
         type: sequelize.QueryTypes.SELECT,
       }
     );
@@ -43,50 +42,39 @@ const getTopHosts = async (limit = 10, xpConfig) => {
       SPL_TOKEN_ADDRESS.SOLANA
     );
 
-    // normalize
-    const normalized = [];
+    const hostsByWallet = new Map();
 
-    for (const row of results2) {
-      const raffles =
-        typeof row.raffles === "string" ? JSON.parse(row.raffles) : row.raffles;
+    for (const payment of ticketPayments) {
+      const tokenAddress = payment.tokenAddress || SPL_TOKEN_ADDRESS.SOLANA;
+      const decimals = Number(payment.decimals ?? 9);
+      const revenue = Number(payment.uiAmount || 0) / Math.pow(10, decimals);
+      const price = await PriceService.getTokenUsdPrice(tokenAddress);
+      const revenueUsd = revenue * price;
 
-      let totalRevenueUsd = 0;
-
-      const normalizedRaffles = [];
-
-      for (const raffle of raffles) {
-        let tokenAddress = raffle.tokenAddress;
-
-        // Fallback token address when older raffle rows do not persist tokenAddress.
-        if (!tokenAddress) {
-          if (raffle.tokenType === TOKEN_TYPE.SOLANA) {
-            tokenAddress = SPL_TOKEN_ADDRESS.SOLANA;
-          } else if (raffle.tokenType === TOKEN_TYPE.USDC) {
-            tokenAddress = SPL_TOKEN_ADDRESS.USDC;
-          }
-        }
-
-        const price = await PriceService.getTokenUsdPrice(tokenAddress);
-
-        const revenueUsd = parseFloat(raffle.revenue || 0) * price;
-
-        totalRevenueUsd += revenueUsd;
-
-        normalizedRaffles.push({
-          raffleId: raffle.raffleId,
-          tokenAddress,
-          revenue: parseFloat(raffle.revenue || 0),
-          revenueUsd,
+      if (!hostsByWallet.has(payment.walletAddress)) {
+        hostsByWallet.set(payment.walletAddress, {
+          walletAddress: payment.walletAddress,
+          totalRevenueUsd: 0,
+          raffleIds: new Set(),
+          raffles: [],
         });
       }
 
-      normalized.push({
-        walletAddress: row.walletAddress,
-        totalRevenueUsd,
-        raffles: normalizedRaffles,
-        raffleCount: raffles.length || 0,
+      const host = hostsByWallet.get(payment.walletAddress);
+      host.totalRevenueUsd += revenueUsd;
+      host.raffleIds.add(payment.raffleId);
+      host.raffles.push({
+        raffleId: payment.raffleId,
+        tokenAddress,
+        revenue,
+        revenueUsd,
       });
     }
+
+    const normalized = [...hostsByWallet.values()].map((host) => ({
+      ...host,
+      raffleCount: host.raffleIds.size,
+    }));
 
     normalized.sort((a, b) => b.totalRevenueUsd - a.totalRevenueUsd);
 
@@ -130,13 +118,14 @@ const getTopBuyers = async (limit = 10, xpConfig) => {
         ON xp.splTokenSendTransactionId = st.id
       WHERE st.status = ?
         AND st.rewardTransferType = 'ticket_purchase'
+        AND st.senderPubkey NOT IN (?)
       GROUP BY st.senderPubkey
       HAVING totalSpent > 0
       ORDER BY totalXpEarned DESC
       LIMIT ?
       `,
       {
-        replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, parseInt(limit, 10)],
+        replacements: [SPL_TOKEN_SEND_TX_STATUS.SUCCESS, LEADERBOARD_EXCLUDED_WALLETS, parseInt(limit, 10)],
         type: sequelize.QueryTypes.SELECT,
       }
     );

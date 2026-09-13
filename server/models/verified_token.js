@@ -22,6 +22,7 @@ module.exports = (sequelize, DataTypes) => {
       conversionRate: DataTypes.DECIMAL(20, 9),
       isVerified: DataTypes.BOOLEAN,
       isPaymentToken: DataTypes.BOOLEAN,
+      isFeatured: DataTypes.BOOLEAN,
     },
     {
       sequelize,

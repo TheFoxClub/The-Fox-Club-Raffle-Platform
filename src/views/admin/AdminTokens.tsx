@@ -11,9 +11,6 @@ import {
   DialogTrigger,
 } from "../../components/ui/Dialog";
 import server from "../../config/server";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../redux/store";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { toast } from "react-toastify";
 
 const solanaToken = {
@@ -56,6 +53,9 @@ function TokenTableSkeleton() {
             <div className="h-5 w-10 rounded bg-muted animate-pulse" />
           </td>
           <td className="p-4">
+            <div className="h-5 w-10 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="p-4">
             <div className="h-5 w-5 rounded bg-muted animate-pulse" />
           </td>
         </tr>
@@ -65,17 +65,8 @@ function TokenTableSkeleton() {
 }
 
 export default function AdminTokens() {
-  const user = useSelector((state: RootState) => state.user);
   const [open, setOpen] = useState(false);
-  const [tokenCandidates, setTokenCandidates] = useState<
-    {
-      mint: string;
-      name: string;
-      symbol: string;
-      decimals: number;
-      programId: string;
-    }[]
-  >([]);
+  const [tokenMint, setTokenMint] = useState("");
   const [verifiedTokens, setVerifiedTokens] = useState<
     {
       id: number;
@@ -87,6 +78,7 @@ export default function AdminTokens() {
       programId: string;
       isVerified: boolean;
       isPaymentToken: boolean;
+      isFeatured: boolean;
     }[]
   >([]);
   const [loading, setLoading] = useState(false);
@@ -99,56 +91,6 @@ export default function AdminTokens() {
     decimals: number;
     programId: string;
   } | null>(null);
-  // const [solanaVerified, setSolanaVerified] = useState(solanaToken.active);
-
-  useEffect(() => {
-    if (!open || !user.isAuthenticated) return;
-
-    const fetchTokens = async () => {
-      try {
-        setLoading(true);
-        const res = await server.get(`/tokens/${user.pubkey}`);
-        const spl = res.data?.message?.splTokens || [];
-        const SOLANA_MINT = "So11111111111111111111111111111111111111112";
-
-        const mapped = spl
-          .filter((t: any) => {
-            const info = t.account?.data?.parsed?.info;
-            const mint = info?.mint;
-            // Filter out Solana token to prevent duplication
-            return mint && mint !== SOLANA_MINT;
-          })
-          .map((t: any, idx: number) => {
-            const info = t.account?.data?.parsed?.info;
-            const decimals = info?.tokenAmount?.decimals ?? 0;
-            const mint = info?.mint || `unknown-${idx}`;
-            const programId =
-              t.account?.owner || t.programId || TOKEN_PROGRAM_ID;
-
-            // Try to get symbol from metadata, fallback to name or mint
-            let symbol =
-              t.metadata?.symbol ||
-              t.metadata?.name ||
-              `Token ${mint.slice(0, 6)}...`;
-            let name = t.metadata?.name || symbol;
-
-            // Truncate symbol to 10 characters maximum (database limit)
-            if (symbol.length > 10) {
-              symbol = symbol.substring(0, 10);
-            }
-
-            return { mint, name, symbol, decimals, programId };
-          });
-        setTokenCandidates(mapped);
-      } catch (err) {
-        console.error(err);
-        setTokenCandidates([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTokens();
-  }, [open, user.isAuthenticated, user.pubkey]);
 
   // Fetch verified tokens from API (excluding SOL which is built-in)
   const fetchVerifiedTokens = async () => {
@@ -182,6 +124,33 @@ export default function AdminTokens() {
     programId: string;
   }) => {
     setSelectedToken(token);
+  };
+
+  const handleInspectTokenMint = async () => {
+    const mint = tokenMint.trim();
+    if (!mint) {
+      toast.error("Enter a token mint address");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await server.get(`/admin/verified-token/inspect/${mint}`);
+      const token = response.data?.data?.token;
+      if (!response.data?.success || !token) {
+        throw new Error(response.data?.message || "Token mint was not found");
+      }
+      handleSelectToken({
+        ...token,
+        name: token.name || token.symbol || `Token ${mint.slice(0, 6)}...`,
+        symbol: token.symbol || token.name || "",
+      });
+    } catch (error: any) {
+      setSelectedToken(null);
+      toast.error(error.response?.data?.message || error.message || "Failed to retrieve token details");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddVerifiedToken = async () => {
@@ -219,34 +188,22 @@ export default function AdminTokens() {
 
       setOpen(false);
       setSelectedToken(null);
+      setTokenMint("");
       toast.success("Token added successfully!");
-
-      // Refresh verified tokens list
       await fetchVerifiedTokens();
     } catch (err: any) {
       console.error("Failed to create verified token", err);
-      const errorMessage = err.response?.data?.message || "Failed to add token";
-      toast.error(errorMessage);
+      toast.error(err.response?.data?.message || "Failed to add token");
     }
   };
 
   const handleToggleVerify = async (tokenId: number) => {
     try {
-      const res = await server.patch(
-        `/admin/verified-token/${tokenId}/toggle-verify`,
-      );
+      const res = await server.patch(`/admin/verified-token/${tokenId}/toggle-verify`);
       const updatedToken = res.data?.data?.token;
-
       if (updatedToken) {
-        // Update the local state to reflect the change
-        setVerifiedTokens((prev) =>
-          prev.map((t) => (t.id === updatedToken.id ? updatedToken : t)),
-        );
-        if (updatedToken.isVerified) {
-          toast.success("Token verified successfully!");
-        } else {
-          toast.success("Token unverified successfully!");
-        }
+        setVerifiedTokens((prev) => prev.map((token) => token.id === updatedToken.id ? updatedToken : token));
+        toast.success(updatedToken.isVerified ? "Token verified successfully!" : "Token unverified successfully!");
       }
     } catch (err) {
       console.error("Failed to toggle token verification", err);
@@ -255,20 +212,11 @@ export default function AdminTokens() {
 
   const handleTogglePaymentToken = async (tokenId: number) => {
     try {
-      const res = await server.patch(
-        `/admin/verified-token/${tokenId}/toggle-payment`,
-      );
+      const res = await server.patch(`/admin/verified-token/${tokenId}/toggle-payment`);
       const updatedToken = res.data?.data?.token;
-
       if (updatedToken) {
-        setVerifiedTokens((prev) =>
-          prev.map((t) => (t.id === updatedToken.id ? updatedToken : t)),
-        );
-        if (updatedToken.isPaymentToken) {
-          toast.success("Token enabled for payments!");
-        } else {
-          toast.success("Token disabled for payments!");
-        }
+        setVerifiedTokens((prev) => prev.map((token) => token.id === updatedToken.id ? updatedToken : token));
+        toast.success(updatedToken.isPaymentToken ? "Token enabled for payments!" : "Token disabled for payments!");
       }
     } catch (err) {
       console.error("Failed to toggle payment token status", err);
@@ -276,14 +224,25 @@ export default function AdminTokens() {
     }
   };
 
+  const handleToggleFeaturedToken = async (tokenId: number) => {
+    try {
+      const res = await server.patch(`/admin/verified-token/${tokenId}/toggle-featured`);
+      const updatedToken = res.data?.data?.token;
+      if (updatedToken) {
+        setVerifiedTokens((prev) => prev.map((token) => token.id === updatedToken.id ? updatedToken : token));
+        toast.success(updatedToken.isFeatured ? "Token featured successfully!" : "Token removed from featured tokens!");
+      }
+    } catch (err) {
+      console.error("Failed to toggle featured token status", err);
+      toast.error("Failed to update featured token status");
+    }
+  };
+
   const handleDeleteVerifiedToken = async (tokenId: number) => {
     try {
       const res = await server.delete(`/admin/verified-token/${tokenId}`);
       if (res.data?.success) {
-        // Remove the token from state
-        setVerifiedTokens((prev) => prev.filter((t) => t.id !== tokenId));
-
-        // Show success toast
+        setVerifiedTokens((prev) => prev.filter((token) => token.id !== tokenId));
         toast.success(res.data.message || "Token deleted successfully!");
       } else {
         toast.error(res.data?.message || "Failed to delete token");
@@ -364,70 +323,49 @@ export default function AdminTokens() {
 
             <DialogContent className="max-w-2xl mx-2 max-h-[70vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Select Token from Your Wallet</DialogTitle>
+                <DialogTitle>Add Token by Mint</DialogTitle>
               </DialogHeader>
 
-              {loading ? (
-                <p className="text-center py-6 text-muted-foreground">
-                  Loading tokens...
-                </p>
-              ) : tokenCandidates.length === 0 ? (
-                <p className="text-center py-6 text-muted-foreground">
-                  No tokens found in your wallet.
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {tokenCandidates.map((token) => {
-                    const isSelected = selectedToken?.mint === token.mint;
+              <div className="space-y-4">
+                <label className="block text-sm font-medium">
+                  Token mint
+                  <input
+                    type="text"
+                    value={tokenMint}
+                    onChange={(event) => setTokenMint(event.target.value.trim())}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void handleInspectTokenMint();
+                      }
+                    }}
+                    placeholder="Enter the Solana token mint address"
+                    className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  />
+                </label>
+                <Button type="button" className="w-full" onClick={() => void handleInspectTokenMint()} disabled={loading || !tokenMint}>
+                  {loading ? "Fetching token..." : "Fetch Token Details"}
+                </Button>
 
-                    return (
-                      <button
-                        key={token.mint}
-                        type="button"
-                        onClick={() => handleSelectToken(token)}
-                        disabled={isSelected}
-                        className={`group relative overflow-hidden rounded-lg border-2 transition-all flex items-center w-full h-16 px-3 py-2 ${
-                          isSelected
-                            ? "border-green-500 opacity-50 cursor-not-allowed"
-                            : "border-border hover:border-primary hover:scale-105"
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">
-                            {token.name}
-                            {token.symbol && token.symbol !== token.name && (
-                              <span className="text-muted-foreground ml-1">
-                                ({token.symbol})
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            Mint: {token.mint}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            Program:{" "}
-                            {token.programId ===
-                            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-                              ? "Token 2022"
-                              : "SPL Token"}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                            Selected
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                {selectedToken && (
+                  <div className="rounded-md border border-border p-3 text-sm">
+                    <p className="font-semibold">
+                      {selectedToken.name}
+                      {selectedToken.symbol && selectedToken.symbol !== selectedToken.name && ` (${selectedToken.symbol})`}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-muted-foreground">Mint: {selectedToken.mint}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedToken.decimals} decimals, {selectedToken.programId === "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" ? "Token 2022" : "SPL Token"}
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* <div className="flex justify-end mt-4"> */}
               <div className="sticky bottom-0 pb-2 flex justify-end">
                 <Button
                   className="gradient-primary shadow-lg shadow-black/80"
-                  // disabled={!selectedToken}
+                  disabled={!selectedToken || loading}
                   onClick={handleAddVerifiedToken}
                 >
                   Add
@@ -450,6 +388,7 @@ export default function AdminTokens() {
                 <th className="p-4 font-medium">Decimals</th>
                 <th className="p-4 font-medium">Verified</th>
                 <th className="p-4 font-medium">Payment Token</th>
+                <th className="p-4 font-medium">Featured</th>
                 <th className="p-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -497,6 +436,9 @@ export default function AdminTokens() {
                         disabled={true}
                         title="SOL is always available for payments"
                       />
+                    </td>
+                    <td className="p-4">
+                      <Switch checked={false} disabled={true} title="SOL is always prioritized" />
                     </td>
                     <td className="p-4 text-muted-foreground">
                       <span className="text-sm">Built-in</span>
@@ -568,6 +510,14 @@ export default function AdminTokens() {
                                 ? "Click to disable for payments"
                                 : "Click to enable for payments"
                           }
+                        />
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        <Switch
+                          checked={token.isFeatured}
+                          onCheckedChange={() => handleToggleFeaturedToken(token.id)}
+                          disabled={!token.isVerified || !token.isPaymentToken}
+                          title={!token.isVerified || !token.isPaymentToken ? "Token must be verified and enabled for payments first" : token.isFeatured ? "Click to remove from featured tokens" : "Click to feature this token"}
                         />
                       </td>
                       <td className="p-4 whitespace-nowrap">

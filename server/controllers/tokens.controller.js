@@ -605,9 +605,10 @@ class TokenController {
           "tokenType",
           "programId",
           "conversionRate",
+          "isFeatured",
         ],
         order: [
-          ["tokenType", "ASC"],
+          ["isFeatured", "DESC"],
           ["name", "ASC"],
         ],
         raw: true,
@@ -624,6 +625,7 @@ class TokenController {
           tokenType: TOKEN_TYPE.SOLANA, // 0
           programId: null,
           conversionRate: "1.000000000",
+          isFeatured: false,
           isBuiltIn: true,
         },
         ...verifiedTokens,

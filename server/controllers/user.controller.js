@@ -9,6 +9,7 @@ const { status: httpStatus } = require("http-status");
 const logger = require("../util/logger");
 const respond = require("../util/respond");
 const { parseSequelizeErrors } = require("../util/error");
+const { LEADERBOARD_EXCLUDED_WALLETS } = require("../config/constants");
 const {
   mapEnumValue,
   TOKEN_TYPE,
@@ -347,6 +348,7 @@ class UserController {
       const totalUsers = await User.count({
         where: {
           totalXp: { [Op.gt]: 0 },
+          pubkey: { [Op.notIn]: LEADERBOARD_EXCLUDED_WALLETS },
         },
       });
 
@@ -355,6 +357,7 @@ class UserController {
         attributes: ["id", "pubkey", "totalXp"],
         where: {
           totalXp: { [Op.gt]: 0 },
+          pubkey: { [Op.notIn]: LEADERBOARD_EXCLUDED_WALLETS },
         },
         order: [["totalXp", "DESC"]],
         limit: 11,
@@ -408,6 +411,7 @@ class UserController {
         attributes: ["id", "pubkey", "totalXp"],
         where: {
           totalXp: { [Op.gt]: 0 },
+          pubkey: { [Op.notIn]: LEADERBOARD_EXCLUDED_WALLETS },
         },
         order: [["totalXp", "DESC"]],
         limit: parseInt(limit),

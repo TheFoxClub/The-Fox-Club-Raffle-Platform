@@ -27,6 +27,7 @@ interface Raffle {
   tokenType: string;
   tokenAddress?: string;
   isVerified: boolean;
+  paymentOptions?: { tokenSymbol: string; ticketPrice: string }[];
 }
 
 function RaffleCard({
@@ -92,8 +93,8 @@ function RaffleCard({
                 Ticket Price
               </span>
               <p className="font-semibold">
-                {formatPrice(raffle.price)}{" "}
-                {loading ? "..." : enhancedTokenSymbol || raffle.tokenType}
+                {formatPrice(raffle.paymentOptions?.[0]?.ticketPrice ?? raffle.price)}{" "}
+                {raffle.paymentOptions?.[0]?.tokenSymbol || (loading ? "..." : enhancedTokenSymbol || raffle.tokenType)}
               </p>
             </div>
           </div>
@@ -161,6 +162,7 @@ export default function RaffleCarousel() {
             tokenType: r.tokenType === "SOLANA" ? "SOL" : r.tokenType,
             tokenAddress: r.tokenAddress,
             isVerified: r.raffle_detail?.requiresNftVerification ?? false,
+            paymentOptions: r.paymentOptions,
           }));
           setRaffles(mapped);
         } else {
@@ -193,6 +195,7 @@ export default function RaffleCarousel() {
                   tokenType: r.tokenType === "SOLANA" ? "SOL" : r.tokenType,
                   tokenAddress: r.tokenAddress,
                   isVerified: r.raffle_detail?.requiresNftVerification ?? false,
+                  paymentOptions: r.paymentOptions,
                 }));
                 setRaffles(mapped);
               }
