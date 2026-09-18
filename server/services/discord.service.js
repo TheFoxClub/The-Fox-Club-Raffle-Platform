@@ -350,6 +350,11 @@ async function sendTicketSaleNotification({ raffle, buyerPubkey, ticketCount, am
     color: EMBED_COLOR,
     fields: [
       { name: "Tickets", value: String(ticketCount), inline: true },
+      {
+        name: "Total tickets sold",
+        value: `${raffle.ticketsSold || 0}/${raffle.totalTickets || 0}`,
+        inline: true,
+      },
       { name: "Paid", value: `${amount} ${tokenSymbol}`, inline: true },
       { name: "Buyer", value: buyer, inline: true },
     ],

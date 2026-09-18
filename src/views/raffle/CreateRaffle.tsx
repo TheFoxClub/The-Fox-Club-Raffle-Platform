@@ -899,6 +899,13 @@ const CreateRaffle = () => {
       toast.error("You must agree to the terms to proceed.");
       return;
     }
+
+    if (!validateForm()) {
+      setDisclaimerOpen(false);
+      toast.error("Please complete the highlighted raffle fields before creating.");
+      return;
+    }
+
     setDisclaimerOpen(false);
     submitRaffle("UPCOMING");
   };
@@ -1094,52 +1101,64 @@ const CreateRaffle = () => {
             let signature;
             let latestBlockhash;
             try {
-              latestBlockhash = await connection.getLatestBlockhash(
-                "confirmed"
-              );
+              for (let attempt = 0; attempt < 2; attempt += 1) {
+                latestBlockhash = await connection.getLatestBlockhash("confirmed");
 
-              if (isVersioned) {
-                tx.message.recentBlockhash = latestBlockhash.blockhash;
-              } else {
-                tx.recentBlockhash = latestBlockhash.blockhash;
-              }
+                if (isVersioned) {
+                  tx.message.recentBlockhash = latestBlockhash.blockhash;
+                } else {
+                  tx.recentBlockhash = latestBlockhash.blockhash;
+                }
 
-              const signedTx = await withTimeout(
-                signTransaction(tx),
-                120_000,
-                "Wallet approval timed out. Please try again."
-              );
-
-              const txBytes = Buffer.from(signedTx.serialize());
-              signature = await connection.sendRawTransaction(txBytes, {
-                skipPreflight: false,
-                maxRetries: 5,
-                preflightCommitment: "confirmed",
-              });
-
-              toast.info("Transaction sent! Waiting for confirmation...");
-
-              const confirmation = await connection.confirmTransaction(
-                {
-                  signature,
-                  blockhash: latestBlockhash.blockhash,
-                  lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-                },
-                "confirmed"
-              );
-
-              if (confirmation.value.err) {
-                throw new Error(
-                  `Transaction failed: ${JSON.stringify(
-                    confirmation.value.err
-                  )}`
+                const signedTx = await withTimeout(
+                  signTransaction(tx),
+                  120_000,
+                  "Wallet approval timed out. Please try again."
                 );
+
+                const txBytes = Buffer.from(signedTx.serialize());
+                signature = await connection.sendRawTransaction(txBytes, {
+                  skipPreflight: false,
+                  maxRetries: 5,
+                  preflightCommitment: "confirmed",
+                });
+
+                toast.info("Transaction sent! Waiting for confirmation...");
+
+                try {
+                  const confirmation = await connection.confirmTransaction(
+                    {
+                      signature,
+                      blockhash: latestBlockhash.blockhash,
+                      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+                    },
+                    "confirmed"
+                  );
+
+                  if (confirmation.value.err) {
+                    throw new Error(
+                      `Transaction failed: ${JSON.stringify(confirmation.value.err)}`
+                    );
+                  }
+                  break;
+                } catch (confirmationError) {
+                  if (!isBlockheightExceededError(confirmationError) || attempt === 1) {
+                    throw confirmationError;
+                  }
+
+                  const status = await connection.getSignatureStatuses([signature]);
+                  const wasConfirmed = status.value[0] && !status.value[0].err &&
+                    ["confirmed", "finalized"].includes(status.value[0].confirmationStatus || "");
+                  if (wasConfirmed) break;
+
+                  toast.info("Transaction expired before confirmation. Requesting a fresh signature...");
+                }
               }
             } catch (submitError: any) {
               console.error("Transaction submission failed:", submitError);
 
               if (isBlockheightExceededError(submitError)) {
-                toast.error("Blockheight Exceeded. Please try again.");
+                toast.error("Transaction expired before confirmation. Please try again.");
                 return;
               }
               if (submitError.getLogs) {
