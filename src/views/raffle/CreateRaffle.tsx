@@ -273,6 +273,8 @@ const CreateRaffle = () => {
 
   const updateTokenTicketPrice = (sourceToken: PaymentTokenOption, value: string) => {
     if (!autofillPrices) {
+      setReferenceTokenAddress(sourceToken.value);
+      setTicketPrice(value);
       setPaymentConfigurations((current) => ({
         ...current,
         [sourceToken.value]: {
