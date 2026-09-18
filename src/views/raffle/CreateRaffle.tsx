@@ -935,8 +935,16 @@ const CreateRaffle = () => {
       const raffleImageUrl = getRaffleImageFromRewards();
 
       const finalStartDate = startNow ? new Date().toISOString() : startDate;
-      const paymentOptions = tokenOptions
-        .filter((token) => paymentConfigurations[token.value]?.enabled)
+      const selectedPaymentTokens = tokenOptions.filter(
+        (token) => paymentConfigurations[token.value]?.enabled,
+      );
+      const referencePaymentToken = selectedPaymentTokens.find(
+        (token) => token.value === referenceTokenAddress,
+      ) || selectedPaymentTokens[0];
+      const referencePaymentPrice = referencePaymentToken
+        ? parseDecimalInput(paymentConfigurations[referencePaymentToken.value].ticketPrice)
+        : null;
+      const paymentOptions = selectedPaymentTokens
         .map((token) => {
           const configuration = paymentConfigurations[token.value];
           const enteredPrice = parseDecimalInput(configuration.ticketPrice) || 0;
@@ -948,20 +956,21 @@ const CreateRaffle = () => {
             decimals: token.decimals,
             baseSolPrice: normalizeDecimalInput(configuration.ticketPrice),
             discountPercent: normalizeDecimalInput(configuration.discountPercent) || "0",
-            priceMode: token.value === referenceTokenAddress ? "manual" : "auto",
+            priceMode: !autofillPrices || token.value === referencePaymentToken?.value
+              ? "manual"
+              : "auto",
             ticketPrice: (enteredPrice * (1 - discountPercent / 100)).toPrecision(12),
           };
         });
-      const referenceToken = tokenOptions.find((token) => token.value === referenceTokenAddress);
 
       const payload = {
         title: title.trim(),
         description: description.trim(),
         totalTickets,
-        ticketPrice: referencePrice,
-        tokenType: referenceToken?.tokenType || 0,
-        tokenAddress: referenceToken?.value || null,
-        priceSourceTokenAddress: referenceTokenAddress,
+        ticketPrice: referencePaymentPrice,
+        tokenType: referencePaymentToken?.tokenType || 0,
+        tokenAddress: referencePaymentToken?.value || null,
+        priceSourceTokenAddress: referencePaymentToken?.value || "",
         paymentOptions,
         numberOfWinners,
         startDate: finalStartDate,
