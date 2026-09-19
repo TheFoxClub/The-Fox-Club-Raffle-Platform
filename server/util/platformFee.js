@@ -1,6 +1,8 @@
 const { DEFAULT_COMMISSION } = require("../config/constants");
+const { ADMIN_PUBKEYS } = require("../config/credentials");
 
-const shouldWaivePlatformFees = (payload) => payload?.role === "admin";
+const shouldWaivePlatformFees = (payload) =>
+  payload?.role === "admin" || ADMIN_PUBKEYS.includes(payload?.pubkey);
 
 const getTransactionFeeAmount = (
   feeData,

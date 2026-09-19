@@ -293,6 +293,7 @@ const sendMultipleSplTokenTx = async ({
           toAccountAddress: toAccount,
           fromAccountAddress: fromAccount,
           direction: effectiveDirection,
+          waivePlatformFees,
         });
 
         if (nftResult && nftResult.serializedTx) {

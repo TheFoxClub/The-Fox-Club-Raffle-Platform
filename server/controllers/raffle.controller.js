@@ -1295,12 +1295,15 @@ class RaffleController {
       const referencePrice = Number(referenceOption?.ticketPrice || ticketPrice);
       let referenceTokenPrice = 0;
       let undiscountedUsdTicketValue = 0;
+      const hasAutoPricedPaymentOption = requestedPaymentOptions.some(
+        (option) => option.priceMode !== "manual",
+      );
 
       if (Array.isArray(paymentOptions) && paymentOptions.length && (!referenceOption || !Number.isFinite(referencePrice) || referencePrice <= 0)) {
         return respond(res, httpStatus.BAD_REQUEST, "Enter a valid ticket price for one selected payment token");
       }
 
-      if (referenceOption) {
+      if (referenceOption && hasAutoPricedPaymentOption) {
         if (referenceAddress === SPL_TOKEN_ADDRESS.SOLANA) {
           referenceTokenPrice = await PriceService.getSolPrice();
         } else {
@@ -1334,8 +1337,19 @@ class RaffleController {
         }
 
         let token = null;
+        if (!isSol) {
+          token = await VerifiedToken.findOne({
+            where: { address: optionAddress, isVerified: true, isPaymentToken: true },
+          });
+          if (!token) {
+            return respond(res, httpStatus.BAD_REQUEST, "Payment token is not verified for raffle payments");
+          }
+        }
+
         let calculatedTicketPrice = 0;
-        if (isSol) {
+        if (priceMode === "manual") {
+          calculatedTicketPrice = Number(option.ticketPrice);
+        } else if (isSol) {
           const solUsdPrice = await PriceService.getSolPrice();
           if (solUsdPrice <= 0) {
             return respond(res, httpStatus.BAD_REQUEST, "No live USD price is available for SOL");
@@ -1344,13 +1358,6 @@ class RaffleController {
             ? undiscountedUsdTicketValue / solUsdPrice * (1 - discountPercent / 100)
             : baseSolPrice * (1 - discountPercent / 100);
         } else {
-          token = await VerifiedToken.findOne({
-            where: { address: optionAddress, isVerified: true, isPaymentToken: true },
-          });
-          if (!token) {
-            return respond(res, httpStatus.BAD_REQUEST, "Payment token is not verified for raffle payments");
-          }
-
           const liveTokenUsdPrice = await PriceService.getTokenUsdPrice(optionAddress, token.symbol || token.name);
           const tokenUsdPrice = liveTokenUsdPrice || Number(token.conversionRate || 0);
           if (tokenUsdPrice <= 0) {
