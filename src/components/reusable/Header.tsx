@@ -215,17 +215,21 @@ export const Header = () => {
     <nav className="sticky top-0 z-50 w-full overflow-visible bg-background/95 px-4 py-3 backdrop-blur-sm">
       <div className="container mx-auto flex flex-col items-center justify-between gap-4 overflow-visible rounded-lg border border-border/70 bg-card/50 px-5 py-3 shadow-lg shadow-black/20 md:flex-row">
         {/* Logo */}
-        <Link to="/" className="flex shrink-0 items-center gap-3 group whitespace-nowrap">
+        <div className="flex shrink-0 items-center gap-3 whitespace-nowrap">
+          <a href="https://thefox.club" className="group">
           <img
             src={logo}
             alt="The Fox Club"
             className="h-10 w-10 transition-transform group-hover:scale-110"
           />
+          </a>
+          <Link to="/">
           <div>
             <h1 className="text-xl font-bold text-gradient">The Fox Club</h1>
             <p className="text-xs text-muted-foreground">Raffle Platform</p>
           </div>
-        </Link>
+          </Link>
+        </div>
         {/* Desktop Menu */}
         <div className="hidden min-w-0 md:flex items-center gap-2">
           <Link to="/">
